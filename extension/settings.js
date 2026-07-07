@@ -116,7 +116,7 @@ async function openFolder() {
     if (!response.ok) {
       throw new Error(response.error?.message || "Could not open folder.");
     }
-    showResult("Folder opened");
+    showResult(`Folder opened at ${formatTime(response.opened_at)}`);
   } catch (error) {
     showResult(error.message, true);
   } finally {
@@ -178,6 +178,14 @@ function splitTags(value) {
     .split(/[,\s]+/)
     .map((tag) => tag.replace(/^#/, "").trim())
     .filter(Boolean);
+}
+
+function formatTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "just now";
+  }
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function sendNative(message) {

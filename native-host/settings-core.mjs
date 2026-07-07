@@ -16,10 +16,12 @@ export async function openNotesDir(options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
   await fs.mkdir(paths.notesDir, { recursive: true });
   await (options.openFolderImpl || openFolder)(paths.notesDir, options);
+  const openedAt = new Date().toISOString();
 
   return {
     ok: true,
     path: paths.notesDir,
+    opened_at: openedAt,
     config: publicConfig(config)
   };
 }
@@ -38,13 +40,23 @@ function settingsResponse(paths, config) {
 }
 
 export function openFolder(targetPath, options = {}) {
-  const platform = options.platform || process.platform;
+  const { command, args } = getOpenFolderCommand(targetPath, options.platform || process.platform);
+  return runOpenCommand(command, args, options);
+}
+
+export function getOpenFolderCommand(targetPath, platform = process.platform) {
   if (platform === "win32") {
-    return runOpenCommand("cmd.exe", ["/d", "/s", "/c", "start", "", targetPath], options);
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "start", "", "explorer.exe", `/n,${targetPath}`]
+    };
   }
 
-  const command = platform === "darwin" ? "open" : "xdg-open";
-  return runOpenCommand(command, [targetPath], options);
+  if (platform === "darwin") {
+    return { command: "open", args: [targetPath] };
+  }
+
+  return { command: "xdg-open", args: [targetPath] };
 }
 
 function runOpenCommand(command, args, options = {}) {
