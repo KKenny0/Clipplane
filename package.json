@@ -1,6 +1,6 @@
 {
   "name": "clipplane",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Local-first browser clipper that saves web pages and selections into an org-mode inbox.",
