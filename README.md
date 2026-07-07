@@ -160,6 +160,14 @@ Clipplane 的应用设置保存在系统应用配置目录里；剪藏内容仍�
 
 `notion-api` 会通过 Notion 官方 API 创建页面，不走 Notion MCP。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
 
+### Notion 同步效果
+
+启用 Notion sink 后，`Save + sync` 会先保存到本地，再在目标 Notion page 下创建页面。
+
+<p align="center">
+  <img src="assets/screenshots/sync-to-notion.png" alt="Clipplane 同步到 Notion 的结果" width="760">
+</p>
+
 <details>
 <summary>高级配置</summary>
 

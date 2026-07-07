@@ -156,6 +156,14 @@ After at least one sink is ready, `Save + sync` becomes available in the popup. 
 
 `notion-api` creates a Notion page through the official Notion API and does not use Notion MCP. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
 
+### Notion Sync Result
+
+After the Notion sink is enabled, `Save + sync` saves the clip locally first, then creates a page under the target Notion page.
+
+<p align="center">
+  <img src="assets/screenshots/sync-to-notion.png" alt="Clipplane sync result in Notion" width="760">
+</p>
+
 <details>
 <summary>Advanced configuration</summary>
 
