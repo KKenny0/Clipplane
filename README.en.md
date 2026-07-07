@@ -6,9 +6,16 @@ Clipplane is a local-first browser clipper. It captures the current page or sele
 
 ## Product Preview
 
-![Clipplane popup](assets/screenshots/popup.png)
-
-![Clipplane settings](assets/screenshots/settings.png)
+<table>
+  <tr>
+    <th>Clipper popup</th>
+    <th>Settings page</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="assets/screenshots/popup.png" alt="Clipplane popup" width="280"></td>
+    <td valign="top"><img src="assets/screenshots/settings.png" alt="Clipplane settings" width="560"></td>
+  </tr>
+</table>
 
 The product stays intentionally narrow:
 

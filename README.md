@@ -8,9 +8,16 @@ Clipplane 会把浏览器里的页面正文或选中文本交给本机 Native Me
 
 ## 产品预览
 
-![Clipplane popup](assets/screenshots/popup.png)
-
-![Clipplane settings](assets/screenshots/settings.png)
+<table>
+  <tr>
+    <th>剪藏弹窗</th>
+    <th>设置页</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="assets/screenshots/popup.png" alt="Clipplane 剪藏弹窗" width="280"></td>
+    <td valign="top"><img src="assets/screenshots/settings.png" alt="Clipplane 设置页" width="560"></td>
+  </tr>
+</table>
 
 ## 它解决什么
 
