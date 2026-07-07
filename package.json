@@ -1,0 +1,15 @@
+{
+  "name": "clipplane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first browser clipper that saves web pages and selections into an org-mode inbox.",
+  "scripts": {
+    "test": "node --test",
+    "doctor": "node scripts/doctor.mjs",
+    "smoke": "node scripts/smoke-clip.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

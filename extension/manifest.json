@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Clipplane",
+  "version": "0.1.0",
+  "description": "Save the current page or selected text into a local org-mode inbox.",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "nativeMessaging",
+    "scripting",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Clip to Clipplane"
+  }
+}
