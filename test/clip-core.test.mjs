@@ -29,6 +29,7 @@ test("classifyTags returns at most two content tags", () => {
 
 test("clipPayload writes inbox and skips duplicates", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-test-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const payload = {
     inputType: "page",
     sourceUrl: "https://example.com/post#section",
@@ -37,8 +38,8 @@ test("clipPayload writes inbox and skips duplicates", async () => {
     contentMarkdown: "# Agent Notes\n\nAI agent article body."
   };
 
-  const first = await clipPayload(payload, { notesDir });
-  const second = await clipPayload(payload, { notesDir });
+  const first = await clipPayload(payload, { notesDir, configDir });
+  const second = await clipPayload(payload, { notesDir, configDir });
 
   assert.equal(first.ok, true);
   assert.equal(first.duplicate, false);
@@ -58,6 +59,7 @@ test("clipPayload writes inbox and skips duplicates", async () => {
 
 test("clipPayload backfills capture body for legacy duplicates", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-legacy-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const payload = {
     inputType: "selection",
     sourceUrl: "https://example.com/legacy",
@@ -66,7 +68,7 @@ test("clipPayload backfills capture body for legacy duplicates", async () => {
     contentMarkdown: "Legacy body"
   };
 
-  const first = await clipPayload(payload, { notesDir });
+  const first = await clipPayload(payload, { notesDir, configDir });
   const legacy = { ...first.capture };
   delete legacy.content_path;
   await fs.rm(first.capture.content_path);
@@ -76,7 +78,7 @@ test("clipPayload backfills capture body for legacy duplicates", async () => {
     "utf8"
   );
 
-  const second = await clipPayload(payload, { notesDir });
+  const second = await clipPayload(payload, { notesDir, configDir });
 
   assert.equal(second.duplicate, true);
   assert.equal(await fileExists(second.capture.content_path), true);

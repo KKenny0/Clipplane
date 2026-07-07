@@ -25,16 +25,18 @@ test("chooseSinkNames prefers explicit sinks, then defaults, then enabled extern
 
 test("syncCapture writes local export and updates captures jsonl", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-sync-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const clip = await clipPayload({
     inputType: "selection",
     sourceUrl: "https://example.com/sync",
     sourceTitle: "Sync Test",
     title: "Sync Test",
     contentMarkdown: "# Sync Test\n\nAPI sink body."
-  }, { notesDir });
+  }, { notesDir, configDir });
 
   const result = await syncCapture(clip.capture.capture_id, {
     notesDir,
+    configDir,
     sinks: ["local-export"]
   });
 
@@ -50,6 +52,7 @@ test("syncCapture writes local export and updates captures jsonl", async () => {
 });
 
 test("getSyncStatus does not expose token values", async () => {
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-status-"));
   await fs.mkdir(path.join(notesDir, ".clipplane"), { recursive: true });
   await fs.writeFile(path.join(notesDir, ".clipplane", "config.json"), JSON.stringify({
@@ -61,7 +64,7 @@ test("getSyncStatus does not expose token values", async () => {
   const previous = process.env.CLIPPLANE_NOTION_TOKEN;
   process.env.CLIPPLANE_NOTION_TOKEN = "secret-token";
   try {
-    const status = await getSyncStatus({ notesDir });
+    const status = await getSyncStatus({ notesDir, configDir });
     assert.equal(status.sinks["notion-api"].configured, true);
     assert.equal(JSON.stringify(status).includes("secret-token"), false);
   } finally {
