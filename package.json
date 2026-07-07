@@ -7,6 +7,8 @@
   "scripts": {
     "test": "node --test",
     "doctor": "node scripts/doctor.mjs",
+    "doctor:native:chrome": "pwsh -NoLogo -NoProfile -File scripts/check-native-host.ps1 -Browser chrome",
+    "doctor:native:edge": "pwsh -NoLogo -NoProfile -File scripts/check-native-host.ps1 -Browser edge",
     "smoke": "node scripts/smoke-clip.mjs"
   },
   "engines": {

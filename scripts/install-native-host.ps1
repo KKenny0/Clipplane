@@ -11,6 +11,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($ExtensionId -notmatch "^[a-p]{32}$") {
+  throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+}
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $hostDir = Join-Path $projectRoot "native-host"
 $launcherPath = Join-Path $hostDir "clipplane-host.cmd"
@@ -46,5 +50,11 @@ $registryPath = if ($Browser -eq "chrome") {
 New-Item -Path $registryPath -Force | Out-Null
 Set-Item -Path $registryPath -Value $manifestPath
 
+$registeredManifest = (Get-Item -LiteralPath $registryPath).GetValue("")
+if ($registeredManifest -ne $manifestPath) {
+  throw "Failed to register native host manifest path. Expected $manifestPath, got $registeredManifest"
+}
+
 Write-Host "Installed Clipplane native host for $Browser"
 Write-Host "Manifest: $manifestPath"
+Write-Host "Allowed origin: chrome-extension://$ExtensionId/"
