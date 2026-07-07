@@ -1,137 +1,143 @@
 # Clipplane
 
-Clipplane is a local-first browser clipper. It captures the current page or selected text, sends it through a Native Messaging host, appends a clean org-mode entry to `~/Documents/notes/inbox.org`, and can explicitly sync that saved capture to optional external sinks.
+> 本地优先的浏览器剪藏工具：把网页或选中文本保存到本地 `inbox.org`，再按需同步到 Notion 或 flomo。
 
-The product stays intentionally narrow:
+[English README](README.en.md)
 
-- browser action and context-menu clipping
-- local Native Messaging host
-- `inbox.org` as the human-readable source of truth
-- `.clipplane/captures.jsonl` as the machine-readable audit and retry log
-- duplicate detection by content hash
-- optional API sinks for Notion and flomo
+Clipplane 会把浏览器里的页面正文或选中文本交给本机 Native Messaging host，清理成 Markdown，转换为 org-mode 条目，并追加到 `~/Documents/notes/inbox.org`。外部服务是可选同步目标，不是保存成功的前置条件。
 
-Local save succeeds or fails independently of any external service. External sync only runs when the user clicks "Save + sync" and has configured at least one sink.
+## 它解决什么
 
-## Reference Workflow
+Clipplane 的第一原则很简单：剪藏内容必须先落到用户自己的本地文件里。
 
-Clipplane Phase 1 follows the clipping workflow from [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip): capture a URL or text selection, clean it into Markdown, convert it into org-mode, tag it, and append it to a local `inbox.org`. Clipplane turns that workflow into a browser-triggered local app while keeping the same local-first storage boundary.
+- 浏览器按钮和右键菜单触发剪藏
+- Native Messaging host 在本机处理内容
+- `inbox.org` 是人可读的主入口
+- `.clipplane/captures.jsonl` 是机器可读的审计和重试日志
+- 用内容 hash 跳过重复剪藏
+- 可选同步到 Notion API 或 flomo webhook API
 
-## How It Works
+本地保存和外部同步解耦。用户点击 `Save local` 时只写本地；点击 `Save + sync` 时，才会在本地保存后尝试同步到已配置的 sink。
+
+## 参考工作流
+
+Clipplane 的剪藏链路参考了 [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip)：捕获 URL 或选中文本，清理为 Markdown，转换为 org-mode，打标签，追加到本地 `inbox.org`。Clipplane 把这条链路变成浏览器可触发的本地应用，同时保留本地优先的存储边界。
+
+## 工作方式
 
 ```mermaid
 flowchart LR
-  A[Web page or selected text] --> B[Clipplane browser extension]
+  A[网页或选中文本] --> B[Clipplane 浏览器扩展]
   B --> C[Chrome Native Messaging]
-  C --> D[Local Node host]
-  D --> E[Clean Markdown]
-  E --> F[Convert to org-mode]
-  F --> G[Append inbox.org]
-  F --> H[Write capture body]
-  F --> I[Append captures.jsonl]
-  I --> J{Explicit Save + sync}
+  C --> D[本地 Node host]
+  D --> E[清理 Markdown]
+  E --> F[转换为 org-mode]
+  F --> G[追加 inbox.org]
+  F --> H[写入 capture body]
+  F --> I[追加 captures.jsonl]
+  I --> J{显式 Save + sync}
   J --> K[Notion API]
   J --> L[flomo webhook API]
-  J --> M[local-export verification sink]
+  J --> M[local-export 验证 sink]
 ```
 
-The native host keeps the full capture locally before any sync attempt. Phase 2 uses direct sink APIs for synchronization. It does not require Claude Code, Codex CLI, Agent CLI, or MCP to save or sync a clip.
+Native host 会先把完整内容写到本地，再尝试任何同步。Phase 2 的同步使用直接 API，不需要 Claude Code、Codex CLI、Agent CLI 或 MCP 才能保存和同步剪藏。
 
-## Layout
+## 目录结构
 
 ```text
-extension/           Manifest V3 browser extension
-native-host/         Native Messaging host and clip core
-scripts/             install, uninstall, smoke, and doctor scripts
-test/                node:test coverage for clip core and framing
+extension/           Manifest V3 浏览器扩展
+native-host/         Native Messaging host 和剪藏核心
+scripts/             安装、卸载、smoke、doctor 脚本
+test/                基于 node:test 的核心逻辑测试
 ```
 
-## Develop
+## 开发
 
-Run tests:
+运行测试：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm test"
 ```
 
-Run a local smoke clip without the browser:
+不通过浏览器跑一次本地剪藏 smoke：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke"
 ```
 
-Run a local sync smoke test without network access:
+不访问网络跑一次本地同步 smoke：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke:sync:local"
 ```
 
-Run environment checks:
+检查本机环境：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run doctor"
 ```
 
-## Quick Local Smoke Test
+## 快速本地验证
 
-Before loading the extension, verify the local clip core:
+加载扩展前，先验证本地剪藏核心：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke"
 ```
 
-This writes a temporary `inbox.org` under the system temp directory and prints the captured org entry.
+这会在系统临时目录下写入一个临时 `inbox.org`，并打印生成的 org 条目。
 
-## Load The Extension
+## 加载浏览器扩展
 
-1. Open `chrome://extensions` or `edge://extensions`.
-2. Enable Developer mode.
-3. Click "Load unpacked".
-4. Select the `extension` folder.
-5. Copy the generated extension ID.
+1. 打开 `chrome://extensions` 或 `edge://extensions`。
+2. 开启 Developer mode。
+3. 点击 `Load unpacked`。
+4. 选择仓库里的 `extension` 目录。
+5. 复制浏览器生成的 extension ID。
 
-## Install The Native Host On Windows
+## 在 Windows 安装 Native Host
 
-Install for Chrome:
+安装到 Chrome：
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
 ```
 
-Install for Edge:
+安装到 Edge：
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser edge -ExtensionId "<extension-id>"
 ```
 
-The installer writes `native-host/com.clipplane.host.json` and registers it under the current user's Native Messaging registry key.
+安装脚本会生成 `native-host/com.clipplane.host.json`，并把 Native Messaging host 注册到当前用户的浏览器 registry key。
 
-Verify the Chrome host registration:
+检查 Chrome host 注册：
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\check-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
 ```
 
-Uninstall:
+卸载：
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\uninstall-native-host.ps1 -Browser chrome
 ```
 
-## Data Files
+## 数据文件
 
-By default Clipplane writes:
+默认写入：
 
 - `~/Documents/notes/inbox.org`
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 - `~/Documents/notes/.clipplane/config.json`
 
-Override the notes directory with `CLIPPLANE_NOTES_DIR` before launching the native host or by editing the generated launcher.
+可以在启动 native host 前设置 `CLIPPLANE_NOTES_DIR`，或编辑生成的 launcher 来修改 notes 目录。
 
-## External Sinks
+## 外部 Sink
 
-External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.json`:
+外部 sink 默认关闭。创建或编辑 `~/Documents/notes/.clipplane/config.json`：
 
 ```json
 {
@@ -155,24 +161,24 @@ External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.j
 }
 ```
 
-Secrets stay out of the config file. For browser use on Windows, set user-level environment variables and restart the browser:
+密钥不要写进配置文件。Windows 浏览器场景建议设置用户级环境变量，然后重启浏览器：
 
 ```powershell
 [Environment]::SetEnvironmentVariable("CLIPPLANE_NOTION_TOKEN", "secret_xxx", "User")
 [Environment]::SetEnvironmentVariable("CLIPPLANE_FLOMO_WEBHOOK_URL", "https://flomoapp.com/iwh/...", "User")
 ```
 
-Temporary `$env:` assignments are useful for command-line smoke tests, but a browser-launched Native Messaging host will normally only see environment variables available to the browser process.
+临时 `$env:` 适合命令行 smoke 测试，但浏览器启动的 Native Messaging host 通常只能读取浏览器进程可见的环境变量。
 
-`notion-api` creates a Notion page through the official Notion API. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
+`notion-api` 会通过 Notion 官方 API 创建页面。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
 
-## Current Scope
+## 当前边界
 
-Clipplane does not watch the clipboard, does not upload data by default, and does not run analysis skills automatically. It only clips when the user explicitly clicks the extension action or context menu, and it only syncs externally when the user clicks "Save + sync".
+Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分析 skill。它只在用户明确点击扩展按钮或右键菜单时剪藏，只在用户点击 `Save + sync` 时外部同步。
 
-## Troubleshooting
+## 排查
 
-- `Specified native messaging host not found`: run `check-native-host.ps1` for the browser you loaded the extension in.
-- `Access to the specified native messaging host is forbidden`: reinstall with the exact extension ID shown on `chrome://extensions` or `edge://extensions`.
-- `Nothing to clip`: select text first or use "Clip Page" so Clipplane can collect the page body.
-- Empty or noisy page clips: clip a selection. Phase 1 uses a lightweight DOM extractor instead of a full readability engine.
+- `Specified native messaging host not found`：对当前浏览器运行 `check-native-host.ps1`。
+- `Access to the specified native messaging host is forbidden`：用 `chrome://extensions` 或 `edge://extensions` 里显示的准确 extension ID 重新安装。
+- `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
+- 页面剪藏为空或噪声太多：优先选中文本剪藏。当前阶段使用轻量 DOM 提取器，不是完整 readability engine。
