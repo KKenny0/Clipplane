@@ -1,16 +1,17 @@
 # Clipplane
 
-Clipplane is a local-first browser clipper. It captures the current page or selected text, sends it through a Native Messaging host, and appends a clean org-mode entry to `~/Documents/notes/inbox.org`.
+Clipplane is a local-first browser clipper. It captures the current page or selected text, sends it through a Native Messaging host, appends a clean org-mode entry to `~/Documents/notes/inbox.org`, and can explicitly sync that saved capture to optional external sinks.
 
-Phase 1 deliberately keeps the product narrow:
+The product stays intentionally narrow:
 
 - browser action and context-menu clipping
 - local Native Messaging host
 - `inbox.org` as the human-readable source of truth
 - `.clipplane/captures.jsonl` as the machine-readable audit and retry log
 - duplicate detection by content hash
+- optional API sinks for Notion and flomo
 
-flomo MCP and Apple Notes are planned sinks, not Phase 1 dependencies. Local save succeeds or fails independently of any external service.
+Local save succeeds or fails independently of any external service. External sync only runs when the user clicks "Save + sync" and has configured at least one sink.
 
 ## Reference Workflow
 
@@ -26,10 +27,15 @@ flowchart LR
   D --> E[Clean Markdown]
   E --> F[Convert to org-mode]
   F --> G[Append inbox.org]
-  F --> H[Append captures.jsonl]
+  F --> H[Write capture body]
+  F --> I[Append captures.jsonl]
+  I --> J{Explicit Save + sync}
+  J --> K[Notion API]
+  J --> L[flomo webhook API]
+  J --> M[local-export verification sink]
 ```
 
-The first release is intentionally local-only. A successful clip means the content is written to local files; external sinks such as flomo MCP and Apple Notes will be added after this local loop stays reliable.
+The native host keeps the full capture locally before any sync attempt. Phase 2 uses direct sink APIs for synchronization. It does not require Claude Code, Codex CLI, Agent CLI, or MCP to save or sync a clip.
 
 ## Layout
 
@@ -52,6 +58,12 @@ Run a local smoke clip without the browser:
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke"
+```
+
+Run a local sync smoke test without network access:
+
+```powershell
+pwsh -NoLogo -NoProfile -Command "npm run smoke:sync:local"
 ```
 
 Run environment checks:
@@ -112,12 +124,51 @@ By default Clipplane writes:
 
 - `~/Documents/notes/inbox.org`
 - `~/Documents/notes/.clipplane/captures.jsonl`
+- `~/Documents/notes/.clipplane/captures/<capture-id>.md`
+- `~/Documents/notes/.clipplane/config.json`
 
 Override the notes directory with `CLIPPLANE_NOTES_DIR` before launching the native host or by editing the generated launcher.
 
+## External Sinks
+
+External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.json`:
+
+```json
+{
+  "sync": {
+    "defaultSinks": ["notion-api"]
+  },
+  "sinks": {
+    "notion-api": {
+      "enabled": true,
+      "parentType": "page",
+      "parentId": "NOTION_PAGE_ID"
+    },
+    "flomo-api": {
+      "enabled": false,
+      "tags": ["clipplane"]
+    },
+    "local-export": {
+      "enabled": false
+    }
+  }
+}
+```
+
+Secrets stay out of the config file. For browser use on Windows, set user-level environment variables and restart the browser:
+
+```powershell
+[Environment]::SetEnvironmentVariable("CLIPPLANE_NOTION_TOKEN", "secret_xxx", "User")
+[Environment]::SetEnvironmentVariable("CLIPPLANE_FLOMO_WEBHOOK_URL", "https://flomoapp.com/iwh/...", "User")
+```
+
+Temporary `$env:` assignments are useful for command-line smoke tests, but a browser-launched Native Messaging host will normally only see environment variables available to the browser process.
+
+`notion-api` creates a Notion page through the official Notion API. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
+
 ## Current Scope
 
-Clipplane does not watch the clipboard, does not upload data by default, and does not run analysis skills automatically. It only clips when the user explicitly clicks the extension action or context menu.
+Clipplane does not watch the clipboard, does not upload data by default, and does not run analysis skills automatically. It only clips when the user explicitly clicks the extension action or context menu, and it only syncs externally when the user clicks "Save + sync".
 
 ## Troubleshooting
 

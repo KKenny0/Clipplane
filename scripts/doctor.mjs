@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getDefaultPaths } from "../native-host/clip-core.mjs";
+import { getSyncStatus } from "../native-host/sync-core.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const checks = [
@@ -23,5 +24,11 @@ console.log(`INFO inbox: ${paths.inboxPath}`);
 console.log(`INFO captures: ${paths.capturesPath}`);
 console.log(`INFO platform: ${os.platform()}`);
 console.log(`INFO node: ${process.version}`);
+
+const sync = await getSyncStatus();
+console.log(`INFO config: ${sync.config_path}`);
+for (const [name, status] of Object.entries(sync.sinks)) {
+  console.log(`INFO sink ${name}: enabled=${status.enabled} configured=${status.configured}`);
+}
 
 process.exitCode = ok ? 0 : 1;

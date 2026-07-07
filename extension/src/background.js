@@ -26,6 +26,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "status") {
+    chrome.runtime.sendNativeMessage(HOST_NAME, { type: "status" })
+      .then(sendResponse)
+      .catch((error) => {
+        sendResponse({ ok: false, error: { message: error.message } });
+      });
+    return true;
+  }
+
   if (message?.type !== "clip") {
     return false;
   }
@@ -34,7 +43,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!tab?.id) {
       throw new Error("No active tab found.");
     }
-    return clipTab(tab.id, message.mode || "selection");
+    return clipTab(tab.id, message.mode || "selection", Boolean(message.sync));
   }).then(sendResponse).catch((error) => {
     sendResponse({ ok: false, error: { message: error.message } });
   });
@@ -42,7 +51,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-async function clipTab(tabId, mode) {
+async function clipTab(tabId, mode, sync = false) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: collectPagePayload,
@@ -51,7 +60,8 @@ async function clipTab(tabId, mode) {
 
   const response = await chrome.runtime.sendNativeMessage(HOST_NAME, {
     type: "clip",
-    payload: result
+    payload: result,
+    sync
   });
 
   await chrome.storage.local.set({ lastClipResult: response });

@@ -9,11 +9,28 @@
   <body>
     <main>
       <header>
-        <h1>Clipplane</h1>
+        <div>
+          <h1>Clipplane</h1>
+          <p class="subtitle">Local first clipper</p>
+        </div>
         <span id="state" class="state">Ready</span>
       </header>
-      <button id="clip-selection" type="button">Clip Selection</button>
-      <button id="clip-page" type="button">Clip Page</button>
+
+      <section class="control-group" aria-label="Clip source">
+        <button id="mode-selection" class="segment active" type="button">Selection</button>
+        <button id="mode-page" class="segment" type="button">Page</button>
+      </section>
+
+      <section class="actions" aria-label="Clip actions">
+        <button id="clip-local" class="primary" type="button">Save local</button>
+        <button id="clip-sync" class="secondary" type="button">Save + sync</button>
+      </section>
+
+      <section class="sync-panel" aria-label="Sync status">
+        <div class="sync-label">Sync target</div>
+        <div id="sync-status" class="sync-status">Checking</div>
+      </section>
+
       <section id="result" class="result" aria-live="polite"></section>
     </main>
     <script src="popup.js" type="module"></script>

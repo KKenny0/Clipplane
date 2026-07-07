@@ -50,7 +50,45 @@ test("clipPayload writes inbox and skips duplicates", async () => {
   assert.match(inbox, /\* Agent Notes :ai:/);
   assert.match(inbox, /:STATUS: inbox/);
   assert.match(inbox, /\*\* Agent Notes/);
+  assert.equal(await fileExists(first.capture.content_path), true);
 
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.equal(captures.trim().split(/\r?\n/).length, 1);
 });
+
+test("clipPayload backfills capture body for legacy duplicates", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-legacy-"));
+  const payload = {
+    inputType: "selection",
+    sourceUrl: "https://example.com/legacy",
+    sourceTitle: "Legacy Clip",
+    title: "Legacy Clip",
+    contentMarkdown: "Legacy body"
+  };
+
+  const first = await clipPayload(payload, { notesDir });
+  const legacy = { ...first.capture };
+  delete legacy.content_path;
+  await fs.rm(first.capture.content_path);
+  await fs.writeFile(
+    path.join(notesDir, ".clipplane", "captures.jsonl"),
+    `${JSON.stringify(legacy)}\n`,
+    "utf8"
+  );
+
+  const second = await clipPayload(payload, { notesDir });
+
+  assert.equal(second.duplicate, true);
+  assert.equal(await fileExists(second.capture.content_path), true);
+  const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
+  assert.match(captures, /"content_path":/);
+});
+
+async function fileExists(file) {
+  try {
+    await fs.access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
