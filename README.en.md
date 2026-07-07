@@ -127,16 +127,42 @@ By default Clipplane writes:
 - `~/Documents/notes/inbox.org`
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
-- `~/Documents/notes/.clipplane/config.json`
 
-Override the notes directory with `CLIPPLANE_NOTES_DIR` before launching the native host or by editing the generated launcher.
+Open `Settings` in the extension to view the current folder, change it, or open it in your file manager. Normal users do not need environment variables or launcher edits.
+
+Clipplane stores app settings in the system application config directory. Clipped content stays in the notes folder you choose.
 
 ## External Sinks
 
-External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.json`:
+External sinks are opt-in. Configure them in the extension `Settings` page:
+
+- flomo: enable flomo, paste the incoming webhook URL, and optionally add tags.
+- Notion: enable Notion, then add a page ID and integration token.
+
+After at least one sink is ready, `Save + sync` becomes available in the popup. Sync failure does not affect local save.
+
+`notion-api` creates a Notion page through the official Notion API. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
+
+<details>
+<summary>Advanced configuration</summary>
+
+The Settings page writes a local app config file. You can still use environment variables for development:
+
+```powershell
+$env:CLIPPLANE_NOTES_DIR = "D:\notes"
+$env:CLIPPLANE_NOTION_TOKEN = "secret_xxx"
+$env:CLIPPLANE_FLOMO_WEBHOOK_URL = "https://flomoapp.com/iwh/..."
+```
+
+A browser-launched Native Messaging host only sees environment variables visible to the browser process, so this is not the recommended path for normal use.
+
+Config file shape:
 
 ```json
 {
+  "storage": {
+    "notesDir": "D:\\notes"
+  },
   "sync": {
     "defaultSinks": ["notion-api"]
   },
@@ -144,10 +170,12 @@ External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.j
     "notion-api": {
       "enabled": true,
       "parentType": "page",
-      "parentId": "NOTION_PAGE_ID"
+      "parentId": "NOTION_PAGE_ID",
+      "token": "secret_xxx"
     },
     "flomo-api": {
       "enabled": false,
+      "webhookUrl": "https://flomoapp.com/iwh/...",
       "tags": ["clipplane"]
     },
     "local-export": {
@@ -157,16 +185,7 @@ External sinks are opt-in. Create or edit `~/Documents/notes/.clipplane/config.j
 }
 ```
 
-Secrets stay out of the config file. For browser use on Windows, set user-level environment variables and restart the browser:
-
-```powershell
-[Environment]::SetEnvironmentVariable("CLIPPLANE_NOTION_TOKEN", "secret_xxx", "User")
-[Environment]::SetEnvironmentVariable("CLIPPLANE_FLOMO_WEBHOOK_URL", "https://flomoapp.com/iwh/...", "User")
-```
-
-Temporary `$env:` assignments are useful for command-line smoke tests, but a browser-launched Native Messaging host will normally only see environment variables available to the browser process.
-
-`notion-api` creates a Notion page through the official Notion API. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
+</details>
 
 ## Current Scope
 

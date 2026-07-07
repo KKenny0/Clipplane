@@ -6,6 +6,10 @@ const modeButtons = {
   selection: document.querySelector("#mode-selection"),
   page: document.querySelector("#mode-page")
 };
+const settingsButtons = [
+  document.querySelector("#open-settings"),
+  document.querySelector("#configure-sync")
+];
 
 let mode = "selection";
 let hasConfiguredSync = false;
@@ -14,6 +18,9 @@ modeButtons.selection.addEventListener("click", () => setMode("selection"));
 modeButtons.page.addEventListener("click", () => setMode("page"));
 document.querySelector("#clip-local").addEventListener("click", () => clip(false));
 document.querySelector("#clip-sync").addEventListener("click", () => clip(true));
+for (const button of settingsButtons) {
+  button.addEventListener("click", () => chrome.runtime.openOptionsPage());
+}
 
 chrome.storage.local.get("lastClipResult").then(({ lastClipResult }) => {
   if (lastClipResult) {
@@ -82,6 +89,7 @@ function renderResult(response) {
 function renderSyncStatus(status) {
   if (!status?.ok) {
     syncStatusEl.textContent = "Host unavailable";
+    document.querySelector("#configure-sync").hidden = false;
     hasConfiguredSync = false;
     updateSyncButton();
     return;
@@ -93,6 +101,7 @@ function renderSyncStatus(status) {
 
   hasConfiguredSync = configured.length > 0;
   syncStatusEl.textContent = configured.length ? configured.join(", ") : "Not configured";
+  document.querySelector("#configure-sync").hidden = configured.length > 0;
   updateSyncButton();
 }
 

@@ -5,7 +5,7 @@ const MAX_RICH_TEXT = 1900;
 
 export async function syncNotionApi({ capture, markdown, config, fetchImpl = fetch }) {
   const sinkConfig = config.sinks["notion-api"];
-  const token = process.env.CLIPPLANE_NOTION_TOKEN;
+  const token = sinkConfig?.token || process.env.CLIPPLANE_NOTION_TOKEN;
 
   if (!sinkConfig?.enabled) {
     return skipped("disabled", "Notion sink is disabled.");

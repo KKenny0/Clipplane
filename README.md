@@ -131,16 +131,42 @@ pwsh -NoLogo -NoProfile -File .\scripts\uninstall-native-host.ps1 -Browser chrom
 - `~/Documents/notes/inbox.org`
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
-- `~/Documents/notes/.clipplane/config.json`
 
-可以在启动 native host 前设置 `CLIPPLANE_NOTES_DIR`，或编辑生成的 launcher 来修改 notes 目录。
+打开扩展里的 `Settings` 可以查看当前保存目录、修改保存目录，或直接打开本地文件夹。普通用户不需要设置环境变量，也不需要编辑 launcher。
+
+Clipplane 的应用设置保存在系统应用配置目录里；剪藏内容仍然保存在你选择的 notes 目录里。
 
 ## 外部 Sink
 
-外部 sink 默认关闭。创建或编辑 `~/Documents/notes/.clipplane/config.json`：
+外部 sink 默认关闭。在扩展的 `Settings` 页面配置：
+
+- flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。
+- Notion：开启 Notion，填写 page ID 和 integration token。
+
+配置完成后，弹窗里的 `Save + sync` 会变为可用。同步失败不会影响本地保存。
+
+`notion-api` 会通过 Notion 官方 API 创建页面。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
+
+<details>
+<summary>高级配置</summary>
+
+Settings 页面会写入本机应用配置文件。你仍然可以用环境变量做开发调试：
+
+```powershell
+$env:CLIPPLANE_NOTES_DIR = "D:\notes"
+$env:CLIPPLANE_NOTION_TOKEN = "secret_xxx"
+$env:CLIPPLANE_FLOMO_WEBHOOK_URL = "https://flomoapp.com/iwh/..."
+```
+
+浏览器启动的 Native Messaging host 只能读取浏览器进程可见的环境变量，所以普通使用不建议走这条路径。
+
+配置文件结构：
 
 ```json
 {
+  "storage": {
+    "notesDir": "D:\\notes"
+  },
   "sync": {
     "defaultSinks": ["notion-api"]
   },
@@ -148,10 +174,12 @@ pwsh -NoLogo -NoProfile -File .\scripts\uninstall-native-host.ps1 -Browser chrom
     "notion-api": {
       "enabled": true,
       "parentType": "page",
-      "parentId": "NOTION_PAGE_ID"
+      "parentId": "NOTION_PAGE_ID",
+      "token": "secret_xxx"
     },
     "flomo-api": {
       "enabled": false,
+      "webhookUrl": "https://flomoapp.com/iwh/...",
       "tags": ["clipplane"]
     },
     "local-export": {
@@ -161,16 +189,7 @@ pwsh -NoLogo -NoProfile -File .\scripts\uninstall-native-host.ps1 -Browser chrom
 }
 ```
 
-密钥不要写进配置文件。Windows 浏览器场景建议设置用户级环境变量，然后重启浏览器：
-
-```powershell
-[Environment]::SetEnvironmentVariable("CLIPPLANE_NOTION_TOKEN", "secret_xxx", "User")
-[Environment]::SetEnvironmentVariable("CLIPPLANE_FLOMO_WEBHOOK_URL", "https://flomoapp.com/iwh/...", "User")
-```
-
-临时 `$env:` 适合命令行 smoke 测试，但浏览器启动的 Native Messaging host 通常只能读取浏览器进程可见的环境变量。
-
-`notion-api` 会通过 Notion 官方 API 创建页面。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
+</details>
 
 ## 当前边界
 

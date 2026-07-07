@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { clipPayload, ClipplaneError } from "./clip-core.mjs";
 import { createNativeMessageParser, writeNativeMessage } from "./native-message.mjs";
+import { getSettings, openNotesDir, setSettings } from "./settings-core.mjs";
 import { getSyncStatus, syncCapture, syncClipResult } from "./sync-core.mjs";
 
 const parser = createNativeMessageParser(async (message) => {
@@ -17,6 +18,18 @@ async function handleMessage(message) {
   try {
     if (message?.type === "status") {
       return await getSyncStatus();
+    }
+
+    if (message?.type === "get_config") {
+      return await getSettings();
+    }
+
+    if (message?.type === "set_config") {
+      return await setSettings(message.config || {});
+    }
+
+    if (message?.type === "open_notes_dir") {
+      return await openNotesDir();
     }
 
     if (message?.type === "sync") {

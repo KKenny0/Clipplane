@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { getDefaultPaths } from "../native-host/clip-core.mjs";
+import { resolveConfiguredPaths } from "../native-host/config.mjs";
 import { getSyncStatus } from "../native-host/sync-core.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -18,15 +18,15 @@ for (const [label, file] of checks) {
   console.log(`${exists ? "PASS" : "FAIL"} ${label}: ${file}`);
 }
 
-const paths = getDefaultPaths();
+const { paths } = await resolveConfiguredPaths();
 console.log(`INFO notes dir: ${paths.notesDir}`);
 console.log(`INFO inbox: ${paths.inboxPath}`);
 console.log(`INFO captures: ${paths.capturesPath}`);
+console.log(`INFO config: ${paths.configPath}`);
 console.log(`INFO platform: ${os.platform()}`);
 console.log(`INFO node: ${process.version}`);
 
 const sync = await getSyncStatus();
-console.log(`INFO config: ${sync.config_path}`);
 for (const [name, status] of Object.entries(sync.sinks)) {
   console.log(`INFO sink ${name}: enabled=${status.enabled} configured=${status.configured}`);
 }

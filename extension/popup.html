@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clipplane</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
@@ -13,7 +14,10 @@
           <h1>Clipplane</h1>
           <p class="subtitle">Local first clipper</p>
         </div>
-        <span id="state" class="state">Ready</span>
+        <div class="header-actions">
+          <button id="open-settings" class="icon-button" type="button" aria-label="Open settings">Settings</button>
+          <span id="state" class="state">Ready</span>
+        </div>
       </header>
 
       <section class="control-group" aria-label="Clip source">
@@ -27,8 +31,11 @@
       </section>
 
       <section class="sync-panel" aria-label="Sync status">
-        <div class="sync-label">Sync target</div>
-        <div id="sync-status" class="sync-status">Checking</div>
+        <div>
+          <div class="sync-label">Sync target</div>
+          <div id="sync-status" class="sync-status">Checking</div>
+        </div>
+        <button id="configure-sync" class="plain-button" type="button">Configure</button>
       </section>
 
       <section id="result" class="result" aria-live="polite"></section>

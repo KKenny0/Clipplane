@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clipplane Settings</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="settings.css">
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <div>
+          <h1>Clipplane settings</h1>
+          <p id="settings-state" class="muted">Loading</p>
+        </div>
+        <a href="popup.html" class="back-link">Back to clipper</a>
+      </header>
+
+      <section class="section" aria-labelledby="storage-title">
+        <div class="section-heading">
+          <h2 id="storage-title">Local folder</h2>
+          <span id="storage-status" class="status-pill">Checking</span>
+        </div>
+        <label class="field">
+          <span>Save clips to</span>
+          <input id="notes-dir" type="text" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="button-row">
+          <button id="save-storage" class="primary" type="button">Save folder</button>
+          <button id="open-folder" class="secondary" type="button">Open folder</button>
+        </div>
+        <p id="storage-note" class="note"></p>
+      </section>
+
+      <section class="section" aria-labelledby="sync-title">
+        <div class="section-heading">
+          <h2 id="sync-title">Sync targets</h2>
+          <span id="sync-status" class="status-pill">Not configured</span>
+        </div>
+
+        <form id="sync-form">
+          <div class="sink">
+            <label class="toggle-row">
+              <input id="flomo-enabled" type="checkbox">
+              <span>flomo</span>
+            </label>
+            <label class="field">
+              <span>Webhook URL</span>
+              <input id="flomo-webhook" type="password" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="field">
+              <span>Tags</span>
+              <input id="flomo-tags" type="text" autocomplete="off" spellcheck="false" placeholder="clipplane, read">
+            </label>
+            <p id="flomo-state" class="note"></p>
+          </div>
+
+          <div class="sink">
+            <label class="toggle-row">
+              <input id="notion-enabled" type="checkbox">
+              <span>Notion</span>
+            </label>
+            <label class="field">
+              <span>Page ID</span>
+              <input id="notion-page" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <label class="field">
+              <span>Integration token</span>
+              <input id="notion-token" type="password" autocomplete="off" spellcheck="false">
+            </label>
+            <p id="notion-state" class="note"></p>
+          </div>
+
+          <div class="button-row">
+            <button id="save-sync" class="primary" type="button">Save sync settings</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="result" class="result" aria-live="polite"></section>
+    </main>
+    <script src="settings.js" type="module"></script>
+  </body>
+</html>

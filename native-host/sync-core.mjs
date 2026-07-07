@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
-import { getDefaultPaths, ClipplaneError } from "./clip-core.mjs";
-import { configuredExternalSinks, readConfig } from "./config.mjs";
+import { ClipplaneError } from "./clip-core.mjs";
+import { configuredExternalSinks, hasFlomoWebhook, hasNotionToken, resolveConfiguredPaths } from "./config.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
 import { syncLocalExport } from "./sinks/local-export.mjs";
 import { syncNotionApi } from "./sinks/notion-api.mjs";
@@ -12,12 +12,16 @@ const SINKS = {
 };
 
 export async function getSyncStatus(options = {}) {
-  const paths = getDefaultPaths(options.notesDir);
-  const config = await readConfig(paths);
+  const { paths, config } = await resolveConfiguredPaths(options);
 
   return {
     ok: true,
     config_path: paths.configPath,
+    storage: {
+      notes_dir: paths.notesDir,
+      default_notes_dir: paths.defaultNotesDir,
+      using_env_override: paths.usingEnvNotesDir
+    },
     default_sinks: config.sync.defaultSinks,
     sinks: {
       "local-export": {
@@ -26,11 +30,11 @@ export async function getSyncStatus(options = {}) {
       },
       "notion-api": {
         enabled: Boolean(config.sinks["notion-api"]?.enabled),
-        configured: Boolean(config.sinks["notion-api"]?.parentId && process.env.CLIPPLANE_NOTION_TOKEN)
+        configured: Boolean(config.sinks["notion-api"]?.parentId && hasNotionToken(config))
       },
       "flomo-api": {
         enabled: Boolean(config.sinks["flomo-api"]?.enabled),
-        configured: Boolean(process.env.CLIPPLANE_FLOMO_WEBHOOK_URL)
+        configured: hasFlomoWebhook(config)
       }
     }
   };
@@ -50,8 +54,7 @@ export async function syncClipResult(clipResult, options = {}) {
 }
 
 export async function syncCapture(captureId, options = {}) {
-  const paths = getDefaultPaths(options.notesDir);
-  const config = await readConfig(paths);
+  const { paths, config } = await resolveConfiguredPaths(options);
   const records = await readCaptureRecords(paths.capturesPath);
   const index = records.findIndex((record) => record.capture_id === captureId);
 

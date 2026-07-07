@@ -7,7 +7,7 @@ export async function syncFlomoApi({ capture, markdown, config, fetchImpl = fetc
     return skipped("disabled", "flomo sink is disabled.");
   }
 
-  const webhookUrl = process.env.CLIPPLANE_FLOMO_WEBHOOK_URL;
+  const webhookUrl = sinkConfig.webhookUrl || process.env.CLIPPLANE_FLOMO_WEBHOOK_URL;
   if (!webhookUrl) {
     return skipped("auth_required", "CLIPPLANE_FLOMO_WEBHOOK_URL is not set.");
   }

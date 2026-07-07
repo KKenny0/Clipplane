@@ -43,6 +43,12 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 button {
   min-height: 40px;
   border: 1px solid oklch(82% 0.025 250);
@@ -118,6 +124,24 @@ button:disabled {
   background: oklch(99% 0.004 245);
   color: oklch(34% 0.075 205);
   font-weight: 600;
+}
+
+.icon-button,
+.plain-button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.icon-button {
+  background: transparent;
+}
+
+.plain-button {
+  border-color: transparent;
+  background: oklch(99% 0.004 245);
+  color: oklch(34% 0.075 205);
 }
 
 .sync-panel {

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { clipPayload } from "../native-host/clip-core.mjs";
-import { normalizeConfig } from "../native-host/config.mjs";
+import { normalizeConfig, publicConfig, resolveConfiguredPaths, saveConfig } from "../native-host/config.mjs";
 import { formatFlomoContent, syncFlomoApi } from "../native-host/sinks/flomo-api.mjs";
 import { buildBlocks, syncNotionApi } from "../native-host/sinks/notion-api.mjs";
 import { chooseSinkNames, getSyncStatus, syncCapture } from "../native-host/sync-core.mjs";
@@ -73,10 +73,42 @@ test("getSyncStatus does not expose token values", async () => {
   }
 });
 
+test("saveConfig makes notesDir and sink secrets config-driven", async () => {
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-notes-"));
+
+  await saveConfig({
+    storage: { notesDir },
+    sinks: {
+      "notion-api": {
+        enabled: true,
+        parentType: "page",
+        parentId: "page123",
+        token: "secret-token"
+      },
+      "flomo-api": {
+        enabled: true,
+        webhookUrl: "https://flomoapp.com/iwh/secret",
+        tags: ["clipplane"]
+      }
+    },
+    sync: { defaultSinks: ["notion-api", "flomo-api"] }
+  }, { configDir });
+
+  const { paths, config } = await resolveConfiguredPaths({ configDir });
+  const visible = publicConfig(config);
+
+  assert.equal(paths.notesDir, notesDir);
+  assert.equal(visible.sinks["notion-api"].tokenConfigured, true);
+  assert.equal(visible.sinks["flomo-api"].webhookConfigured, true);
+  assert.equal(JSON.stringify(visible).includes("secret-token"), false);
+  assert.equal(JSON.stringify(visible).includes("https://flomoapp.com/iwh/secret"), false);
+});
+
 test("notion sink creates a page with compact blocks", async () => {
   const capture = sampleCapture();
   const previous = process.env.CLIPPLANE_NOTION_TOKEN;
-  process.env.CLIPPLANE_NOTION_TOKEN = "notion-token";
+  delete process.env.CLIPPLANE_NOTION_TOKEN;
   let request;
 
   try {
@@ -85,7 +117,7 @@ test("notion sink creates a page with compact blocks", async () => {
       markdown: "# Heading\n\n- one\nplain text",
       config: normalizeConfig({
         sinks: {
-          "notion-api": { enabled: true, parentType: "page", parentId: "page123" }
+          "notion-api": { enabled: true, parentType: "page", parentId: "page123", token: "config-token" }
         }
       }),
       fetchImpl: async (url, init) => {
@@ -96,6 +128,7 @@ test("notion sink creates a page with compact blocks", async () => {
 
     assert.equal(result.status, "synced");
     assert.equal(result.external_url, "https://notion.so/page");
+    assert.equal(request.init.headers.Authorization, "Bearer config-token");
     const body = JSON.parse(request.init.body);
     assert.equal(body.parent.page_id, "page123");
     assert.equal(body.children[3].type, "heading_1");
@@ -111,14 +144,22 @@ test("notion sink creates a page with compact blocks", async () => {
 test("flomo sink posts webhook content", async () => {
   const capture = sampleCapture();
   const previous = process.env.CLIPPLANE_FLOMO_WEBHOOK_URL;
-  process.env.CLIPPLANE_FLOMO_WEBHOOK_URL = "https://flomoapp.com/iwh/token";
+  delete process.env.CLIPPLANE_FLOMO_WEBHOOK_URL;
   let request;
 
   try {
     const result = await syncFlomoApi({
       capture,
       markdown: "Body",
-      config: normalizeConfig({ sinks: { "flomo-api": { enabled: true, tags: ["clipplane"] } } }),
+      config: normalizeConfig({
+        sinks: {
+          "flomo-api": {
+            enabled: true,
+            webhookUrl: "https://flomoapp.com/iwh/token",
+            tags: ["clipplane"]
+          }
+        }
+      }),
       fetchImpl: async (url, init) => {
         request = { url, init };
         return jsonResponse(200, { memo: { slug: "memo1" } });

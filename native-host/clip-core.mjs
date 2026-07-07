@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { resolveConfiguredPaths } from "./config.mjs";
+import { getDefaultPaths } from "./paths.mjs";
 
 const TAG_RULES = [
   { tag: "ai", patterns: [/ai\b/i, /llm/i, /agent/i, /model/i, /\u673a\u5668\u5b66\u4e60/, /\u5927\u6a21\u578b/] },
@@ -13,21 +14,10 @@ const TAG_RULES = [
   { tag: "read", patterns: [/book/i, /paper/i, /article/i, /reading/i, /\u8bfb\u4e66/, /\u8bba\u6587/, /\u9605\u8bfb/] }
 ];
 
-const DEFAULT_NOTES_DIR = path.join(os.homedir(), "Documents", "notes");
-
-export function getDefaultPaths(notesDir = process.env.CLIPPLANE_NOTES_DIR || DEFAULT_NOTES_DIR) {
-  return {
-    notesDir,
-    inboxPath: path.join(notesDir, "inbox.org"),
-    stateDir: path.join(notesDir, ".clipplane"),
-    capturesPath: path.join(notesDir, ".clipplane", "captures.jsonl"),
-    captureBodiesDir: path.join(notesDir, ".clipplane", "captures"),
-    configPath: path.join(notesDir, ".clipplane", "config.json")
-  };
-}
+export { getDefaultPaths };
 
 export async function clipPayload(payload, options = {}) {
-  const paths = getDefaultPaths(options.notesDir);
+  const { paths } = await resolveConfiguredPaths(options);
   const normalized = normalizePayload(payload);
   const contentHash = createContentHash(normalized);
   const existing = await findExistingCapture(paths.capturesPath, contentHash);
