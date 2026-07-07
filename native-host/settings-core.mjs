@@ -15,7 +15,7 @@ export async function setSettings(patch, options = {}) {
 export async function openNotesDir(options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
   await fs.mkdir(paths.notesDir, { recursive: true });
-  openFolder(paths.notesDir);
+  await (options.openFolderImpl || openFolder)(paths.notesDir, options);
 
   return {
     ok: true,
@@ -37,17 +37,32 @@ function settingsResponse(paths, config) {
   };
 }
 
-function openFolder(targetPath) {
-  const command = process.platform === "win32"
-    ? "explorer.exe"
-    : process.platform === "darwin"
-      ? "open"
-      : "xdg-open";
+export function openFolder(targetPath, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform === "win32") {
+    return runOpenCommand("cmd.exe", ["/d", "/s", "/c", "start", "", targetPath], options);
+  }
 
-  const child = spawn(command, [targetPath], {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true
+  const command = platform === "darwin" ? "open" : "xdg-open";
+  return runOpenCommand(command, [targetPath], options);
+}
+
+function runOpenCommand(command, args, options = {}) {
+  const spawnImpl = options.spawnImpl || spawn;
+
+  return new Promise((resolve, reject) => {
+    const child = spawnImpl(command, args, {
+      stdio: "ignore",
+      windowsHide: true
+    });
+
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0 || code === null) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Open folder command failed with exit code ${code}.`));
+    });
   });
-  child.unref();
 }
