@@ -55,6 +55,11 @@ h2 {
   text-decoration: none;
 }
 
+.sink-help a,
+.back-link {
+  text-underline-offset: 3px;
+}
+
 .section {
   margin-top: 14px;
   padding: 18px;
@@ -191,6 +196,17 @@ button:disabled {
   gap: 10px;
   color: oklch(25% 0.018 245);
   font-weight: 700;
+}
+
+.sink-help {
+  margin: 6px 0 0;
+  color: oklch(48% 0.025 245);
+  font-size: 12px;
+}
+
+.sink-help a {
+  color: oklch(34% 0.075 205);
+  font-weight: 650;
 }
 
 .result {

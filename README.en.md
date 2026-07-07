@@ -4,6 +4,12 @@
 
 Clipplane is a local-first browser clipper. It captures the current page or selected text, sends it through a Native Messaging host, appends a clean org-mode entry to `~/Documents/notes/inbox.org`, and can explicitly sync that saved capture to optional external sinks.
 
+## Product Preview
+
+![Clipplane popup](assets/screenshots/popup.png)
+
+![Clipplane settings](assets/screenshots/settings.png)
+
 The product stays intentionally narrow:
 
 - browser action and context-menu clipping
@@ -136,12 +142,12 @@ Clipplane stores app settings in the system application config directory. Clippe
 
 External sinks are opt-in. Configure them in the extension `Settings` page:
 
-- flomo: enable flomo, paste the incoming webhook URL, and optionally add tags.
-- Notion: enable Notion, then add a page ID and integration token.
+- flomo: enable flomo, paste the incoming webhook URL, and optionally add tags. Official pages: [API & URL Scheme](https://help.flomoapp.com/advance/api.html) and [flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook). flomo API access requires Pro.
+- Notion: enable Notion, then add a page ID and integration token. Official pages: [Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) and [Authorization](https://developers.notion.com/guides/get-started/authorization). Share the target page with the connection before syncing.
 
 After at least one sink is ready, `Save + sync` becomes available in the popup. Sync failure does not affect local save.
 
-`notion-api` creates a Notion page through the official Notion API. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
+`notion-api` creates a Notion page through the official Notion API and does not use Notion MCP. `flomo-api` posts to flomo's incoming webhook API and requires flomo Pro access. `local-export` writes JSON files under `.clipplane/sinks/local-export/` and is mainly for local verification.
 
 <details>
 <summary>Advanced configuration</summary>

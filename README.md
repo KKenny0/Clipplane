@@ -6,6 +6,12 @@
 
 Clipplane 会把浏览器里的页面正文或选中文本交给本机 Native Messaging host，清理成 Markdown，转换为 org-mode 条目，并追加到 `~/Documents/notes/inbox.org`。外部服务是可选同步目标，不是保存成功的前置条件。
 
+## 产品预览
+
+![Clipplane popup](assets/screenshots/popup.png)
+
+![Clipplane settings](assets/screenshots/settings.png)
+
 ## 它解决什么
 
 Clipplane 的第一原则很简单：剪藏内容必须先落到用户自己的本地文件里。
@@ -140,12 +146,12 @@ Clipplane 的应用设置保存在系统应用配置目录里；剪藏内容仍�
 
 外部 sink 默认关闭。在扩展的 `Settings` 页面配置：
 
-- flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。
-- Notion：开启 Notion，填写 page ID 和 integration token。
+- flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。官方入口：[API & URL Scheme](https://help.flomoapp.com/advance/api.html)，webhook 页面：[flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook)。flomo API 需要 Pro 权限。
+- Notion：开启 Notion，填写 page ID 和 integration token。官方入口：[Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) 和 [Authorization](https://developers.notion.com/guides/get-started/authorization)。目标 page 需要授权给对应 connection，否则 API 无法写入。
 
 配置完成后，弹窗里的 `Save + sync` 会变为可用。同步失败不会影响本地保存。
 
-`notion-api` 会通过 Notion 官方 API 创建页面。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
+`notion-api` 会通过 Notion 官方 API 创建页面，不走 Notion MCP。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
 
 <details>
 <summary>高级配置</summary>
