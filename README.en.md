@@ -87,9 +87,9 @@ Run environment checks:
 pwsh -NoLogo -NoProfile -Command "npm run doctor"
 ```
 
-## Quick Local Smoke Test
+## Quick Start
 
-Before loading the extension, verify the local clip core:
+First verify the local clip core:
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke"
@@ -97,7 +97,7 @@ pwsh -NoLogo -NoProfile -Command "npm run smoke"
 
 This writes a temporary `inbox.org` under the system temp directory and prints the captured org entry.
 
-## Load The Extension
+Then load the browser extension:
 
 1. Open `chrome://extensions` or `edge://extensions`.
 2. Enable Developer mode.
@@ -105,26 +105,75 @@ This writes a temporary `inbox.org` under the system temp directory and prints t
 4. Select the `extension` folder.
 5. Copy the generated extension ID.
 
-## Install The Native Host On Windows
+Next register the Native Messaging host for your platform.
+
+### Windows
 
 Install for Chrome:
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
 ```
 
 Install for Edge:
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser edge -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge -ExtensionId "<extension-id>"
 ```
 
-The installer writes `native-host/com.clipplane.host.json` and registers it under the current user's Native Messaging registry key.
+You can also pass the extension ID through npm scripts:
+
+```powershell
+npm run setup:windows:chrome -- -ExtensionId "<extension-id>"
+npm run setup:windows:edge -- -ExtensionId "<extension-id>"
+```
+
+### macOS
+
+Install for Chrome:
+
+```bash
+bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
+```
+
+Install for Edge:
+
+```bash
+bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
+```
+
+You can also pass the extension ID through npm scripts:
+
+```bash
+npm run setup:macos:chrome -- --extension-id "<extension-id>"
+npm run setup:macos:edge -- --extension-id "<extension-id>"
+```
+
+The macOS installer writes `native-host/clipplane-host` and copies the Native Messaging manifest into the current user's browser directory:
+
+- Chrome: `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`
+- Edge: `~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/`
+
+### Check The Install
+
+Run the cross-platform doctor:
+
+```powershell
+pwsh -NoLogo -NoProfile -Command "npm run doctor"
+```
+
+If the extension popup says `Host unavailable`, rerun the matching setup command with the exact extension ID shown by your browser.
 
 Verify the Chrome host registration:
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\check-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
+```
+
+Verify the Chrome host registration on macOS:
+
+```bash
+bash scripts/check-native-host-macos.sh --browser chrome --extension-id "<extension-id>"
 ```
 
 Uninstall:

@@ -91,9 +91,9 @@ pwsh -NoLogo -NoProfile -Command "npm run smoke:sync:local"
 pwsh -NoLogo -NoProfile -Command "npm run doctor"
 ```
 
-## 快速本地验证
+## 快速开始
 
-加载扩展前，先验证本地剪藏核心：
+先验证本地剪藏核心：
 
 ```powershell
 pwsh -NoLogo -NoProfile -Command "npm run smoke"
@@ -101,7 +101,7 @@ pwsh -NoLogo -NoProfile -Command "npm run smoke"
 
 这会在系统临时目录下写入一个临时 `inbox.org`，并打印生成的 org 条目。
 
-## 加载浏览器扩展
+然后加载浏览器扩展：
 
 1. 打开 `chrome://extensions` 或 `edge://extensions`。
 2. 开启 Developer mode。
@@ -109,26 +109,75 @@ pwsh -NoLogo -NoProfile -Command "npm run smoke"
 4. 选择仓库里的 `extension` 目录。
 5. 复制浏览器生成的 extension ID。
 
-## 在 Windows 安装 Native Host
+再按平台注册 Native Messaging host。
+
+### Windows
 
 安装到 Chrome：
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
 ```
 
 安装到 Edge：
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\install-native-host.ps1 -Browser edge -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge -ExtensionId "<extension-id>"
 ```
 
-安装脚本会生成 `native-host/com.clipplane.host.json`，并把 Native Messaging host 注册到当前用户的浏览器 registry key。
+也可以通过 npm script 传入 extension ID：
+
+```powershell
+npm run setup:windows:chrome -- -ExtensionId "<extension-id>"
+npm run setup:windows:edge -- -ExtensionId "<extension-id>"
+```
+
+### macOS
+
+安装到 Chrome：
+
+```bash
+bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
+```
+
+安装到 Edge：
+
+```bash
+bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
+```
+
+也可以通过 npm script 传入 extension ID：
+
+```bash
+npm run setup:macos:chrome -- --extension-id "<extension-id>"
+npm run setup:macos:edge -- --extension-id "<extension-id>"
+```
+
+macOS 安装脚本会生成 `native-host/clipplane-host` launcher，并把 Native Messaging manifest 写到当前用户的浏览器目录：
+
+- Chrome：`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`
+- Edge：`~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/`
+
+### 检查安装
+
+运行跨平台 doctor：
+
+```powershell
+pwsh -NoLogo -NoProfile -Command "npm run doctor"
+```
+
+如果扩展弹窗显示 `Host unavailable`，用浏览器扩展页里显示的准确 extension ID 重新运行对应平台的 setup 命令。
 
 检查 Chrome host 注册：
 
 ```powershell
 pwsh -NoLogo -NoProfile -File .\scripts\check-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
+```
+
+macOS 检查 Chrome host：
+
+```bash
+bash scripts/check-native-host-macos.sh --browser chrome --extension-id "<extension-id>"
 ```
 
 卸载：
