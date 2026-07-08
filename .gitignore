@@ -1,6 +1,10 @@
 node_modules/
 npm-debug.log*
 *.log
+*.pem
+*.key
+*.p12
+*.pfx
 
 native-host/com.clipplane.host.json
 
