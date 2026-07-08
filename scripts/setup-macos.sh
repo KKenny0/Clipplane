@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: scripts/setup-macos.sh --browser chrome|edge --extension-id <id> [--notes-dir <path>]
+Usage: scripts/setup-macos.sh --browser chrome|edge [--extension-id <id>] [--notes-dir <path>]
 EOF
 }
 
@@ -46,11 +46,6 @@ case "$browser" in
     ;;
 esac
 
-if ! printf '%s' "$extension_id" | grep -Eq '^[a-p]{32}$'; then
-  echo "Extension ID must be a 32-character Chrome extension ID using letters a-p." >&2
-  exit 2
-fi
-
 node_path="$(command -v node || true)"
 if [ -z "$node_path" ]; then
   echo "Node.js is required but was not found on PATH." >&2
@@ -59,6 +54,16 @@ fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 project_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
+
+if [ -z "$extension_id" ]; then
+  extension_id="$("$node_path" "$script_dir/extension-identity.mjs" id)"
+fi
+
+if ! printf '%s' "$extension_id" | grep -Eq '^[a-p]{32}$'; then
+  echo "Extension ID must be a 32-character Chrome extension ID using letters a-p." >&2
+  exit 2
+fi
+
 host_dir="$project_root/native-host"
 launcher_path="$host_dir/clipplane-host"
 manifest_path="$host_dir/com.clipplane.host.json"

@@ -3,7 +3,6 @@ param(
   [ValidateSet("chrome", "edge")]
   [string]$Browser,
 
-  [Parameter(Mandatory = $true)]
   [string]$ExtensionId,
 
   [string]$NotesDir
@@ -11,8 +10,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ($ExtensionId -notmatch "^[a-p]{32}$") {
-  throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+function Resolve-ClipplaneExtensionId {
+  param(
+    [string]$ExtensionId,
+    [Parameter(Mandatory = $true)]
+    [string]$NodePath,
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectRoot
+  )
+
+  if ($ExtensionId) {
+    return $ExtensionId
+  }
+
+  $identityScript = Join-Path $ProjectRoot "scripts\extension-identity.mjs"
+  $resolved = & $NodePath $identityScript id
+  if ($LASTEXITCODE -ne 0 -or -not $resolved) {
+    throw "ExtensionId was not provided and the default Clipplane extension ID could not be resolved. Pass -ExtensionId for development builds."
+  }
+
+  return $resolved.Trim()
 }
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -20,6 +37,16 @@ $hostDir = Join-Path $projectRoot "native-host"
 $launcherPath = Join-Path $hostDir "clipplane-host.cmd"
 $manifestPath = Join-Path $hostDir "com.clipplane.host.json"
 $nodePath = (Get-Command node -ErrorAction Stop).Source
+
+$ExtensionId = Resolve-ClipplaneExtensionId -ExtensionId $ExtensionId -NodePath $nodePath -ProjectRoot $projectRoot
+
+if ($ExtensionId -notmatch "^[a-p]{32}$") {
+  throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+}
+
+if ($NotesDir -and $NotesDir -match "[`"`r`n]") {
+  throw "NotesDir must not contain quotes or newlines."
+}
 
 $envLine = if ($NotesDir) { "set `"CLIPPLANE_NOTES_DIR=$NotesDir`"" } else { "rem CLIPPLANE_NOTES_DIR not set" }
 $launcher = @"

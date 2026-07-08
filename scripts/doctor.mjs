@@ -4,10 +4,21 @@ import os from "node:os";
 import path from "node:path";
 import { resolveConfiguredPaths } from "../native-host/config.mjs";
 import { getSyncStatus } from "../native-host/sync-core.mjs";
+import { getDefaultExtensionId } from "./extension-identity.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const platform = os.platform();
 let ok = true;
+let defaultExtensionId = "";
+
+try {
+  defaultExtensionId = await getDefaultExtensionId(root);
+  console.log(`PASS extension id: ${defaultExtensionId}`);
+} catch (error) {
+  ok = false;
+  console.log(`FAIL extension id: ${error.message}`);
+  console.log("NEXT ensure extension/manifest.json contains Clipplane's public manifest key.");
+}
 
 checkFile("extension manifest", path.join(root, "extension", "manifest.json"));
 checkFile("native host", path.join(root, "native-host", "host.mjs"));
@@ -46,7 +57,7 @@ for (const [name, status] of Object.entries(sync.sinks)) {
   console.log(`INFO sink ${name}: enabled=${status.enabled} configured=${status.configured}`);
 }
 
-console.log("NEXT if the extension popup says Host unavailable, rerun the setup command with the exact extension ID from your browser.");
+console.log("NEXT if the extension popup says Host unavailable, rerun the setup command for your browser.");
 console.log("NEXT Notion and flomo can stay unconfigured unless you want Save + sync.");
 
 process.exitCode = ok ? 0 : 1;
@@ -61,7 +72,7 @@ function checkFile(label, file) {
 function checkExecutable(label, file) {
   const exists = checkFile(label, file);
   if (!exists) {
-    console.log("NEXT run: bash scripts/setup-macos.sh --browser chrome --extension-id <extension-id>");
+    console.log("NEXT run: bash scripts/setup-macos.sh --browser chrome");
     return false;
   }
 
@@ -89,13 +100,18 @@ function checkWindowsRegistration(browser) {
     });
     const manifestPath = parseRegistryDefault(output);
     if (manifestPath && fs.existsSync(manifestPath)) {
-      console.log(`PASS ${browser} native host registry: ${manifestPath}`);
+      if (manifestAllowsDefaultOrigin(manifestPath)) {
+        console.log(`PASS ${browser} native host registry: ${manifestPath}`);
+      } else {
+        console.log(`WARN ${browser} native host registry exists but does not allow Clipplane extension ID: ${defaultExtensionId || "(unresolved)"}`);
+        console.log(`NEXT run: pwsh -NoLogo -NoProfile -File .\\scripts\\setup-windows.ps1 -Browser ${browser}`);
+      }
       return;
     }
     console.log(`WARN ${browser} native host registry exists but manifest is missing: ${manifestPath || "(empty)"}`);
   } catch {
     console.log(`WARN ${browser} native host is not registered.`);
-    console.log(`NEXT run: pwsh -NoLogo -NoProfile -File .\\scripts\\setup-windows.ps1 -Browser ${browser} -ExtensionId "<extension-id>"`);
+    console.log(`NEXT run: pwsh -NoLogo -NoProfile -File .\\scripts\\setup-windows.ps1 -Browser ${browser}`);
   }
 }
 
@@ -105,12 +121,17 @@ function checkMacManifest(browser) {
     : path.join(os.homedir(), "Library", "Application Support", "Microsoft Edge", "NativeMessagingHosts", "com.clipplane.host.json");
 
   if (fs.existsSync(manifestPath)) {
-    console.log(`PASS ${browser} native host manifest: ${manifestPath}`);
+    if (manifestAllowsDefaultOrigin(manifestPath)) {
+      console.log(`PASS ${browser} native host manifest: ${manifestPath}`);
+    } else {
+      console.log(`WARN ${browser} native host manifest exists but does not allow Clipplane extension ID: ${defaultExtensionId || "(unresolved)"}`);
+      console.log(`NEXT run: bash scripts/setup-macos.sh --browser ${browser}`);
+    }
     return;
   }
 
   console.log(`WARN ${browser} native host manifest is missing: ${manifestPath}`);
-  console.log(`NEXT run: bash scripts/setup-macos.sh --browser ${browser} --extension-id <extension-id>`);
+  console.log(`NEXT run: bash scripts/setup-macos.sh --browser ${browser}`);
 }
 
 function parseRegistryDefault(output) {
@@ -120,4 +141,17 @@ function parseRegistryDefault(output) {
     .find((value) => value.includes("REG_SZ"));
 
   return line?.replace(/^.*REG_SZ\s+/, "").trim() || "";
+}
+
+function manifestAllowsDefaultOrigin(manifestPath) {
+  if (!defaultExtensionId) {
+    return false;
+  }
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    return manifest.allowed_origins?.includes(`chrome-extension://${defaultExtensionId}/`) || false;
+  } catch {
+    return false;
+  }
 }
