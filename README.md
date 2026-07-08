@@ -18,13 +18,13 @@ Clipplane 由浏览器扩展和本地 Native Messaging host 组成。扩展负�
 
 Clipplane 仍是 dev preview：
 
-- GitHub Release 提供打包好的扩展 zip，用于手动 `Load unpacked`。
+- GitHub Release 提供打包好的扩展 zip，用于手动 `Load unpacked`，扩展 ID 固定为 `mhgcfphfcgbgabhbegdonadkedfaddhc`。
 - 本地 host 和 setup 脚本来自源码仓库，或 Release 自带的 `Source code` 包。
-- 目前还没有上架 Chrome Web Store 或 Edge Add-ons。
-- 现阶段 setup 仍需要浏览器生成的 extension ID。
-- 后续 `v0.4` 会优先推进商店分发和更低摩擦的 host 安装流程。
+- 目前还没有上架 Chrome Web Store 或 Edge Add-ons；Chrome Web Store 不是 v0.4 的依赖。
+- setup 默认使用固定 extension ID，普通用户不需要复制浏览器生成的 ID。
+- Edge Add-ons 可以作为后续免费商店分发路径单独推进。
 
-Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。商店分发前，手动加载的扩展 ID 由浏览器生成，所以 setup 脚本需要这个 ID 来写入本机 manifest。
+Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。Clipplane 的 `manifest.key` 是公开身份 key，用于让手动加载的扩展保持稳定 ID；它不是签名私钥，仓库也不保存 `.pem` 或其他私钥文件。
 
 ## 5 分钟开始
 
@@ -50,32 +50,32 @@ npm run smoke
 2. 开启 `Developer mode`。
 3. 点击 `Load unpacked`。
 4. 选择解压后的 `clipplane-extension-vX` 目录，或源码仓库里的 `extension` 目录。
-5. 复制浏览器显示的 extension ID。
+5. 确认浏览器显示的 extension ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`。
 
 ### 3. 注册本地 host
 
 Windows Chrome：
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome
 ```
 
 Windows Edge：
 
 ```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge -ExtensionId "<extension-id>"
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge
 ```
 
 macOS Chrome：
 
 ```bash
-bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
+bash scripts/setup-macos.sh --browser chrome
 ```
 
 macOS Edge：
 
 ```bash
-bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
+bash scripts/setup-macos.sh --browser edge
 ```
 
 ### 4. 检查安装
@@ -84,7 +84,7 @@ bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
 npm run doctor
 ```
 
-如果扩展弹窗显示 `Host unavailable`，通常是 extension ID 不匹配。回到浏览器扩展页复制准确 ID，然后重新运行对应平台的 setup 命令。
+如果扩展弹窗显示 `Host unavailable`，先复制弹窗里的 setup 命令并重新运行。开发版或自定义 manifest 才需要在高级模式下传入手动 extension ID。
 
 ### 5. 开始剪藏
 
@@ -189,7 +189,7 @@ npm run doctor
 npm run package:extension
 ```
 
-`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。
+`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。打包脚本会拒绝 `.pem`、`.key`、`.p12`、`.pfx`、`.env*` 和 Native Messaging 本机 manifest 进入扩展包。
 
 <details>
 <summary>高级配置</summary>
@@ -203,6 +203,16 @@ $env:CLIPPLANE_FLOMO_WEBHOOK_URL = "https://flomoapp.com/iwh/..."
 ```
 
 浏览器启动的 Native Messaging host 只能读取浏览器进程可见的环境变量，所以普通使用不建议走这条路径。
+
+如果你在开发自定义扩展 identity，可以手动覆盖 extension ID：
+
+```powershell
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
+```
+
+```bash
+bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
+```
 
 配置文件结构：
 
@@ -241,8 +251,8 @@ Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分�
 
 ## 排查
 
-- `Specified native messaging host not found`：对当前浏览器运行 `check-native-host.ps1`。
-- `Access to the specified native messaging host is forbidden`：用 `chrome://extensions` 或 `edge://extensions` 里显示的准确 extension ID 重新安装。
+- `Specified native messaging host not found`：对当前浏览器重新运行 setup 命令，再运行 `npm run doctor`。
+- `Access to the specified native messaging host is forbidden`：确认扩展 ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`，然后重新运行对应浏览器的 setup 命令。
 - `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
 - 页面剪藏为空或噪声太多：优先选中文本剪藏。当前阶段使用轻量 DOM 提取器，不是完整 readability engine。
 
