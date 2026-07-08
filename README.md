@@ -1,10 +1,91 @@
 # Clipplane
 
-> 本地优先的浏览器剪藏工具：把网页或选中文本保存到本地 `inbox.org`，再按需同步到 Notion 或 flomo。
+> 本地优先的浏览器剪藏工具：把网页或选中文本先保存到你自己的本地 `inbox.org`，再按需同步到 Notion 或 flomo。
 
 [English README](README.en.md)
 
-Clipplane 会把浏览器里的页面正文或选中文本交给本机 Native Messaging host，清理成 Markdown，转换为 org-mode 条目，并追加到 `~/Documents/notes/inbox.org`。外部服务是可选同步目标，不是保存成功的前置条件。
+Clipplane 由一个浏览器扩展和一个本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不是保存成功的前置条件。
+
+## 当前状态
+
+Clipplane 还处在 dev preview 阶段：
+
+- GitHub Release 会提供打包好的扩展 zip，适合手动 `Load unpacked`。
+- 本地 host 和 setup 脚本仍来自源码仓库或 Release 自带的 Source code 包。
+- 目前还没有上架 Chrome Web Store 或 Edge Add-ons。
+- 现阶段仍然需要把浏览器生成的 extension ID 交给本地 setup 脚本。
+- 后续 `v0.4` 会优先推进商店分发和更低摩擦的 host 安装流程。
+
+为什么还需要 extension ID：Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。商店分发前，手动加载的扩展 ID 由浏览器生成，所以 setup 脚本需要这个 ID 来写入本机 manifest。
+
+## 5 分钟开始
+
+### 1. 准备项目
+
+如果你只是试用，从最新 Release 下载两样东西：
+
+- `Source code`：里面有本地 host 和 setup 脚本。
+- `clipplane-extension-vX.zip`：浏览器要加载的扩展包。
+
+把两者分别解压到固定目录，然后在 `Source code` 目录里运行下面命令。如果你直接从 Git 仓库运行，也是在仓库根目录运行同样命令：
+
+```powershell
+npm install
+npm run smoke
+```
+
+`smoke` 会在系统临时目录写入一份测试用 `inbox.org`，用来确认本地剪藏核心可以工作。
+
+### 2. 加载浏览器扩展
+
+1. 打开 `chrome://extensions` 或 `edge://extensions`。
+2. 开启 `Developer mode`。
+3. 点击 `Load unpacked`。
+4. 选择解压后的 `clipplane-extension-vX` 目录，或源码仓库里的 `extension` 目录。
+5. 复制浏览器显示的 extension ID。
+
+### 3. 注册本地 host
+
+Windows Chrome：
+
+```powershell
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
+```
+
+Windows Edge：
+
+```powershell
+pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge -ExtensionId "<extension-id>"
+```
+
+macOS Chrome：
+
+```bash
+bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
+```
+
+macOS Edge：
+
+```bash
+bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
+```
+
+### 4. 检查安装
+
+```powershell
+npm run doctor
+```
+
+如果扩展弹窗显示 `Host unavailable`，通常是 extension ID 不匹配。回到浏览器扩展页复制准确 ID，然后重新运行对应平台的 setup 命令。
+
+### 5. 开始剪藏
+
+打开任意网页，点击 Clipplane 扩展：
+
+- `Save local`：只保存到本地。
+- `Save + sync`：先保存到本地，再同步到已启用的外部 sink。
+
+也可以选中一段文字后用右键菜单剪藏。
 
 ## 产品预览
 
@@ -19,18 +100,34 @@ Clipplane 会把浏览器里的页面正文或选中文本交给本机 Native Me
   </tr>
 </table>
 
-## 它解决什么
+### Notion 同步效果
 
-Clipplane 的第一原则很简单：剪藏内容必须先落到用户自己的本地文件里。
+启用 Notion sink 后，`Save + sync` 会先保存到本地，再在目标 Notion page 下创建页面。
 
-- 浏览器按钮和右键菜单触发剪藏
-- Native Messaging host 在本机处理内容
-- `inbox.org` 是人可读的主入口
-- `.clipplane/captures.jsonl` 是机器可读的审计和重试日志
-- 用内容 hash 跳过重复剪藏
-- 可选同步到 Notion API 或 flomo webhook API
+<p align="center">
+  <img src="assets/screenshots/sync-to-notion.png" alt="Clipplane 同步到 Notion 的结果" width="760">
+</p>
 
-本地保存和外部同步解耦。用户点击 `Save local` 时只写本地；点击 `Save + sync` 时，才会在本地保存后尝试同步到已配置的 sink。
+## Clipplane 保存什么
+
+默认保存到：
+
+- `~/Documents/notes/inbox.org`
+- `~/Documents/notes/.clipplane/captures.jsonl`
+- `~/Documents/notes/.clipplane/captures/<capture-id>.md`
+
+`inbox.org` 是人可读的主文件；`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
+
+打开扩展里的 `Settings` 可以查看当前保存目录、修改保存目录，或直接打开本地文件夹。普通用户不需要设置环境变量，也不需要编辑 launcher。
+
+## 外部同步
+
+外部 sink 默认关闭。配置完成后，弹窗里的 `Save + sync` 才会可用。同步失败不会影响本地保存。
+
+- flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。官方入口：[API & URL Scheme](https://help.flomoapp.com/advance/api.html)，webhook 页面：[flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook)。flomo API 需要 Pro 权限。
+- Notion：开启 Notion，填写 page ID 和 integration token。官方入口：[Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) 和 [Authorization](https://developers.notion.com/guides/get-started/authorization)。目标 page 需要授权给对应 connection，否则 API 无法写入。
+
+`notion-api` 通过 Notion 官方 API 创建页面，不走 Notion MCP。`flomo-api` 调用 flomo incoming webhook API。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
 
 ## 参考工作流
 
@@ -56,166 +153,28 @@ flowchart LR
 
 Native host 会先把完整内容写到本地，再尝试任何同步。Phase 2 的同步使用直接 API，不需要 Claude Code、Codex CLI、Agent CLI 或 MCP 才能保存和同步剪藏。
 
-## 目录结构
+## 开发
+
+目录结构：
 
 ```text
 extension/           Manifest V3 浏览器扩展
 native-host/         Native Messaging host 和剪藏核心
-scripts/             安装、卸载、smoke、doctor 脚本
+scripts/             安装、卸载、smoke、doctor、打包脚本
 test/                基于 node:test 的核心逻辑测试
 ```
 
-## 开发
-
-运行测试：
+常用命令：
 
 ```powershell
-pwsh -NoLogo -NoProfile -Command "npm test"
+npm test
+npm run smoke
+npm run smoke:sync:local
+npm run doctor
+npm run package:extension
 ```
 
-不通过浏览器跑一次本地剪藏 smoke：
-
-```powershell
-pwsh -NoLogo -NoProfile -Command "npm run smoke"
-```
-
-不访问网络跑一次本地同步 smoke：
-
-```powershell
-pwsh -NoLogo -NoProfile -Command "npm run smoke:sync:local"
-```
-
-检查本机环境：
-
-```powershell
-pwsh -NoLogo -NoProfile -Command "npm run doctor"
-```
-
-## 快速开始
-
-先验证本地剪藏核心：
-
-```powershell
-pwsh -NoLogo -NoProfile -Command "npm run smoke"
-```
-
-这会在系统临时目录下写入一个临时 `inbox.org`，并打印生成的 org 条目。
-
-然后加载浏览器扩展：
-
-1. 打开 `chrome://extensions` 或 `edge://extensions`。
-2. 开启 Developer mode。
-3. 点击 `Load unpacked`。
-4. 选择仓库里的 `extension` 目录。
-5. 复制浏览器生成的 extension ID。
-
-再按平台注册 Native Messaging host。
-
-### Windows
-
-安装到 Chrome：
-
-```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser chrome -ExtensionId "<extension-id>"
-```
-
-安装到 Edge：
-
-```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge -ExtensionId "<extension-id>"
-```
-
-也可以通过 npm script 传入 extension ID：
-
-```powershell
-npm run setup:windows:chrome -- -ExtensionId "<extension-id>"
-npm run setup:windows:edge -- -ExtensionId "<extension-id>"
-```
-
-### macOS
-
-安装到 Chrome：
-
-```bash
-bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
-```
-
-安装到 Edge：
-
-```bash
-bash scripts/setup-macos.sh --browser edge --extension-id "<extension-id>"
-```
-
-也可以通过 npm script 传入 extension ID：
-
-```bash
-npm run setup:macos:chrome -- --extension-id "<extension-id>"
-npm run setup:macos:edge -- --extension-id "<extension-id>"
-```
-
-macOS 安装脚本会生成 `native-host/clipplane-host` launcher，并把 Native Messaging manifest 写到当前用户的浏览器目录：
-
-- Chrome：`~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`
-- Edge：`~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/`
-
-### 检查安装
-
-运行跨平台 doctor：
-
-```powershell
-pwsh -NoLogo -NoProfile -Command "npm run doctor"
-```
-
-如果扩展弹窗显示 `Host unavailable`，用浏览器扩展页里显示的准确 extension ID 重新运行对应平台的 setup 命令。
-
-检查 Chrome host 注册：
-
-```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\check-native-host.ps1 -Browser chrome -ExtensionId "<extension-id>"
-```
-
-macOS 检查 Chrome host：
-
-```bash
-bash scripts/check-native-host-macos.sh --browser chrome --extension-id "<extension-id>"
-```
-
-卸载：
-
-```powershell
-pwsh -NoLogo -NoProfile -File .\scripts\uninstall-native-host.ps1 -Browser chrome
-```
-
-## 数据文件
-
-默认写入：
-
-- `~/Documents/notes/inbox.org`
-- `~/Documents/notes/.clipplane/captures.jsonl`
-- `~/Documents/notes/.clipplane/captures/<capture-id>.md`
-
-打开扩展里的 `Settings` 可以查看当前保存目录、修改保存目录，或直接打开本地文件夹。普通用户不需要设置环境变量，也不需要编辑 launcher。
-
-Clipplane 的应用设置保存在系统应用配置目录里；剪藏内容仍然保存在你选择的 notes 目录里。
-
-## 外部 Sink
-
-外部 sink 默认关闭。在扩展的 `Settings` 页面配置：
-
-- flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。官方入口：[API & URL Scheme](https://help.flomoapp.com/advance/api.html)，webhook 页面：[flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook)。flomo API 需要 Pro 权限。
-- Notion：开启 Notion，填写 page ID 和 integration token。官方入口：[Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) 和 [Authorization](https://developers.notion.com/guides/get-started/authorization)。目标 page 需要授权给对应 connection，否则 API 无法写入。
-
-配置完成后，弹窗里的 `Save + sync` 会变为可用。同步失败不会影响本地保存。
-
-`notion-api` 会通过 Notion 官方 API 创建页面，不走 Notion MCP。`flomo-api` 会调用 flomo incoming webhook API，需要 flomo Pro 权限。`local-export` 会把同步结果写到 `.clipplane/sinks/local-export/`，主要用于本地验证。
-
-### Notion 同步效果
-
-启用 Notion sink 后，`Save + sync` 会先保存到本地，再在目标 Notion page 下创建页面。
-
-<p align="center">
-  <img src="assets/screenshots/sync-to-notion.png" alt="Clipplane 同步到 Notion 的结果" width="760">
-</p>
+`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展；native host 仍随源码包分发。
 
 <details>
 <summary>高级配置</summary>
