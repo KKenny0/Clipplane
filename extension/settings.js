@@ -1,7 +1,17 @@
+import {
+  copySetupCommand,
+  getSetupCommand,
+  isHostUnavailable,
+  openSetupGuide,
+  safeErrorMessage
+} from "./setup-guide.js";
+
 const stateEl = document.querySelector("#settings-state");
 const resultEl = document.querySelector("#result");
 const storageStatusEl = document.querySelector("#storage-status");
 const syncStatusEl = document.querySelector("#sync-status");
+const hostPanelEl = document.querySelector("#host-panel");
+const setupCommandEl = document.querySelector("#setup-command");
 const fields = {
   notesDir: document.querySelector("#notes-dir"),
   flomoEnabled: document.querySelector("#flomo-enabled"),
@@ -15,11 +25,27 @@ const fields = {
   storageNote: document.querySelector("#storage-note")
 };
 const buttons = [...document.querySelectorAll("button")];
+const hostDependentControls = [
+  fields.notesDir,
+  fields.flomoEnabled,
+  fields.flomoWebhook,
+  fields.flomoTags,
+  fields.notionEnabled,
+  fields.notionPage,
+  fields.notionToken,
+  document.querySelector("#save-storage"),
+  document.querySelector("#open-folder"),
+  document.querySelector("#save-sync")
+];
+let hostAvailable = true;
 
 document.querySelector("#save-storage").addEventListener("click", saveStorage);
 document.querySelector("#open-folder").addEventListener("click", openFolder);
 document.querySelector("#save-sync").addEventListener("click", saveSync);
 document.querySelector("#sync-form").addEventListener("submit", (event) => event.preventDefault());
+document.querySelector("#copy-setup").addEventListener("click", copySetup);
+document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
+document.querySelector("#retry-host").addEventListener("click", loadSettings);
 
 loadSettings();
 
@@ -29,14 +55,24 @@ async function loadSettings() {
   try {
     const response = await sendNative({ type: "get_config" });
     if (!response.ok) {
+      if (isHostUnavailable(response)) {
+        renderHostUnavailable();
+        return;
+      }
       throw new Error(response.error?.message || "Could not load settings.");
     }
+    hostAvailable = true;
+    hostPanelEl.hidden = true;
     renderSettings(response);
     showResult("");
     loaded = true;
   } catch (error) {
-    showResult(error.message, true);
-    stateEl.textContent = "Host unavailable";
+    showResult(safeErrorMessage(error), true);
+    if (!hostAvailable) {
+      stateEl.textContent = "Host unavailable";
+    } else {
+      stateEl.textContent = "Error";
+    }
   } finally {
     setBusy(false, loaded ? "Ready" : stateEl.textContent);
   }
@@ -54,12 +90,16 @@ async function saveStorage() {
       }
     });
     if (!response.ok) {
+      if (isHostUnavailable(response)) {
+        renderHostUnavailable();
+        throw new Error("Run local host setup, then retry.");
+      }
       throw new Error(response.error?.message || "Could not save folder.");
     }
     renderSettings(response);
     showResult("Folder saved");
   } catch (error) {
-    showResult(error.message, true);
+    showResult(safeErrorMessage(error), true);
   } finally {
     setBusy(false, "Ready");
   }
@@ -96,6 +136,10 @@ async function saveSync() {
       }
     });
     if (!response.ok) {
+      if (isHostUnavailable(response)) {
+        renderHostUnavailable();
+        throw new Error("Run local host setup, then retry.");
+      }
       throw new Error(response.error?.message || "Could not save sync settings.");
     }
     fields.flomoWebhook.value = "";
@@ -103,7 +147,7 @@ async function saveSync() {
     renderSettings(response);
     showResult("Sync settings saved");
   } catch (error) {
-    showResult(error.message, true);
+    showResult(safeErrorMessage(error), true);
   } finally {
     setBusy(false, "Ready");
   }
@@ -114,11 +158,15 @@ async function openFolder() {
   try {
     const response = await sendNative({ type: "open_notes_dir" });
     if (!response.ok) {
+      if (isHostUnavailable(response)) {
+        renderHostUnavailable();
+        throw new Error("Run local host setup, then retry.");
+      }
       throw new Error(response.error?.message || "Could not open folder.");
     }
     showResult(`Folder opened at ${formatTime(response.opened_at)}`);
   } catch (error) {
-    showResult(error.message, true);
+    showResult(safeErrorMessage(error), true);
   } finally {
     setBusy(false, "Ready");
   }
@@ -162,10 +210,11 @@ function setStatus(element, text, state) {
 }
 
 function setBusy(isBusy, label) {
-  stateEl.textContent = label;
+  stateEl.textContent = isBusy ? label : (hostAvailable ? label : "Host unavailable");
   for (const button of buttons) {
     button.disabled = isBusy;
   }
+  updateHostDependentControls(isBusy);
 }
 
 function showResult(message, isError = false) {
@@ -190,4 +239,29 @@ function formatTime(value) {
 
 function sendNative(message) {
   return chrome.runtime.sendMessage(message);
+}
+
+function renderHostUnavailable() {
+  hostAvailable = false;
+  hostPanelEl.hidden = false;
+  setupCommandEl.textContent = getSetupCommand();
+  stateEl.textContent = "Host unavailable";
+  setStatus(storageStatusEl, "Unavailable", "warning");
+  setStatus(syncStatusEl, "Unavailable", "warning");
+  updateHostDependentControls();
+}
+
+function updateHostDependentControls(isBusy = false) {
+  for (const control of hostDependentControls) {
+    control.disabled = isBusy || !hostAvailable;
+  }
+}
+
+async function copySetup() {
+  try {
+    await copySetupCommand();
+    showResult("Setup command copied.");
+  } catch {
+    showResult("Could not copy. Select the command shown above.", true);
+  }
 }

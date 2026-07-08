@@ -27,11 +27,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (["status", "get_config", "set_config", "open_notes_dir"].includes(message?.type)) {
-    chrome.runtime.sendNativeMessage(HOST_NAME, message)
-      .then(sendResponse)
-      .catch((error) => {
-        sendResponse({ ok: false, error: { message: error.message } });
-      });
+    sendNative(message).then(sendResponse);
     return true;
   }
 
@@ -58,7 +54,7 @@ async function clipTab(tabId, mode, sync = false) {
     args: [mode]
   });
 
-  const response = await chrome.runtime.sendNativeMessage(HOST_NAME, {
+  const response = await sendNative({
     type: "clip",
     payload: result,
     sync
@@ -66,6 +62,21 @@ async function clipTab(tabId, mode, sync = false) {
 
   await chrome.storage.local.set({ lastClipResult: response });
   return response;
+}
+
+async function sendNative(message) {
+  try {
+    return await chrome.runtime.sendNativeMessage(HOST_NAME, message);
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "host_unavailable",
+        message: "Host unavailable. Run the Clipplane local host setup for this browser.",
+        detail: error.message
+      }
+    };
+  }
 }
 
 function collectPagePayload(mode) {

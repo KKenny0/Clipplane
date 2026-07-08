@@ -68,6 +68,19 @@ h2 {
   box-shadow: 0 1px 3px oklch(25% 0.02 245 / 0.12);
 }
 
+.host-panel[hidden] {
+  display: none;
+}
+
+#setup-command {
+  display: block;
+  overflow-wrap: anywhere;
+  color: oklch(28% 0.025 245);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .section-heading,
 .toggle-row,
 .button-row {
