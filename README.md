@@ -245,3 +245,11 @@ Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分�
 - `Access to the specified native messaging host is forbidden`：用 `chrome://extensions` 或 `edge://extensions` 里显示的准确 extension ID 重新安装。
 - `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
 - 页面剪藏为空或噪声太多：优先选中文本剪藏。当前阶段使用轻量 DOM 提取器，不是完整 readability engine。
+
+## 支持 Clipplane
+
+如果 Clipplane 节省了你剪藏网页、整理本地 inbox，或同步到 Notion / flomo 的时间，可以在这里支持持续维护：
+
+<https://kkenny0.github.io/support/>
+
+支持会帮助我继续维护浏览器扩展、本地 Native Messaging host、跨平台安装流程、同步 sink 和文档。

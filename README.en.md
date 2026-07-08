@@ -245,3 +245,11 @@ Clipplane does not watch the clipboard, does not upload data by default, and doe
 - `Access to the specified native messaging host is forbidden`: reinstall with the exact extension ID shown on `chrome://extensions` or `edge://extensions`.
 - `Nothing to clip`: select text first or use `Page` mode so Clipplane can collect the page body.
 - Empty or noisy page clips: clip a selection. The current version uses a lightweight DOM extractor instead of a full readability engine.
+
+## Support
+
+If Clipplane saves you time clipping web pages, maintaining a local inbox, or syncing notes to Notion / flomo, you can support continued maintenance here:
+
+<https://kkenny0.github.io/support/>
+
+Support helps keep the browser extension, local Native Messaging host, cross-platform setup flow, sync sinks, and documentation maintained.
