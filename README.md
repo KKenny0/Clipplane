@@ -1,40 +1,48 @@
-# Clipplane
+<p align="center">
+  <img src="extension/icons/icon-128.png" alt="Clipplane logo" width="96" height="96">
+</p>
 
-> 本地优先的浏览器剪藏工具：把网页或选中文本先保存到你自己的本地 `inbox.org`，再按需同步到 Notion 或 flomo。
+<h1 align="center">Clipplane</h1>
 
-[English README](README.en.md)
+<p align="center">
+  本地优先的浏览器剪藏工具。网页或选中文本先保存到你的本地 <code>inbox.org</code>，再按需同步到 Notion 或 flomo。
+</p>
 
-Clipplane 由一个浏览器扩展和一个本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不是保存成功的前置条件。
+<p align="center">
+  <a href="README.en.md">English README</a>
+</p>
+
+Clipplane 由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
 
 ## 当前状态
 
-Clipplane 还处在 dev preview 阶段：
+Clipplane 仍是 dev preview：
 
-- GitHub Release 会提供打包好的扩展 zip，适合手动 `Load unpacked`。
-- 本地 host 和 setup 脚本仍来自源码仓库或 Release 自带的 Source code 包。
+- GitHub Release 提供打包好的扩展 zip，用于手动 `Load unpacked`。
+- 本地 host 和 setup 脚本来自源码仓库，或 Release 自带的 `Source code` 包。
 - 目前还没有上架 Chrome Web Store 或 Edge Add-ons。
-- 现阶段仍然需要把浏览器生成的 extension ID 交给本地 setup 脚本。
+- 现阶段 setup 仍需要浏览器生成的 extension ID。
 - 后续 `v0.4` 会优先推进商店分发和更低摩擦的 host 安装流程。
 
-为什么还需要 extension ID：Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。商店分发前，手动加载的扩展 ID 由浏览器生成，所以 setup 脚本需要这个 ID 来写入本机 manifest。
+Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。商店分发前，手动加载的扩展 ID 由浏览器生成，所以 setup 脚本需要这个 ID 来写入本机 manifest。
 
 ## 5 分钟开始
 
-### 1. 准备项目
+### 1. 准备文件
 
-如果你只是试用，从最新 Release 下载两样东西：
+如果你从 Release 试用，下载两样东西：
 
-- `Source code`：里面有本地 host 和 setup 脚本。
+- `Source code`：本地 host 和 setup 脚本。
 - `clipplane-extension-vX.zip`：浏览器要加载的扩展包。
 
-把两者分别解压到固定目录，然后在 `Source code` 目录里运行下面命令。如果你直接从 Git 仓库运行，也是在仓库根目录运行同样命令：
+把两者解压到固定目录。然后在 `Source code` 目录里运行：
 
 ```powershell
 npm install
 npm run smoke
 ```
 
-`smoke` 会在系统临时目录写入一份测试用 `inbox.org`，用来确认本地剪藏核心可以工作。
+如果你直接从 Git 仓库运行，也是在仓库根目录执行同样命令。`smoke` 会在系统临时目录写入一份测试用 `inbox.org`，用来确认本地剪藏核心可以工作。
 
 ### 2. 加载浏览器扩展
 
@@ -116,7 +124,7 @@ npm run doctor
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.org` 是人可读的主文件；`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
+`inbox.org` 是人可读的主文件。`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
 
 打开扩展里的 `Settings` 可以查看当前保存目录、修改保存目录，或直接打开本地文件夹。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
@@ -174,7 +182,7 @@ npm run doctor
 npm run package:extension
 ```
 
-`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展；native host 仍随源码包分发。
+`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。
 
 <details>
 <summary>高级配置</summary>
