@@ -5,14 +5,16 @@
 <h1 align="center">Clipplane</h1>
 
 <p align="center">
-  本地优先的浏览器剪藏工具。网页或选中文本先保存到你的本地 <code>inbox.org</code>，再按需同步到 Notion 或 flomo。
+  先把网页剪藏留在你的电脑上。
+  <br>
+  一键保存网页或选中文本到本地 <code>inbox.org</code>，之后可以检查完整剪藏轨迹，也可以在需要时手动同步到 Notion 或 flomo。
 </p>
 
 <p align="center">
   <a href="README.en.md">English README</a>
 </p>
 
-Clipplane 由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
+Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
 
 ## 当前状态
 

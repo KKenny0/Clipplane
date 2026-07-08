@@ -5,14 +5,16 @@
 <h1 align="center">Clipplane</h1>
 
 <p align="center">
-  A local-first browser clipper. Save pages and selections to your local <code>inbox.org</code> first, then sync to Notion or flomo when you choose.
+  Keep web clips on your machine first.
+  <br>
+  Save pages or selected text to a local <code>inbox.org</code>, inspect the capture trail later, and sync to Notion or flomo only when you choose.
 </p>
 
 <p align="center">
   <a href="README.md">中文 README</a>
 </p>
 
-Clipplane has two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.
+Clipplane is a local-first web clipper with two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.
 
 ## Current Status
 
