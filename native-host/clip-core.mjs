@@ -52,7 +52,7 @@ export async function clipPayload(payload, options = {}) {
 export function normalizePayload(payload = {}) {
   const sourceUrl = stringOr(payload.sourceUrl, "manual");
   const sourceTitle = stringOr(payload.sourceTitle, sourceUrl);
-  const contentMarkdown = stringOr(payload.contentMarkdown || payload.contentText, "").trim();
+  const contentMarkdown = cleanCapturedMarkdown(stringOr(payload.contentMarkdown || payload.contentText, ""));
 
   if (!contentMarkdown) {
     throw new ClipplaneError("empty_content", "Nothing to clip.");
@@ -68,6 +68,16 @@ export function normalizePayload(payload = {}) {
     title,
     contentMarkdown
   };
+}
+
+export function cleanCapturedMarkdown(markdown) {
+  return String(markdown)
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => !isCaptureBoilerplateLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function classifyTags(text) {
@@ -312,4 +322,14 @@ function normalizeUrlForHash(value) {
 
 function stringOr(value, fallback) {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function isCaptureBoilerplateLine(line) {
+  const text = line
+    .replace(/^\s{0,3}#{1,6}\s+/, "")
+    .replace(/^\s*[-*]\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return /^To view keyboard shortcuts, press question mark\s*View keyboard shortcuts\.?$/i.test(text);
 }

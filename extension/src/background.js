@@ -153,7 +153,7 @@ function collectPagePayload(mode) {
   function walk(node, lines, ctx) {
     if (node.nodeType === Node.TEXT_NODE) {
       const value = node.nodeValue.replace(/\s+/g, " ").trim();
-      if (value) {
+      if (value && !isBoilerplateText(value)) {
         appendText(lines, value);
       }
       return;
@@ -170,8 +170,12 @@ function collectPagePayload(mode) {
     }
 
     if (/^h[1-6]$/.test(tag)) {
+      const text = node.innerText.trim();
+      if (isBoilerplateText(text)) {
+        return;
+      }
       blank(lines);
-      lines.push(`${"#".repeat(Number(tag.slice(1)))} ${node.innerText.trim()}`);
+      lines.push(`${"#".repeat(Number(tag.slice(1)))} ${text}`);
       blank(lines);
       return;
     }
@@ -184,9 +188,13 @@ function collectPagePayload(mode) {
     }
 
     if (tag === "pre") {
+      const text = node.innerText.replace(/\n+$/g, "");
+      if (isBoilerplateText(text)) {
+        return;
+      }
       blank(lines);
       lines.push("```");
-      lines.push(node.innerText.replace(/\n+$/g, ""));
+      lines.push(text);
       lines.push("```");
       blank(lines);
       return;
@@ -214,6 +222,9 @@ function collectPagePayload(mode) {
     if (tag === "a") {
       const href = node.getAttribute("href");
       const text = node.innerText.trim();
+      if (isBoilerplateText(text)) {
+        return;
+      }
       appendText(lines, href && text ? `[${text}](${new URL(href, location.href).href})` : text);
       return;
     }
@@ -244,5 +255,10 @@ function collectPagePayload(mode) {
   function firstLine(text, fallback) {
     const line = text.split(/\r?\n/).find(Boolean) || fallback;
     return line.replace(/\s+/g, " ").slice(0, 80);
+  }
+
+  function isBoilerplateText(text) {
+    const normalized = String(text).replace(/\s+/g, " ").trim();
+    return /^To view keyboard shortcuts, press question mark\s*View keyboard shortcuts\.?$/i.test(normalized);
   }
 }
