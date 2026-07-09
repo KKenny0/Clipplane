@@ -135,7 +135,7 @@ By default Clipplane writes:
 
 `inbox.org` is the human-readable source of truth. `captures.jsonl` and `captures/` are machine-readable audit, retry, and sync records. Clipplane skips duplicate clips by content hash.
 
-Open `Settings` in the extension to view the current folder, change it, or open it in your file manager. Normal users do not need environment variables or launcher edits.
+The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder, `History` to review recent clips, local body files, and sync status, and `Sync` to configure Notion or flomo. Normal users do not need environment variables or launcher edits.
 
 ## External Sync
 
@@ -257,6 +257,7 @@ Clipplane does not watch the clipboard, does not upload data by default, and doe
 - `Access to the specified native messaging host is forbidden`: confirm the extension ID is `mhgcfphfcgbgabhbegdonadkedfaddhc`, then rerun the setup command for that browser.
 - `Nothing to clip`: select text first or use `Page` mode so Clipplane can collect the page body.
 - Empty or noisy page clips: clip a selection. The current version uses a lightweight DOM extractor instead of a full readability engine.
+- `Capture history` says unreadable records were skipped: one line in `captures.jsonl` is likely malformed. Clipplane skips the bad line and keeps showing the rest of your local trail.
 
 ## Support
 

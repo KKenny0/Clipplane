@@ -30,78 +30,107 @@
         </div>
       </section>
 
-      <section class="section" aria-labelledby="storage-title">
-        <div class="section-heading">
-          <h2 id="storage-title">Local folder</h2>
-          <span id="storage-status" class="status-pill">Checking</span>
-        </div>
-        <label class="field">
-          <span>Save clips to</span>
-          <input id="notes-dir" type="text" autocomplete="off" spellcheck="false">
-        </label>
-        <div class="button-row">
-          <button id="save-storage" class="primary" type="button">Save folder</button>
-          <button id="open-folder" class="secondary" type="button">Open folder</button>
-        </div>
-        <p id="storage-note" class="note"></p>
-      </section>
+      <nav class="settings-tabs" aria-label="Settings sections">
+        <button id="tab-storage" class="settings-tab" type="button" role="tab" aria-controls="panel-storage" aria-selected="false" data-tab="storage">Storage</button>
+        <button id="tab-history" class="settings-tab" type="button" role="tab" aria-controls="panel-history" aria-selected="false" data-tab="history">History</button>
+        <button id="tab-sync" class="settings-tab" type="button" role="tab" aria-controls="panel-sync" aria-selected="false" data-tab="sync">Sync</button>
+      </nav>
 
-      <section class="section" aria-labelledby="sync-title">
-        <div class="section-heading">
-          <h2 id="sync-title">Sync targets</h2>
-          <span id="sync-status" class="status-pill">Not configured</span>
-        </div>
-
-        <form id="sync-form">
-          <div class="sink">
-            <label class="toggle-row">
-              <input id="flomo-enabled" type="checkbox">
-              <span>flomo</span>
-            </label>
-            <p class="sink-help">
-              Requires flomo Pro API access.
-              <a href="https://help.flomoapp.com/advance/api.html" target="_blank" rel="noreferrer">API docs</a>
-              <span aria-hidden="true">·</span>
-              <a href="https://flomoapp.com/mine?source=incoming_webhook" target="_blank" rel="noreferrer">Get webhook URL</a>
-            </p>
-            <label class="field">
-              <span>Webhook URL</span>
-              <input id="flomo-webhook" type="password" autocomplete="off" spellcheck="false">
-            </label>
-            <label class="field">
-              <span>Tags</span>
-              <input id="flomo-tags" type="text" autocomplete="off" spellcheck="false" placeholder="clipplane, read">
-            </label>
-            <p id="flomo-state" class="note"></p>
+      <div id="panel-storage" role="tabpanel" aria-labelledby="tab-storage" data-panel="storage" hidden>
+        <section class="section" aria-labelledby="storage-title">
+          <div class="section-heading">
+            <h2 id="storage-title">Local folder</h2>
+            <span id="storage-status" class="status-pill">Checking</span>
           </div>
-
-          <div class="sink">
-            <label class="toggle-row">
-              <input id="notion-enabled" type="checkbox">
-              <span>Notion</span>
-            </label>
-            <p class="sink-help">
-              Use a Notion API token and share the target page with the connection.
-              <a href="https://developers.notion.com/guides/get-started/quick-start" target="_blank" rel="noreferrer">API quickstart</a>
-              <span aria-hidden="true">·</span>
-              <a href="https://developers.notion.com/guides/get-started/authorization" target="_blank" rel="noreferrer">Permissions</a>
-            </p>
-            <label class="field">
-              <span>Page ID</span>
-              <input id="notion-page" type="text" autocomplete="off" spellcheck="false">
-            </label>
-            <label class="field">
-              <span>Integration token</span>
-              <input id="notion-token" type="password" autocomplete="off" spellcheck="false">
-            </label>
-            <p id="notion-state" class="note"></p>
-          </div>
-
+          <label class="field">
+            <span>Save clips to</span>
+            <input id="notes-dir" type="text" autocomplete="off" spellcheck="false">
+          </label>
           <div class="button-row">
-            <button id="save-sync" class="primary" type="button">Save sync settings</button>
+            <button id="save-storage" class="primary" type="button">Save folder</button>
+            <button id="open-folder" class="secondary" type="button">Open folder</button>
           </div>
-        </form>
-      </section>
+          <p id="storage-note" class="note"></p>
+        </section>
+      </div>
+
+      <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" data-panel="history" hidden>
+        <section class="section history-section" aria-labelledby="history-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="history-title">Capture history</h2>
+              <p id="history-note" class="note">Recent local clips from your capture trail.</p>
+            </div>
+            <span id="history-status" class="status-pill">Loading</span>
+          </div>
+          <div class="history-toolbar">
+            <button id="refresh-history" class="secondary" type="button">Refresh</button>
+          </div>
+          <p id="history-warning" class="note history-warning" hidden></p>
+          <div id="history-list" class="history-list" aria-live="polite">
+            <div class="history-empty">Loading capture history</div>
+          </div>
+        </section>
+      </div>
+
+      <div id="panel-sync" role="tabpanel" aria-labelledby="tab-sync" data-panel="sync" hidden>
+        <section class="section" aria-labelledby="sync-title">
+          <div class="section-heading">
+            <h2 id="sync-title">Sync targets</h2>
+            <span id="sync-status" class="status-pill">Not configured</span>
+          </div>
+
+          <form id="sync-form">
+            <div class="sink">
+              <label class="toggle-row">
+                <input id="flomo-enabled" type="checkbox">
+                <span>flomo</span>
+              </label>
+              <p class="sink-help">
+                Requires flomo Pro API access.
+                <a href="https://help.flomoapp.com/advance/api.html" target="_blank" rel="noreferrer">API docs</a>
+                <span aria-hidden="true">·</span>
+                <a href="https://flomoapp.com/mine?source=incoming_webhook" target="_blank" rel="noreferrer">Get webhook URL</a>
+              </p>
+              <label class="field">
+                <span>Webhook URL</span>
+                <input id="flomo-webhook" type="password" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="field">
+                <span>Tags</span>
+                <input id="flomo-tags" type="text" autocomplete="off" spellcheck="false" placeholder="clipplane, read">
+              </label>
+              <p id="flomo-state" class="note"></p>
+            </div>
+
+            <div class="sink">
+              <label class="toggle-row">
+                <input id="notion-enabled" type="checkbox">
+                <span>Notion</span>
+              </label>
+              <p class="sink-help">
+                Use a Notion API token and share the target page with the connection.
+                <a href="https://developers.notion.com/guides/get-started/quick-start" target="_blank" rel="noreferrer">API quickstart</a>
+                <span aria-hidden="true">·</span>
+                <a href="https://developers.notion.com/guides/get-started/authorization" target="_blank" rel="noreferrer">Permissions</a>
+              </p>
+              <label class="field">
+                <span>Page ID</span>
+                <input id="notion-page" type="text" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="field">
+                <span>Integration token</span>
+                <input id="notion-token" type="password" autocomplete="off" spellcheck="false">
+              </label>
+              <p id="notion-state" class="note"></p>
+            </div>
+
+            <div class="button-row">
+              <button id="save-sync" class="primary" type="button">Save sync settings</button>
+            </div>
+          </form>
+        </section>
+      </div>
 
       <section id="result" class="result" aria-live="polite"></section>
     </main>

@@ -135,7 +135,7 @@ npm run doctor
 
 `inbox.org` 是人可读的主文件。`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
 
-打开扩展里的 `Settings` 可以查看当前保存目录、修改保存目录，或直接打开本地文件夹。普通用户不需要设置环境变量，也不需要编辑 launcher。
+扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件和同步状态，在 `Sync` 配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
 ## 外部同步
 
@@ -257,6 +257,7 @@ Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分�
 - `Access to the specified native messaging host is forbidden`：确认扩展 ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`，然后重新运行对应浏览器的 setup 命令。
 - `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
 - 页面剪藏为空或噪声太多：优先选中文本剪藏。当前阶段使用轻量 DOM 提取器，不是完整 readability engine。
+- `Capture history` 提示跳过 unreadable record：通常是 `captures.jsonl` 中有一行损坏；Clipplane 会跳过坏行并继续显示其他剪藏。
 
 ## 支持 Clipplane
 

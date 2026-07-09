@@ -18,11 +18,6 @@ const modeButtons = {
   selection: document.querySelector("#mode-selection"),
   page: document.querySelector("#mode-page")
 };
-const settingsButtons = [
-  document.querySelector("#open-settings"),
-  document.querySelector("#configure-sync")
-];
-
 let mode = "selection";
 let hostAvailable = true;
 let hasConfiguredSync = false;
@@ -34,9 +29,8 @@ clipSyncButton.addEventListener("click", () => clip(true));
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
 document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
 document.querySelector("#retry-host").addEventListener("click", refreshStatus);
-for (const button of settingsButtons) {
-  button.addEventListener("click", () => chrome.runtime.openOptionsPage());
-}
+document.querySelector("#open-settings").addEventListener("click", () => openSettings());
+document.querySelector("#configure-sync").addEventListener("click", () => openSettings("sync"));
 
 chrome.storage.local.get("lastClipResult").then(({ lastClipResult }) => {
   if (lastClipResult) {
@@ -160,6 +154,13 @@ async function copySetup() {
     resultEl.className = "result error";
     resultEl.textContent = "Could not copy. Select the command shown above.";
   }
+}
+
+async function openSettings(tab) {
+  if (tab) {
+    await chrome.storage.local.set({ settingsTab: tab });
+  }
+  await chrome.runtime.openOptionsPage();
 }
 
 function summarizeSync(sync) {
