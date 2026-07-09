@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Clipplane",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnA1K/wjAQMO6aiGQnYT8BQVH/c/CNxT2qftLNyfIdmdoVtqmd9L4JJ6BEsynrXdX+d6jetrD+UWAmdlhW89qZ+/fe7m1/OAHTH7krWpt93jfnophUEgSEUWKKbINCj3vSAtY5xtBKFdp1KpPHMmrHpW6aOWOxCIscHVC8UhTwssHEbd81hwRszytaHeOImdo5IPFF4X6mF0rnO4EGxn+ozHv3+wShL1iwBflmGyc2N8WUOOOzpKE4a29xt5KpL+pUSrbgs66g72hvwacT2XDImu0hIwnF/3JxBAmOskStUaDD5/WwgstDlMDM/73Y29JrA7sDGlNB3I6L9wK1MN0hQIDAQAB",
   "description": "Save the current page or selected text into a local org-mode inbox.",
   "permissions": [

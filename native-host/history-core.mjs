@@ -6,6 +6,7 @@ import { openFolder } from "./settings-core.mjs";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const PREVIEW_LIMIT = 500;
 
 export async function listCaptureHistory(options = {}) {
   const { paths } = await resolveConfiguredPaths(options);
@@ -57,20 +58,41 @@ export async function openCaptureBody(captureId, options = {}) {
 async function summarizeCapture(record, paths) {
   const contentPath = safeCaptureBodyPath(record, paths, { allowMissing: true });
   const contentExists = contentPath ? await fileExists(contentPath) : false;
+  const inputType = record.input_type === "selection" ? "selection" : "page";
+  const preview = inputType === "selection" && contentExists ? await readCapturePreview(contentPath) : "";
 
   return {
     capture_id: cleanString(record.capture_id),
     title: cleanString(record.title) || "Untitled",
     source_url: cleanString(record.source_url),
     source_host: sourceHost(record.source_url),
-    input_type: record.input_type === "selection" ? "selection" : "page",
+    input_type: inputType,
     clipped_at: cleanString(record.clipped_at),
     tags: Array.isArray(record.tags) ? record.tags.map(cleanString).filter(Boolean).slice(0, 8) : [],
     sync_status: cleanString(record.sync_status) || "local_saved",
     content_path: contentPath || "",
     content_exists: contentExists,
+    body_state: contentExists ? "available" : contentPath ? "missing" : "unsafe",
+    preview,
     sinks: publicSinks(record.sinks)
   };
+}
+
+async function readCapturePreview(contentPath) {
+  try {
+    const text = await fs.readFile(contentPath, "utf8");
+    return cleanPreview(text);
+  } catch {
+    return "";
+  }
+}
+
+function cleanPreview(value) {
+  return String(value)
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, PREVIEW_LIMIT);
 }
 
 async function readCaptureRecords(capturesPath) {

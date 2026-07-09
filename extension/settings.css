@@ -302,6 +302,19 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.history-preview {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: oklch(34% 0.028 245);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .history-tags {
   display: flex;
   flex-wrap: wrap;

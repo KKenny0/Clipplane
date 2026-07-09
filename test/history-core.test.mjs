@@ -41,6 +41,8 @@ test("listCaptureHistory returns recent captures with warnings for bad jsonl lin
   assert.equal(response.history.items[0].capture_id, second.capture.capture_id);
   assert.equal(response.history.items[0].source_host, "news.example");
   assert.equal(response.history.items[0].content_exists, true);
+  assert.equal(response.history.items[0].body_state, "available");
+  assert.equal(response.history.items[0].preview, "");
   assert.equal(response.history.items[0].content_path.includes(notesDir), true);
   assert.deepEqual(response.history.warnings, [{ line: 3, code: "invalid_json" }]);
   assert.notEqual(first.capture.capture_id, second.capture.capture_id);
@@ -63,6 +65,59 @@ test("listCaptureHistory marks missing capture bodies without failing", async ()
 
   assert.equal(response.history.items.length, 1);
   assert.equal(response.history.items[0].content_exists, false);
+  assert.equal(response.history.items[0].body_state, "missing");
+  assert.equal(response.history.items[0].preview, "");
+});
+
+test("listCaptureHistory returns a bounded preview for selection bodies", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-preview-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const body = `Selected text\n\n${"x".repeat(800)}`;
+  await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/preview",
+    sourceTitle: "Preview",
+    title: "Selection preview",
+    contentMarkdown: body
+  }, { notesDir, configDir });
+
+  const response = await listCaptureHistory({ notesDir, configDir });
+  const item = response.history.items[0];
+
+  assert.equal(item.input_type, "selection");
+  assert.equal(item.body_state, "available");
+  assert.equal(item.preview.length, 500);
+  assert.match(item.preview, /^Selected text\n\nx+/);
+});
+
+test("listCaptureHistory marks unsafe body paths without exposing them", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-unsafe-list-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/unsafe-list",
+    sourceTitle: "Unsafe list",
+    title: "Unsafe list body",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+
+  const unsafe = {
+    ...clip.capture,
+    content_path: path.join(os.tmpdir(), "outside-clipplane-list.md")
+  };
+  await fs.writeFile(
+    path.join(notesDir, ".clipplane", "captures.jsonl"),
+    `${JSON.stringify(unsafe)}\n`,
+    "utf8"
+  );
+
+  const response = await listCaptureHistory({ notesDir, configDir });
+  const item = response.history.items[0];
+
+  assert.equal(item.content_exists, false);
+  assert.equal(item.body_state, "unsafe");
+  assert.equal(item.content_path, "");
+  assert.equal(item.preview, "");
 });
 
 test("openCaptureBody opens only capture files inside notes dir", async () => {

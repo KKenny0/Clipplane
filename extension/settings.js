@@ -353,6 +353,12 @@ function renderHistoryItem(item) {
   }
 
   main.append(title, meta);
+  if (item.input_type === "selection" && item.preview) {
+    const preview = document.createElement("p");
+    preview.className = "history-preview";
+    preview.textContent = item.preview;
+    main.append(preview);
+  }
   if (item.tags?.length) {
     main.append(tags);
   }
@@ -362,7 +368,7 @@ function renderHistoryItem(item) {
 
   const status = document.createElement("span");
   status.className = `history-state ${historyStateClass(item.sync_status)}`;
-  status.textContent = historyStatusLabel(item.sync_status, item.content_exists);
+  status.textContent = historyStatusLabel(item);
   actions.append(status);
 
   const open = document.createElement("button");
@@ -370,7 +376,7 @@ function renderHistoryItem(item) {
   open.type = "button";
   open.dataset.action = "open-body";
   open.dataset.captureId = item.capture_id;
-  open.textContent = item.content_exists ? "Open body" : "Body missing";
+  open.textContent = historyOpenLabel(item);
   open.disabled = !item.content_exists || !hostAvailable;
   actions.append(open);
 
@@ -544,10 +550,11 @@ function historyStateClass(status) {
   return "";
 }
 
-function historyStatusLabel(status, contentExists) {
-  if (!contentExists) {
-    return "Body missing";
+function historyStatusLabel(item) {
+  if (!item.content_exists) {
+    return item.input_type === "selection" ? "Text unavailable" : "Body missing";
   }
+  const status = item.sync_status;
   if (status === "synced") {
     return "Synced";
   }
@@ -558,6 +565,13 @@ function historyStatusLabel(status, contentExists) {
     return "Sync skipped";
   }
   return "Saved local";
+}
+
+function historyOpenLabel(item) {
+  if (!item.content_exists) {
+    return item.input_type === "selection" ? "Text unavailable" : "Body missing";
+  }
+  return item.input_type === "selection" ? "Open text" : "Open body";
 }
 
 function syncResultMessage(response) {
