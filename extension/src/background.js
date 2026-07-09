@@ -26,7 +26,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (["status", "get_config", "set_config", "open_notes_dir"].includes(message?.type)) {
+  if (["status", "get_config", "set_config", "open_notes_dir", "history", "open_capture_body", "sync"].includes(message?.type)) {
     sendNative(message).then(sendResponse);
     return true;
   }
