@@ -30,8 +30,8 @@ test("getOpenFolderCommand selects platform-native folder openers", () => {
   assert.deepEqual(
     getOpenFolderCommand("D:\\Notes\\Clipplane", "win32"),
     {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", "start", "", "explorer.exe", "/n,D:\\Notes\\Clipplane"]
+      command: "explorer.exe",
+      args: ["D:\\Notes\\Clipplane"]
     }
   );
   assert.deepEqual(
@@ -59,10 +59,18 @@ test("openFolder launches one OS open request per invocation", async () => {
 
   assert.equal(captured.length, 5);
   for (const call of captured) {
-    assert.equal(call.command, "cmd.exe");
-    assert.deepEqual(call.args, ["/d", "/s", "/c", "start", "", "explorer.exe", "/n,D:\\Notes\\Clipplane"]);
+    assert.equal(call.command, "explorer.exe");
+    assert.deepEqual(call.args, ["D:\\Notes\\Clipplane"]);
     assert.equal(call.options.windowsHide, true);
   }
+});
+
+test("Windows folder paths never pass through a command interpreter", () => {
+  const targetPath = "D:\\Notes & Archive|(2026)\\\u4e2d\u6587";
+  assert.deepEqual(getOpenFolderCommand(targetPath, "win32"), {
+    command: "explorer.exe",
+    args: [targetPath]
+  });
 });
 
 test("openFolder uses platform-native commands outside Windows", async () => {

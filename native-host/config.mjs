@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { validateFlomoWebhookUrl } from "./flomo-webhook.mjs";
+import { getSecret, setSecretVerified } from "./secret-store.mjs";
 import { DEFAULT_NOTES_DIR, getDefaultPaths } from "./paths.mjs";
 
 const DEFAULT_CONFIG = {
@@ -36,29 +38,31 @@ export async function resolveConfiguredPaths(options = {}) {
     || DEFAULT_NOTES_DIR;
   const paths = getDefaultPaths(notesDir, { configDir: options.configDir, notesDir: options.notesDir });
 
-  return {
-    paths,
-    config: normalizeConfig({
-      ...config,
-      storage: {
-        ...config.storage,
-        notesDir: configuredNotesDir
-      }
-    })
-  };
+  config.storage.notesDir = configuredNotesDir;
+  return { paths, config };
 }
 
 export async function readConfig(paths) {
-  const raw = await readJsonIfExists(paths.configPath)
-    ?? await readJsonIfExists(paths.legacyConfigPath)
-    ?? {};
-
-  return normalizeConfig(raw);
+  const appConfig = await readJsonIfExists(paths.configPath);
+  const legacyConfig = appConfig ? null : await readJsonIfExists(paths.legacyConfigPath);
+  const config = normalizeConfig(appConfig ?? legacyConfig ?? {});
+  Object.defineProperty(config, "sourcePath", {
+    value: appConfig ? paths.configPath : legacyConfig ? paths.legacyConfigPath : null,
+    enumerable: false
+  });
+  return config;
 }
 
 export async function saveConfig(patch = {}, options = {}) {
   const { paths: currentPaths, config: currentConfig } = await resolveConfiguredPaths(options);
+  const migrated = await persistSecretChanges(currentConfig, patch, options);
   const config = mergeConfig(currentConfig, patch);
+  if (migrated.notionToken) {
+    config.sinks["notion-api"].token = "";
+  }
+  if (migrated.flomoWebhook) {
+    config.sinks["flomo-api"].webhookUrl = "";
+  }
   const notesDir = options.notesDir
     || process.env.CLIPPLANE_NOTES_DIR
     || cleanString(config.storage.notesDir)
@@ -68,11 +72,22 @@ export async function saveConfig(patch = {}, options = {}) {
   await fs.mkdir(paths.notesDir, { recursive: true });
   await fs.mkdir(paths.stateDir, { recursive: true });
   await fs.mkdir(paths.appConfigDir, { recursive: true });
-  await fs.writeFile(paths.configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  await writeConfigAtomic(paths.configPath, config);
+
+  if (
+    (migrated.notionToken || migrated.flomoWebhook)
+    && currentConfig.sourcePath === currentPaths.legacyConfigPath
+    && currentConfig.sourcePath !== paths.configPath
+  ) {
+    await fs.rm(currentConfig.sourcePath, { force: true });
+  }
+
+  const secretStatus = await getSecretStatus(config, options);
 
   return {
     paths,
     config,
+    secretStatus,
     previousConfigPath: currentPaths.configPath
   };
 }
@@ -107,13 +122,17 @@ export function normalizeConfig(raw = {}) {
   };
 }
 
-export function publicConfig(config) {
+export function publicConfig(config, secretStatus = localSecretStatus(config)) {
   return {
     storage: {
       notesDir: config.storage.notesDir
     },
     sync: {
       defaultSinks: config.sync.defaultSinks
+    },
+    secretStore: {
+      available: secretStatus.available,
+      errorCode: secretStatus.errorCode
     },
     sinks: {
       "local-export": {
@@ -123,12 +142,14 @@ export function publicConfig(config) {
         enabled: Boolean(config.sinks["notion-api"]?.enabled),
         parentType: config.sinks["notion-api"]?.parentType || "page",
         parentId: config.sinks["notion-api"]?.parentId || "",
-        tokenConfigured: hasNotionToken(config)
+        tokenConfigured: secretStatus.notionToken,
+        credentialMigrationRequired: Boolean(config.sinks["notion-api"]?.token)
       },
       "flomo-api": {
         enabled: Boolean(config.sinks["flomo-api"]?.enabled),
         tags: config.sinks["flomo-api"]?.tags || [],
-        webhookConfigured: hasFlomoWebhook(config)
+        webhookConfigured: secretStatus.flomoWebhook,
+        credentialMigrationRequired: Boolean(config.sinks["flomo-api"]?.webhookUrl)
       }
     }
   };
@@ -138,12 +159,41 @@ export function configuredExternalSinks(config) {
   return ["notion-api", "flomo-api"].filter((name) => Boolean(config.sinks[name]?.enabled));
 }
 
-export function hasNotionToken(config) {
-  return Boolean(cleanString(config.sinks["notion-api"]?.token) || process.env.CLIPPLANE_NOTION_TOKEN);
+export async function getSecretStatus(config, options = {}) {
+  const secrets = await resolveSyncSecrets(config, options);
+  return {
+    available: !secrets.errorCode,
+    errorCode: secrets.errorCode || null,
+    notionToken: Boolean(secrets.notionToken),
+    flomoWebhook: Boolean(secrets.flomoWebhook)
+  };
 }
 
-export function hasFlomoWebhook(config) {
-  return Boolean(cleanString(config.sinks["flomo-api"]?.webhookUrl) || process.env.CLIPPLANE_FLOMO_WEBHOOK_URL);
+export async function resolveSyncSecrets(config, options = {}) {
+  const secrets = {
+    notionToken: cleanString(process.env.CLIPPLANE_NOTION_TOKEN) || cleanString(config.sinks["notion-api"]?.token),
+    flomoWebhook: cleanString(process.env.CLIPPLANE_FLOMO_WEBHOOK_URL) || cleanString(config.sinks["flomo-api"]?.webhookUrl),
+    errorCode: null,
+    errorMessage: null
+  };
+
+  if (secrets.notionToken && secrets.flomoWebhook) {
+    return secrets;
+  }
+
+  try {
+    if (!secrets.notionToken) {
+      secrets.notionToken = cleanString(await getSecret("notionToken", options));
+    }
+    if (!secrets.flomoWebhook) {
+      secrets.flomoWebhook = cleanString(await getSecret("flomoWebhook", options));
+    }
+  } catch (error) {
+    secrets.errorCode = error.code || "secret_store_unavailable";
+    secrets.errorMessage = "The operating system credential store is unavailable.";
+  }
+
+  return secrets;
 }
 
 function mergeConfig(current, patch) {
@@ -183,21 +233,57 @@ function mergeSink(name, current, patch) {
     if ("parentId" in patch) {
       next.parentId = cleanString(patch.parentId);
     }
-    if (cleanString(patch.token)) {
-      next.token = cleanString(patch.token);
-    }
   }
 
   if (name === "flomo-api") {
-    if (cleanString(patch.webhookUrl)) {
-      next.webhookUrl = cleanString(patch.webhookUrl);
-    }
     if (Array.isArray(patch.tags)) {
       next.tags = uniqueStrings(patch.tags);
     }
   }
 
   return next;
+}
+
+async function persistSecretChanges(currentConfig, patch, options) {
+  const migrated = { notionToken: false, flomoWebhook: false };
+  if (!isObject(patch.sinks)) {
+    return migrated;
+  }
+
+  const notionPatch = patch.sinks["notion-api"];
+  if (isObject(notionPatch)) {
+    const token = cleanString(notionPatch.token) || cleanString(currentConfig.sinks["notion-api"]?.token);
+    if (token) {
+      await setSecretVerified("notionToken", token, options);
+      migrated.notionToken = true;
+    }
+  }
+
+  const flomoPatch = patch.sinks["flomo-api"];
+  if (isObject(flomoPatch)) {
+    const webhook = cleanString(flomoPatch.webhookUrl) || cleanString(currentConfig.sinks["flomo-api"]?.webhookUrl);
+    if (webhook) {
+      await setSecretVerified("flomoWebhook", validateFlomoWebhookUrl(webhook), options);
+      migrated.flomoWebhook = true;
+    }
+  }
+
+  return migrated;
+}
+
+function localSecretStatus(config) {
+  return {
+    available: true,
+    errorCode: null,
+    notionToken: Boolean(cleanString(process.env.CLIPPLANE_NOTION_TOKEN) || cleanString(config.sinks["notion-api"]?.token)),
+    flomoWebhook: Boolean(cleanString(process.env.CLIPPLANE_FLOMO_WEBHOOK_URL) || cleanString(config.sinks["flomo-api"]?.webhookUrl))
+  };
+}
+
+async function writeConfigAtomic(file, config) {
+  const temporary = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await fs.rename(temporary, file);
 }
 
 function normalizeSink(name, value) {

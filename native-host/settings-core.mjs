@@ -1,15 +1,15 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
-import { publicConfig, resolveConfiguredPaths, saveConfig } from "./config.mjs";
+import { getSecretStatus, publicConfig, resolveConfiguredPaths, saveConfig } from "./config.mjs";
 
 export async function getSettings(options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
-  return settingsResponse(paths, config);
+  return settingsResponse(paths, config, await getSecretStatus(config, options));
 }
 
 export async function setSettings(patch, options = {}) {
-  const { paths, config } = await saveConfig(patch, options);
-  return settingsResponse(paths, config);
+  const { paths, config, secretStatus } = await saveConfig(patch, options);
+  return settingsResponse(paths, config, secretStatus);
 }
 
 export async function openNotesDir(options = {}) {
@@ -22,11 +22,11 @@ export async function openNotesDir(options = {}) {
     ok: true,
     path: paths.notesDir,
     opened_at: openedAt,
-    config: publicConfig(config)
+    config: publicConfig(config, await getSecretStatus(config, options))
   };
 }
 
-function settingsResponse(paths, config) {
+function settingsResponse(paths, config, secretStatus) {
   return {
     ok: true,
     config_path: paths.configPath,
@@ -35,7 +35,7 @@ function settingsResponse(paths, config) {
       default_notes_dir: paths.defaultNotesDir,
       using_env_override: paths.usingEnvNotesDir
     },
-    config: publicConfig(config)
+    config: publicConfig(config, secretStatus)
   };
 }
 
@@ -47,8 +47,8 @@ export function openFolder(targetPath, options = {}) {
 export function getOpenFolderCommand(targetPath, platform = process.platform) {
   if (platform === "win32") {
     return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", "start", "", "explorer.exe", `/n,${targetPath}`]
+      command: "explorer.exe",
+      args: [targetPath]
     };
   }
 

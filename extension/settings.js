@@ -285,13 +285,17 @@ function renderSettings(response) {
   fields.flomoEnabled.checked = flomo.enabled;
   fields.flomoWebhook.placeholder = flomo.webhookConfigured ? "Webhook saved" : "https://flomoapp.com/iwh/...";
   fields.flomoTags.value = flomo.tags.join(", ");
-  fields.flomoState.textContent = flomoReady(flomo) ? "Ready" : "Paste a webhook URL to enable flomo sync.";
+  fields.flomoState.textContent = flomo.credentialMigrationRequired
+    ? "Webhook uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
+    : flomoReady(flomo) ? "Ready" : "Paste a webhook URL to enable flomo sync.";
 
   const notion = config.sinks["notion-api"];
   fields.notionEnabled.checked = notion.enabled;
   fields.notionPage.value = notion.parentId;
   fields.notionToken.placeholder = notion.tokenConfigured ? "Token saved" : "secret_xxx";
-  fields.notionState.textContent = notionReady(notion) ? "Ready" : "Add a page ID and integration token to enable Notion sync.";
+  fields.notionState.textContent = notion.credentialMigrationRequired
+    ? "Token uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
+    : notionReady(notion) ? "Ready" : "Add a page ID and integration token to enable Notion sync.";
 
   const readyCount = [flomoReady(flomo), notionReady(notion)].filter(Boolean).length;
   setStatus(syncStatusEl, readyCount ? `${readyCount} ready` : "Not configured", readyCount ? "ready" : "warning");

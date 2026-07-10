@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveConfiguredPaths } from "./config.mjs";
 import { getDefaultPaths } from "./paths.mjs";
+import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
 
 const TAG_RULES = [
   { tag: "ai", patterns: [/ai\b/i, /llm/i, /agent/i, /model/i, /\u673a\u5668\u5b66\u4e60/, /\u5927\u6a21\u578b/] },
@@ -50,7 +51,7 @@ export async function clipPayload(payload, options = {}) {
 }
 
 export function normalizePayload(payload = {}) {
-  const sourceUrl = stringOr(payload.sourceUrl, "manual");
+  const sourceUrl = sanitizeSourceUrl(stringOr(payload.sourceUrl, "manual"));
   const sourceTitle = stringOr(payload.sourceTitle, sourceUrl);
   const contentMarkdown = cleanCapturedMarkdown(stringOr(payload.contentMarkdown || payload.contentText, ""));
 

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { clipPayload } from "../native-host/clip-core.mjs";
-import { normalizeConfig, publicConfig, resolveConfiguredPaths, saveConfig } from "../native-host/config.mjs";
+import { getSecretStatus, normalizeConfig, publicConfig, resolveConfiguredPaths, saveConfig } from "../native-host/config.mjs";
 import { formatFlomoContent, syncFlomoApi } from "../native-host/sinks/flomo-api.mjs";
 import { buildBlocks, syncNotionApi } from "../native-host/sinks/notion-api.mjs";
 import { chooseSinkNames, getSyncStatus, syncCapture } from "../native-host/sync-core.mjs";
@@ -79,6 +79,7 @@ test("getSyncStatus does not expose token values", async () => {
 test("saveConfig makes notesDir and sink secrets config-driven", async () => {
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-notes-"));
+  const secretStore = memorySecretStore();
 
   await saveConfig({
     storage: { notesDir },
@@ -96,16 +97,47 @@ test("saveConfig makes notesDir and sink secrets config-driven", async () => {
       }
     },
     sync: { defaultSinks: ["notion-api", "flomo-api"] }
-  }, { configDir });
+  }, { configDir, secretStore });
+  await saveConfig({ storage: { notesDir } }, { configDir, secretStore });
 
   const { paths, config } = await resolveConfiguredPaths({ configDir });
-  const visible = publicConfig(config);
+  const visible = publicConfig(config, await getSecretStatus(config, { secretStore }));
+  const stored = await fs.readFile(path.join(configDir, "config.json"), "utf8");
 
   assert.equal(paths.notesDir, notesDir);
   assert.equal(visible.sinks["notion-api"].tokenConfigured, true);
   assert.equal(visible.sinks["flomo-api"].webhookConfigured, true);
   assert.equal(JSON.stringify(visible).includes("secret-token"), false);
   assert.equal(JSON.stringify(visible).includes("https://flomoapp.com/iwh/secret"), false);
+  assert.equal(stored.includes("secret-token"), false);
+  assert.equal(stored.includes("https://flomoapp.com/iwh/secret"), false);
+  assert.equal(await secretStore.get("notion-token"), "secret-token");
+  assert.equal(await secretStore.get("flomo-webhook"), "https://flomoapp.com/iwh/secret");
+});
+
+test("failed credential migration leaves the legacy plaintext config unchanged", async () => {
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-failed-migration-"));
+  const configPath = path.join(configDir, "config.json");
+  const legacy = {
+    sinks: {
+      "notion-api": { enabled: true, parentType: "page", parentId: "page123", token: "legacy-secret" }
+    }
+  };
+  await fs.writeFile(configPath, JSON.stringify(legacy), "utf8");
+
+  await assert.rejects(
+    saveConfig({ sinks: { "notion-api": { enabled: true, token: "" } } }, {
+      configDir,
+      secretStore: {
+        async get() { return null; },
+        async set() { throw new Error("credential store locked"); },
+        async delete() {}
+      }
+    }),
+    /credential store locked/
+  );
+
+  assert.deepEqual(JSON.parse(await fs.readFile(configPath, "utf8")), legacy);
 });
 
 test("notion sink creates a page with compact blocks", async () => {
@@ -120,9 +152,10 @@ test("notion sink creates a page with compact blocks", async () => {
       markdown: "# Heading\n\n- one\nplain text",
       config: normalizeConfig({
         sinks: {
-          "notion-api": { enabled: true, parentType: "page", parentId: "page123", token: "config-token" }
+          "notion-api": { enabled: true, parentType: "page", parentId: "page123" }
         }
       }),
+      secrets: { notionToken: "config-token" },
       fetchImpl: async (url, init) => {
         request = { url, init };
         return jsonResponse(200, { id: "notion-page-id", url: "https://notion.so/page" });
@@ -158,11 +191,11 @@ test("flomo sink posts webhook content", async () => {
         sinks: {
           "flomo-api": {
             enabled: true,
-            webhookUrl: "https://flomoapp.com/iwh/token",
             tags: ["clipplane"]
           }
         }
       }),
+      secrets: { flomoWebhook: "https://flomoapp.com/iwh/token" },
       fetchImpl: async (url, init) => {
         request = { url, init };
         return jsonResponse(200, { memo: { slug: "memo1" } });
@@ -204,6 +237,21 @@ function jsonResponse(status, body) {
     status,
     async json() {
       return body;
+    }
+  };
+}
+
+function memorySecretStore(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    async get(account) {
+      return values.get(account) || null;
+    },
+    async set(account, value) {
+      values.set(account, value);
+    },
+    async delete(account) {
+      values.delete(account);
     }
   };
 }

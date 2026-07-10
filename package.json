@@ -27,5 +27,8 @@
   "devDependencies": {
     "@mozilla/readability": "0.6.0",
     "jsdom": "29.1.1"
+  },
+  "dependencies": {
+    "cross-keychain": "1.1.0"
   }
 }

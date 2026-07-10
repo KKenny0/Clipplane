@@ -1,18 +1,27 @@
+import { validateFlomoWebhookUrl } from "../flomo-webhook.mjs";
+
 const MAX_FLOMO_CONTENT = 5000;
 
-export async function syncFlomoApi({ capture, markdown, config, fetchImpl = fetch }) {
+export async function syncFlomoApi({ capture, markdown, config, secrets = {}, fetchImpl = fetch }) {
   const sinkConfig = config.sinks["flomo-api"];
 
   if (!sinkConfig?.enabled) {
     return skipped("disabled", "flomo sink is disabled.");
   }
 
-  const webhookUrl = sinkConfig.webhookUrl || process.env.CLIPPLANE_FLOMO_WEBHOOK_URL;
+  const webhookUrl = secrets.flomoWebhook;
   if (!webhookUrl) {
-    return skipped("auth_required", "CLIPPLANE_FLOMO_WEBHOOK_URL is not set.");
+    return skipped(secrets.errorCode || "auth_required", secrets.errorMessage || "flomo authentication is not configured.");
   }
 
-  const response = await fetchImpl(webhookUrl, {
+  let verifiedWebhook;
+  try {
+    verifiedWebhook = validateFlomoWebhookUrl(webhookUrl);
+  } catch (error) {
+    return skipped(error.code || "invalid_webhook_url", error.message);
+  }
+
+  const response = await fetchImpl(verifiedWebhook, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

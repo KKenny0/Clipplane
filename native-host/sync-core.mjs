@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { ClipplaneError } from "./clip-core.mjs";
-import { configuredExternalSinks, hasFlomoWebhook, hasNotionToken, resolveConfiguredPaths } from "./config.mjs";
+import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
 import { syncLocalExport } from "./sinks/local-export.mjs";
 import { syncNotionApi } from "./sinks/notion-api.mjs";
@@ -13,6 +13,7 @@ const SINKS = {
 
 export async function getSyncStatus(options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
+  const secretStatus = await getSecretStatus(config, options);
 
   return {
     ok: true,
@@ -30,11 +31,13 @@ export async function getSyncStatus(options = {}) {
       },
       "notion-api": {
         enabled: Boolean(config.sinks["notion-api"]?.enabled),
-        configured: Boolean(config.sinks["notion-api"]?.parentId && hasNotionToken(config))
+        configured: Boolean(config.sinks["notion-api"]?.parentId && secretStatus.notionToken),
+        credential_migration_required: Boolean(config.sinks["notion-api"]?.token)
       },
       "flomo-api": {
         enabled: Boolean(config.sinks["flomo-api"]?.enabled),
-        configured: hasFlomoWebhook(config)
+        configured: secretStatus.flomoWebhook,
+        credential_migration_required: Boolean(config.sinks["flomo-api"]?.webhookUrl)
       }
     }
   };
@@ -65,6 +68,9 @@ export async function syncCapture(captureId, options = {}) {
   const capture = records[index];
   const markdown = await readCaptureMarkdown(capture);
   const sinkNames = chooseSinkNames(options.sinks, config);
+  const secrets = sinkNames.some((name) => name === "notion-api" || name === "flomo-api")
+    ? await resolveSyncSecrets(config, options)
+    : {};
   const results = [];
 
   if (!sinkNames.length) {
@@ -93,6 +99,7 @@ export async function syncCapture(captureId, options = {}) {
         capture,
         markdown,
         config,
+        secrets,
         paths,
         fetchImpl: options.fetchImpl
       });

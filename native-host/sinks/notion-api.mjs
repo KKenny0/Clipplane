@@ -3,15 +3,15 @@ const NOTION_VERSION = "2022-06-28";
 const MAX_BLOCKS = 80;
 const MAX_RICH_TEXT = 1900;
 
-export async function syncNotionApi({ capture, markdown, config, fetchImpl = fetch }) {
+export async function syncNotionApi({ capture, markdown, config, secrets = {}, fetchImpl = fetch }) {
   const sinkConfig = config.sinks["notion-api"];
-  const token = sinkConfig?.token || process.env.CLIPPLANE_NOTION_TOKEN;
+  const token = secrets.notionToken;
 
   if (!sinkConfig?.enabled) {
     return skipped("disabled", "Notion sink is disabled.");
   }
   if (!token) {
-    return skipped("auth_required", "CLIPPLANE_NOTION_TOKEN is not set.");
+    return skipped(secrets.errorCode || "auth_required", secrets.errorMessage || "Notion authentication is not configured.");
   }
   if (sinkConfig.parentType !== "page" || !sinkConfig.parentId) {
     return skipped("config_required", "Notion page parent is not configured.");
