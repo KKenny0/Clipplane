@@ -1,0 +1,67 @@
+:root {
+  --cp-ink: oklch(28% 0.055 163);
+  --cp-ink-strong: oklch(21% 0.04 163);
+  --cp-paper: oklch(98% 0.006 165);
+  --cp-surface: oklch(100% 0.002 165);
+  --cp-line: oklch(84% 0.014 165);
+  --cp-muted: oklch(48% 0.022 165);
+  --cp-moss: oklch(43% 0.075 162);
+  --cp-moss-soft: oklch(92% 0.035 160);
+  --cp-signal: oklch(68% 0.14 50);
+  --cp-signal-soft: oklch(94% 0.04 55);
+  --cp-danger: oklch(49% 0.14 28);
+  --cp-radius: 8px;
+  --cp-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --cp-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html { background: var(--cp-paper); }
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-mark { flex: none; width: 32px; height: 32px; }
+
+.brand-name {
+  display: block;
+  color: var(--cp-ink-strong);
+  font-family: var(--cp-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: .9;
+  letter-spacing: 0;
+}
+
+.brand-kicker,
+.eyebrow {
+  display: block;
+  margin-top: 5px;
+  color: var(--cp-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--cp-moss);
+  box-shadow: 0 0 0 3px var(--cp-moss-soft);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .status-dot { animation: cp-status-pulse 2.8s ease-in-out infinite; }
+}
+
+@keyframes cp-status-pulse { 50% { opacity: .58; transform: scale(.85); } }

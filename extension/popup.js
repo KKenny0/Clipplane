@@ -73,7 +73,7 @@ async function refreshStatus() {
     }
     hostAvailable = true;
     hostPanelEl.hidden = true;
-    stateEl.textContent = "Ready";
+    setPopupState("Ready");
     renderSyncStatus(status);
   } catch (error) {
     renderHostUnavailable();
@@ -91,12 +91,25 @@ function setMode(nextMode) {
 
 function updateActionLabels() {
   const choosingElement = mode === "element";
-  clipLocalButton.textContent = choosingElement ? "Choose area" : "Save local";
-  clipSyncButton.textContent = choosingElement ? "Choose area + sync" : "Save + sync";
+  setActionLabel(
+    clipLocalButton,
+    choosingElement ? "Choose area" : "Save local",
+    choosingElement ? "Pick a region" : "Inbox first"
+  );
+  setActionLabel(
+    clipSyncButton,
+    choosingElement ? "Choose area + sync" : "Save + sync",
+    choosingElement ? "Pick before sending" : "Only configured destinations"
+  );
+}
+
+function setActionLabel(button, label, detail) {
+  button.querySelector("span").textContent = label;
+  button.querySelector("small").textContent = detail;
 }
 
 function setBusy(isBusy) {
-  stateEl.textContent = isBusy ? "Clipping" : (hostAvailable ? "Ready" : "Host unavailable");
+  setPopupState(isBusy ? "Clipping" : (hostAvailable ? "Ready" : "Host unavailable"));
   for (const button of buttons) {
     button.disabled = isBusy;
   }
@@ -155,7 +168,7 @@ function updateActionButtons(forceDisabled = false) {
 function renderHostUnavailable(outdated = false) {
   hostAvailable = false;
   hasConfiguredSync = false;
-  stateEl.textContent = outdated ? "Host outdated" : "Host unavailable";
+  setPopupState(outdated ? "Host outdated" : "Host unavailable");
   syncStatusEl.textContent = outdated ? "Update required" : "Host unavailable";
   document.querySelector(".host-title").textContent = outdated ? "Local host update required" : "Local host unavailable";
   setupCommandEl.textContent = getSetupCommand();
@@ -196,4 +209,11 @@ function summarizeSync(sync) {
     return "Saved locally, sync skipped";
   }
   return "";
+}
+
+function setPopupState(label) {
+  const dot = document.createElement("i");
+  dot.className = "status-dot";
+  dot.setAttribute("aria-hidden", "true");
+  stateEl.replaceChildren(dot, document.createTextNode(label));
 }

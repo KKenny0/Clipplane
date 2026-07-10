@@ -148,3 +148,81 @@ a:focus-visible {
     padding: 34px 0;
   }
 }
+
+/* Shared Clipplane editorial instrument system. */
+body {
+  color: var(--cp-ink-strong);
+  background: var(--cp-paper);
+  font-family: var(--cp-ui);
+}
+
+.topbar {
+  justify-content: space-between;
+  min-height: 82px;
+  padding: 18px clamp(20px, 6vw, 72px);
+  border-bottom-color: var(--cp-line);
+  background: var(--cp-surface);
+}
+
+.topbar .brand-mark { width: 38px; height: 38px; }
+.topbar .brand-name { font-size: 26px; }
+.onboarding-state { color: var(--cp-muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.onboarding-state .status-dot { vertical-align: 1px; }
+
+main { width: min(860px, calc(100% - 44px)); }
+section { padding: 58px 0; border-bottom-color: var(--cp-line); }
+.section-heading,
+.next-band { gap: 42px; }
+
+h2 {
+  max-width: 510px;
+  color: var(--cp-ink-strong);
+  font-family: var(--cp-display);
+  font-size: clamp(28px, 4vw, 43px);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: .98;
+  text-wrap: balance;
+}
+
+.eyebrow { margin-bottom: 12px; color: var(--cp-moss); font-size: 10px; }
+.description { max-width: 565px; color: var(--cp-ink); font-size: 15px; line-height: 1.6; text-wrap: pretty; }
+
+.status {
+  border: 1px solid var(--cp-line);
+  border-radius: 999px;
+  background: var(--cp-surface);
+  color: var(--cp-muted);
+  font-size: 11px;
+}
+.status.ready { border-color: oklch(82% .05 160); background: var(--cp-moss-soft); color: var(--cp-moss); }
+.status.warning { border-color: oklch(82% .06 60); background: var(--cp-signal-soft); color: oklch(40% .1 55); }
+
+.actions { gap: 8px; margin-top: 26px; }
+button,
+.primary {
+  min-height: 42px;
+  border-color: var(--cp-line);
+  border-radius: 5px;
+  background: var(--cp-surface);
+  color: var(--cp-ink-strong);
+  font-family: var(--cp-ui);
+  font-weight: 700;
+  transition: transform 120ms cubic-bezier(.16, 1, .3, 1), background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.primary { border-color: var(--cp-ink); background: var(--cp-ink); color: oklch(98% .006 165); }
+@media (hover: hover) { button:hover { border-color: var(--cp-moss); } }
+button:focus-visible,
+a:focus-visible { outline-color: var(--cp-moss); }
+button:active { transform: scale(.97); }
+.note,
+.text-link { color: var(--cp-muted); }
+.text-link { color: var(--cp-moss); font-weight: 700; text-underline-offset: 4px; }
+
+@media (max-width: 620px) {
+  .topbar { align-items: flex-start; gap: 14px; }
+  .onboarding-state { padding-top: 5px; }
+  main { width: min(100% - 32px, 860px); }
+  section { padding: 40px 0; }
+  h2 { font-size: 33px; }
+}

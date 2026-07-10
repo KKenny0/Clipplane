@@ -105,9 +105,9 @@ async function loadSettings() {
   } catch (error) {
     showResult(safeErrorMessage(error), true);
     if (!hostAvailable) {
-      stateEl.textContent = "Host unavailable";
+      setWorkspaceState("Host unavailable");
     } else {
-      stateEl.textContent = "Error";
+      setWorkspaceState("Error");
     }
   } finally {
     setBusy(false, loaded ? "Ready" : stateEl.textContent);
@@ -439,7 +439,7 @@ function setStatus(element, text, state) {
 }
 
 function setBusy(isBusy, label) {
-  stateEl.textContent = isBusy ? label : (hostAvailable ? label : "Host unavailable");
+  setWorkspaceState(isBusy ? label : (hostAvailable ? label : "Host unavailable"));
   for (const button of buttons) {
     button.disabled = isBusy;
   }
@@ -488,7 +488,7 @@ function renderHostUnavailable() {
   hostAvailable = false;
   hostPanelEl.hidden = false;
   setupCommandEl.textContent = getSetupCommand();
-  stateEl.textContent = "Host unavailable";
+  setWorkspaceState("Host unavailable");
   setStatus(storageStatusEl, "Unavailable", "warning");
   setStatus(syncStatusEl, "Unavailable", "warning");
   renderHistoryUnavailable();
@@ -646,4 +646,11 @@ async function copySetup() {
 function isUnsupportedMessage(response) {
   return response?.error?.code === "unknown_message"
     || /Unsupported native host message/i.test(response?.error?.message || "");
+}
+
+function setWorkspaceState(label) {
+  const dot = document.createElement("i");
+  dot.className = "status-dot";
+  dot.setAttribute("aria-hidden", "true");
+  stateEl.replaceChildren(dot, document.createTextNode(label));
 }

@@ -4,17 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clipplane Settings</title>
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="icons/icon-32.png">
+    <link rel="stylesheet" href="brand.css">
     <link rel="stylesheet" href="settings.css">
   </head>
   <body>
     <main>
       <header class="page-header">
-        <div>
-          <h1>Clipplane settings</h1>
-          <p id="settings-state" class="muted">Loading</p>
+        <div class="workspace-identity">
+          <a class="brand-lockup" href="popup.html" aria-label="Back to Clipplane clipper">
+            <img class="brand-mark" src="icons/clipplane.svg" alt="">
+            <span>
+              <strong class="brand-name">Clipplane</strong>
+              <span class="brand-kicker">Workspace controls</span>
+            </span>
+          </a>
+          <p id="settings-state" class="muted"><i class="status-dot" aria-hidden="true"></i>Loading</p>
         </div>
-        <a href="popup.html" class="back-link">Back to clipper</a>
+        <a href="popup.html" class="back-link">Return to clipper <span aria-hidden="true">&#8599;</span></a>
       </header>
 
       <section id="host-panel" class="section host-panel" aria-labelledby="host-title" hidden>

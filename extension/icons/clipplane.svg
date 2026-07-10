@@ -1,11 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Clipplane">
-  <rect width="128" height="128" rx="28" fill="#14231F"/>
-  <path d="M47 25h32l20 20v50c0 5.5-4.5 10-10 10H47c-5.5 0-10-4.5-10-10V35c0-5.5 4.5-10 10-10Z" fill="#F4EFE3"/>
-  <path d="M79 25v17c0 3.3 2.7 6 6 6h14L79 25Z" fill="#CFE9DF"/>
-  <path d="M49 57h37" stroke="#14231F" stroke-width="5" stroke-linecap="round" opacity=".18"/>
-  <path d="M49 72h29" stroke="#14231F" stroke-width="5" stroke-linecap="round" opacity=".18"/>
-  <path d="M24 51 101 28 68 101 56 70 24 51Z" fill="#62C7A8"/>
-  <path d="M56 70 101 28 47 79 24 51l32 19Z" fill="#F7F2E8"/>
-  <path d="M56 70 68 101 75 61 56 70Z" fill="#3DA98B"/>
-  <path d="M47 79 56 70 75 61 47 79Z" fill="#DDF7EF"/>
+  <rect width="128" height="128" rx="30" fill="#163B33"/>
+  <path d="M31 40c0-8.3 6.7-15 15-15h37c8.3 0 15 6.7 15 15v16H79V44H48c-3.9 0-7 3.1-7 7v26c0 3.9 3.1 7 7 7h20v19H46c-8.3 0-15-6.7-15-15V40Z" fill="#F7F8F4"/>
+  <path d="m57 72 45-20-21 45-8-18-16-7Z" fill="#E9773D"/>
+  <path d="m73 79 29-27-21 45-8-18Z" fill="#F7C15A"/>
+  <path d="m57 72 45-20-29 27-16-7Z" fill="#FFE3A1"/>
+  <circle cx="94" cy="34" r="5" fill="#77C9AD"/>
 </svg>

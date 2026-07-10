@@ -4,31 +4,41 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clipplane</title>
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="icons/icon-32.png">
+    <link rel="stylesheet" href="brand.css">
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
-    <main>
-      <header>
-        <div>
-          <h1>Clipplane</h1>
-          <p class="subtitle">Local first clipper</p>
-        </div>
+    <main class="clipper">
+      <header class="clipper-header">
+        <a class="brand-lockup" href="settings.html" aria-label="Open Clipplane settings">
+          <img class="brand-mark" src="icons/icon-32.png" alt="">
+          <span>
+            <strong class="brand-name">Clipplane</strong>
+            <span class="brand-kicker">Local capture trail</span>
+          </span>
+        </a>
         <div class="header-actions">
-          <button id="open-settings" class="icon-button" type="button" aria-label="Open settings">Settings</button>
-          <span id="state" class="state">Ready</span>
+          <button id="open-settings" class="icon-button" type="button" aria-label="Open settings" title="Open settings">&#9881;</button>
+          <span id="state" class="state"><i class="status-dot" aria-hidden="true"></i>Ready</span>
         </div>
       </header>
 
-      <section class="control-group" aria-label="Clip source">
-        <button id="mode-selection" class="segment active" type="button">Selection</button>
-        <button id="mode-page" class="segment" type="button">Page</button>
-        <button id="mode-element" class="segment" type="button">Element</button>
+      <section class="capture-surface" aria-label="Clip source">
+        <div class="capture-heading">
+          <span class="eyebrow">Capture from this page</span>
+          <span class="capture-note">Choose the grain of your clip</span>
+        </div>
+        <div class="control-group">
+          <button id="mode-selection" class="segment active" type="button">Selection</button>
+          <button id="mode-page" class="segment" type="button">Page</button>
+          <button id="mode-element" class="segment" type="button">Element</button>
+        </div>
       </section>
 
       <section class="actions" aria-label="Clip actions">
-        <button id="clip-local" class="primary" type="button">Save local</button>
-        <button id="clip-sync" class="secondary" type="button">Save + sync</button>
+        <button id="clip-local" class="primary" type="button"><span>Save local</span><small>Inbox first</small></button>
+        <button id="clip-sync" class="secondary" type="button"><span>Save + sync</span><small>Only configured destinations</small></button>
       </section>
 
       <section id="host-panel" class="host-panel" aria-label="Local host setup" hidden>
@@ -46,7 +56,7 @@
 
       <section class="sync-panel" aria-label="Sync status">
         <div>
-          <div class="sync-label">Sync target</div>
+          <div class="sync-label">External destinations</div>
           <div id="sync-status" class="sync-status">Checking</div>
         </div>
         <button id="configure-sync" class="plain-button" type="button">Configure</button>

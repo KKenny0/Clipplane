@@ -2,6 +2,7 @@ import path from "node:path";
 
 const REQUIRED_FILES = new Set([
   "manifest.json",
+  "brand.css",
   "onboarding.css",
   "onboarding.html",
   "onboarding.js",
