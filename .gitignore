@@ -14,5 +14,11 @@ coverage/
 .nyc_output/
 extension/vendor/
 
+# Maintainer-local planning and release materials.
+CHROME_WEB_STORE_LISTING.md
+CHROME_WEB_STORE_READINESS_PLAN.md
+DESIGN.md
+HANDOFF.md
+
 .DS_Store
 Thumbs.db
