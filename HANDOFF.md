@@ -46,25 +46,24 @@ git diff --check
 
 Latest results:
 
-- `npm test`: 56 passing tests, including capture quality, credential storage, malicious folder paths, URL redaction, flomo validation, sync consent, retry-sync consent, package policy, Host protocol, versioned downloads, and Host runtime policy.
+- `npm test`: 57 passing tests, including capture quality, credential storage, malicious folder paths, URL redaction, flomo validation, sync consent, retry-sync consent, package policy, Host protocol, versioned downloads, Host runtime policy, and configured-versus-approved external destination status.
 - `npm run smoke` and `npm run smoke:sync:local`: passed with `extraction_method` preserved in capture records and org entries.
-- `npm run doctor`: passed core checks. Chrome and Edge Native Messaging manifests are not registered on this machine, which is expected until setup is run.
-- `npm run package:extension` and `npm run verify:store`: produced and verified the 24-file extension ZIP. It contains onboarding, Readability, and its license, but no private key, `.env`, native host manifest, launcher, executable, remote code, or expanded permission.
+- `npm run doctor`: passed core checks in the Windows user context where setup ran. Chrome and Edge Native Messaging manifests, the fixed extension ID, native launcher, and configured Notion credentials were all detected.
+- `npm run package:extension` and `npm run verify:store`: produced and verified the 25-file extension ZIP. It contains onboarding, Readability, its license, and the local brand stylesheet, but no private key, `.env`, native host manifest, launcher, executable, remote code, or expanded permission.
 - Windows Host bundle: built with Node `20.19.0`, checked 450 files, and passed a real framed `status` request from its bundled runtime as Host `0.5.0`, protocol `1`. No dev dependency, fixture, private key, local config, or credential material was found. macOS bundle execution remains a CI/real-mac verification item.
 - Onboarding: rendered at desktop and 375px widths with no horizontal overflow. Versioned installer links remain disabled for `0.5.x`, which has no signed installer, and become eligible at `0.6.0`.
+- Chrome and Edge: Native Hosts were registered and the full Selection, Page, Element, Escape, timeout, and unsupported-page acceptance checks passed in real browser profiles.
+- External destinations: Popup now distinguishes saved credentials from approved external data handling. A destination with credentials but no consent is shown as needing approval; `Save + sync` stays disabled until consent is explicit.
 
-## Required Before Release
+## Release State
 
-1. Load the prepared `extension/` folder in a fresh Chrome profile. Run the Chrome host setup command if required, then verify:
-   - Selection saves exact text.
-   - Page saves an article through Readability.
-   - A short/non-article page saves through fallback.
-   - Element highlights a target, saves only the confirmed region, and `Escape` or timeout writes nothing.
-2. Repeat the same checks in Edge. Browser internal pages, the Chrome Web Store, and cross-origin iframes should fail clearly rather than capture.
-3. Rebuild the package after the final browser checks, run `npm run verify:store`, then publish the verified `0.5.0` GitHub Release if a standalone v0.5 release is still wanted.
-4. For Chrome Web Store work, the user must create an unpublished dashboard item and return only its public Item ID and public key. Canonical identity migration cannot be implemented safely before that value exists.
-5. Signed Windows `.exe` and notarized macOS `.pkg` installers still require the public Store ID plus the user's signing environments. Current Host ZIPs are verified installer inputs, not public end-user installers.
-6. Replace all bracketed fields in `CHROME_WEB_STORE_LISTING.md`, generate screenshots from the final Store-ID build, and run trusted-tester review before Public submission.
+The v0.5 GitHub dev-preview release gates are complete. Rebuild the package and run `npm run verify:store` immediately before publishing so the uploaded asset is the final verified ZIP.
+
+For Chrome Web Store work, the remaining manual gates are separate v0.6 work:
+
+1. Create an unpublished dashboard item and return only its public Item ID and public key. Canonical identity migration cannot be implemented safely before that value exists.
+2. Produce signed Windows `.exe` and notarized macOS `.pkg` installers from the user's signing environments. Current Host ZIPs are verified installer inputs, not public end-user installers.
+3. Replace all bracketed fields in `CHROME_WEB_STORE_LISTING.md`, generate screenshots from the final Store-ID build, and run trusted-tester review before Public submission.
 
 ## Non-Scope
 
