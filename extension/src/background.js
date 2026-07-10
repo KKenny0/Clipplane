@@ -1,4 +1,13 @@
+import {
+  readPendingElementCapture,
+  removeExpiredElementCaptures,
+  removePendingElementCapture,
+  savePendingElementCapture
+} from "./element-capture-state.js";
+
 const HOST_NAME = "com.clipplane.host";
+const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
+const ELEMENT_CAPTURE_STATE_TTL_MS = 70_000;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -15,17 +24,15 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   const mode = info.menuItemId === "clipplane-selection" ? "selection" : "page";
-  clipTab(tab.id, mode).catch((error) => {
-    chrome.storage.local.set({
-      lastClipResult: {
-        ok: false,
-        error: { message: error.message }
-      }
-    });
-  });
+  clipTab(tab.id, mode).catch(storeClipError);
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "element_capture_result") {
+    finishElementCapture(message, sender).then(sendResponse);
+    return true;
+  }
+
   if (["status", "get_config", "set_config", "open_notes_dir", "history", "open_capture_body", "sync"].includes(message?.type)) {
     sendNative(message).then(sendResponse);
     return true;
@@ -48,20 +55,147 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function clipTab(tabId, mode, sync = false) {
+  if (mode === "selection") {
+    const selection = await captureSelection(tabId);
+    if (selection) {
+      return saveClip(selection, sync);
+    }
+    mode = "page";
+  }
+
+  await ensurePageCapture(tabId);
+  if (mode === "element") {
+    return beginElementCapture(tabId, sync);
+  }
+
+  const payload = await runPageCapture(tabId, mode);
+  return saveClip(payload, sync);
+}
+
+async function captureSelection(tabId) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
-    func: collectPagePayload,
+    func: () => {
+      const selectedText = String(window.getSelection?.() || "").trim();
+      if (!selectedText) {
+        return null;
+      }
+      const sourceUrl = location.href;
+      const sourceTitle = document.title || sourceUrl;
+      const title = (selectedText.split(/\r?\n/).find(Boolean) || sourceTitle)
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+      return {
+        inputType: "selection",
+        extractionMethod: "selection",
+        sourceUrl,
+        sourceTitle,
+        title: title || sourceTitle,
+        contentMarkdown: selectedText,
+        contentText: selectedText
+      };
+    }
+  });
+  return result;
+}
+
+async function ensurePageCapture(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: PAGE_CAPTURE_FILES
+  });
+}
+
+async function runPageCapture(tabId, mode) {
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (captureMode) => {
+      if (!globalThis.__clipplaneCapture?.capture) {
+        throw new Error("Clipplane page capture is unavailable.");
+      }
+      return globalThis.__clipplaneCapture.capture(captureMode);
+    },
     args: [mode]
   });
+  return result;
+}
 
-  const response = await sendNative({
-    type: "clip",
-    payload: result,
-    sync
+async function beginElementCapture(tabId, sync) {
+  const requestId = crypto.randomUUID();
+  await removeExpiredElementCaptures();
+  await savePendingElementCapture(requestId, {
+    tabId,
+    sync,
+    expiresAt: Date.now() + ELEMENT_CAPTURE_STATE_TTL_MS
   });
 
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (id) => {
+        if (!globalThis.__clipplaneCapture?.startElementPicker) {
+          throw new Error("Clipplane area picker is unavailable.");
+        }
+        globalThis.__clipplaneCapture.startElementPicker(id);
+      },
+      args: [requestId]
+    });
+  } catch (error) {
+    await removePendingElementCapture(requestId);
+    throw error;
+  }
+
+  return { ok: true, pending: true };
+}
+
+async function finishElementCapture(message, sender) {
+  const requestId = typeof message.requestId === "string" ? message.requestId : "";
+  const pending = await readPendingElementCapture(requestId);
+  if (!pending) {
+    return { ok: false, error: { code: "invalid_element_capture", message: "Ignoring an unexpected element capture result." } };
+  }
+  if (pending.expiresAt <= Date.now()) {
+    await removePendingElementCapture(requestId);
+    const response = { ok: false, error: { code: "element_capture_timeout", message: "Area selection timed out." } };
+    await chrome.storage.local.set({ lastClipResult: response });
+    return response;
+  }
+  if (sender.tab?.id !== pending.tabId || sender.frameId !== 0) {
+    return { ok: false, error: { code: "invalid_element_capture", message: "Ignoring an unexpected element capture result." } };
+  }
+
+  await removePendingElementCapture(requestId);
+  if (message.cancelled) {
+    return { ok: true, cancelled: true };
+  }
+  if (message.error) {
+    const response = { ok: false, error: message.error };
+    await chrome.storage.local.set({ lastClipResult: response });
+    return response;
+  }
+  if (!message.payload || typeof message.payload !== "object") {
+    const response = { ok: false, error: { code: "missing_element_payload", message: "No content was selected." } };
+    await chrome.storage.local.set({ lastClipResult: response });
+    return response;
+  }
+
+  return saveClip(message.payload, pending.sync);
+}
+
+async function saveClip(payload, sync) {
+  const response = await sendNative({ type: "clip", payload, sync });
   await chrome.storage.local.set({ lastClipResult: response });
   return response;
+}
+
+async function storeClipError(error) {
+  await chrome.storage.local.set({
+    lastClipResult: {
+      ok: false,
+      error: { message: error.message }
+    }
+  });
 }
 
 async function sendNative(message) {
@@ -76,200 +210,5 @@ async function sendNative(message) {
         detail: error.message
       }
     };
-  }
-}
-
-function collectPagePayload(mode) {
-  const selectedText = String(window.getSelection?.() || "").trim();
-  const inputType = mode === "selection" && selectedText ? "selection" : "page";
-  const sourceUrl = location.href;
-  const sourceTitle = document.title || sourceUrl;
-
-  if (inputType === "selection") {
-    return {
-      inputType,
-      sourceUrl,
-      sourceTitle,
-      title: firstLine(selectedText, sourceTitle),
-      contentMarkdown: selectedText,
-      contentText: selectedText
-    };
-  }
-
-  const article = pickMainElement(document);
-  const markdown = elementToMarkdown(article).trim();
-  const text = article.innerText.trim();
-
-  return {
-    inputType,
-    sourceUrl,
-    sourceTitle,
-    title: sourceTitle,
-    contentMarkdown: markdown || text,
-    contentText: text
-  };
-
-  function pickMainElement(doc) {
-    const clone = doc.body.cloneNode(true);
-    for (const selector of [
-      "script",
-      "style",
-      "noscript",
-      "svg",
-      "canvas",
-      "iframe",
-      "nav",
-      "header",
-      "footer",
-      "aside",
-      "form",
-      "button",
-      "[role='navigation']",
-      "[aria-hidden='true']"
-    ]) {
-      for (const node of clone.querySelectorAll(selector)) {
-        node.remove();
-      }
-    }
-
-    const selectors = [
-      "article",
-      "main",
-      "[role='main']",
-      ".article",
-      ".post",
-      ".entry-content",
-      ".content",
-      "#content"
-    ];
-
-    const candidates = selectors.flatMap((selector) => [...clone.querySelectorAll(selector)]);
-    candidates.push(clone);
-    candidates.sort((a, b) => scoreElement(b) - scoreElement(a));
-    return candidates[0] || clone;
-  }
-
-  function scoreElement(element) {
-    const text = element.innerText || "";
-    const paragraphs = element.querySelectorAll?.("p").length || 0;
-    return text.trim().length + paragraphs * 120;
-  }
-
-  function elementToMarkdown(element) {
-    const lines = [];
-    walk(element, lines, { listDepth: 0 });
-    return lines.join("\n").replace(/\n{3,}/g, "\n\n");
-  }
-
-  function walk(node, lines, ctx) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const value = node.nodeValue.replace(/\s+/g, " ").trim();
-      if (value && !isBoilerplateText(value)) {
-        appendText(lines, value);
-      }
-      return;
-    }
-
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return;
-    }
-
-    const tag = node.tagName.toLowerCase();
-    if (tag === "br") {
-      lines.push("");
-      return;
-    }
-
-    if (/^h[1-6]$/.test(tag)) {
-      const text = node.innerText.trim();
-      if (isBoilerplateText(text)) {
-        return;
-      }
-      blank(lines);
-      lines.push(`${"#".repeat(Number(tag.slice(1)))} ${text}`);
-      blank(lines);
-      return;
-    }
-
-    if (tag === "p") {
-      blank(lines);
-      walkChildren(node, lines, ctx);
-      blank(lines);
-      return;
-    }
-
-    if (tag === "pre") {
-      const text = node.innerText.replace(/\n+$/g, "");
-      if (isBoilerplateText(text)) {
-        return;
-      }
-      blank(lines);
-      lines.push("```");
-      lines.push(text);
-      lines.push("```");
-      blank(lines);
-      return;
-    }
-
-    if (tag === "li") {
-      const before = lines.length;
-      walkChildren(node, lines, ctx);
-      const item = lines.splice(before).join(" ").trim();
-      if (item) {
-        lines.push(`${"  ".repeat(ctx.listDepth)}- ${item}`);
-      }
-      return;
-    }
-
-    if (tag === "ul" || tag === "ol") {
-      blank(lines);
-      for (const child of node.children) {
-        walk(child, lines, { ...ctx, listDepth: ctx.listDepth + 1 });
-      }
-      blank(lines);
-      return;
-    }
-
-    if (tag === "a") {
-      const href = node.getAttribute("href");
-      const text = node.innerText.trim();
-      if (isBoilerplateText(text)) {
-        return;
-      }
-      appendText(lines, href && text ? `[${text}](${new URL(href, location.href).href})` : text);
-      return;
-    }
-
-    walkChildren(node, lines, ctx);
-  }
-
-  function walkChildren(node, lines, ctx) {
-    for (const child of node.childNodes) {
-      walk(child, lines, ctx);
-    }
-  }
-
-  function appendText(lines, text) {
-    if (!lines.length || lines.at(-1) === "") {
-      lines.push(text);
-    } else {
-      lines[lines.length - 1] += ` ${text}`;
-    }
-  }
-
-  function blank(lines) {
-    if (lines.length && lines.at(-1) !== "") {
-      lines.push("");
-    }
-  }
-
-  function firstLine(text, fallback) {
-    const line = text.split(/\r?\n/).find(Boolean) || fallback;
-    return line.replace(/\s+/g, " ").slice(0, 80);
-  }
-
-  function isBoilerplateText(text) {
-    const normalized = String(text).replace(/\s+/g, " ").trim();
-    return /^To view keyboard shortcuts, press question mark\s*View keyboard shortcuts\.?$/i.test(normalized);
   }
 }

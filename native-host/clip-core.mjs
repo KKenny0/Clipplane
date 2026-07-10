@@ -59,10 +59,12 @@ export function normalizePayload(payload = {}) {
   }
 
   const title = cleanTitle(stringOr(payload.title, sourceTitle));
-  const inputType = payload.inputType === "selection" ? "selection" : "page";
+  const inputType = ["selection", "element"].includes(payload.inputType) ? payload.inputType : "page";
+  const extractionMethod = normalizeExtractionMethod(payload.extractionMethod, inputType);
 
   return {
     inputType,
+    extractionMethod,
     sourceUrl,
     sourceTitle,
     title,
@@ -245,6 +247,7 @@ function buildCapture(normalized, contentHash, paths) {
     source_title: normalized.sourceTitle,
     title: normalized.title,
     input_type: normalized.inputType,
+    extraction_method: normalized.extractionMethod,
     clipped_at: clippedAt.toISOString(),
     org_timestamp: formatOrgTimestamp(clippedAt),
     content_hash: contentHash,
@@ -269,6 +272,7 @@ function buildOrgEntry(capture, markdown) {
     `:SOURCE: ${capture.source_url}`,
     ":STATUS: inbox",
     `:CONTENT_HASH: ${capture.content_hash}`,
+    `:CAPTURE_METHOD: ${capture.extraction_method}`,
     ":END:",
     "",
     markdownToOrg(markdown),
@@ -322,6 +326,20 @@ function normalizeUrlForHash(value) {
 
 function stringOr(value, fallback) {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function normalizeExtractionMethod(value, inputType) {
+  const allowed = new Set(["selection", "readability", "fallback", "element"]);
+  if (allowed.has(value)) {
+    return value;
+  }
+  if (inputType === "selection") {
+    return "selection";
+  }
+  if (inputType === "element") {
+    return "element";
+  }
+  return "fallback";
 }
 
 function isCaptureBoilerplateLine(line) {

@@ -92,8 +92,10 @@ npm run doctor
 
 打开任意网页，点击 Clipplane 扩展：
 
-- `Save local`：只保存到本地。
-- `Save + sync`：先保存到本地，再同步到已启用的外部 sink。
+- `Selection`：保存当前选中的文本；没有选中文本时会回退到页面剪藏。
+- `Page`：优先提取可读正文，失败时回退到经过本地去噪的页面内容。
+- `Element`：点击 `Choose area` 后，在页面中点选一段、卡片、评论或区域。
+- `Save local`：只保存到本地；`Save + sync`：先保存到本地，再同步到已启用的外部 sink。
 
 也可以选中一段文字后用右键菜单剪藏。
 
@@ -135,7 +137,7 @@ npm run doctor
 
 `inbox.org` 是人可读的主文件。`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
 
-扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件和同步状态，在 `Sync` 配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
+扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态，在 `Sync` 配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
 ## 外部同步
 
@@ -191,7 +193,7 @@ npm run doctor
 npm run package:extension
 ```
 
-`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。打包脚本会拒绝 `.pem`、`.key`、`.p12`、`.pfx`、`.env*` 和 Native Messaging 本机 manifest 进入扩展包。
+`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。打包脚本会拒绝 `.pem`、`.key`、`.p12`、`.pfx`、`.env*` 和 Native Messaging 本机 manifest 进入扩展包。
 
 <details>
 <summary>高级配置</summary>
@@ -249,14 +251,15 @@ bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
 
 ## 当前边界
 
-Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分析 skill。它只在用户明确点击扩展按钮或右键菜单时剪藏，只在用户点击 `Save + sync` 时外部同步。
+Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分析 skill。它只在用户明确点击扩展按钮或右键菜单时剪藏，只在用户点击 `Save + sync` 时外部同步。`Element` 模式的高亮和点击监听只在用户启动选择后临时存在，确认、取消或超时后立即移除。
 
 ## 排查
 
 - `Specified native messaging host not found`：对当前浏览器重新运行 setup 命令，再运行 `npm run doctor`。
 - `Access to the specified native messaging host is forbidden`：确认扩展 ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`，然后重新运行对应浏览器的 setup 命令。
 - `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
-- 页面剪藏为空或噪声太多：优先选中文本剪藏。当前阶段使用轻量 DOM 提取器，不是完整 readability engine。
+- 页面剪藏不理想：先使用 `Page` 模式，它会优先提取正文并自动回退；文章、文档以外的页面可改用 `Element` 点选目标区域，或使用 `Selection` 保存精确文本。
+- `Element` 模式无法启动：浏览器内部页、Chrome Web Store 和跨域 iframe 受到浏览器隔离限制，无法剪藏。
 - `Capture history` 提示跳过 unreadable record：通常是 `captures.jsonl` 中有一行损坏；Clipplane 会跳过坏行并继续显示其他剪藏。
 
 ## 支持 Clipplane

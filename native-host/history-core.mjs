@@ -58,8 +58,9 @@ export async function openCaptureBody(captureId, options = {}) {
 async function summarizeCapture(record, paths) {
   const contentPath = safeCaptureBodyPath(record, paths, { allowMissing: true });
   const contentExists = contentPath ? await fileExists(contentPath) : false;
-  const inputType = record.input_type === "selection" ? "selection" : "page";
-  const preview = inputType === "selection" && contentExists ? await readCapturePreview(contentPath) : "";
+  const inputType = ["selection", "element"].includes(record.input_type) ? record.input_type : "page";
+  const extractionMethod = publicExtractionMethod(record.extraction_method, inputType);
+  const preview = ["selection", "element"].includes(inputType) && contentExists ? await readCapturePreview(contentPath) : "";
 
   return {
     capture_id: cleanString(record.capture_id),
@@ -67,6 +68,7 @@ async function summarizeCapture(record, paths) {
     source_url: cleanString(record.source_url),
     source_host: sourceHost(record.source_url),
     input_type: inputType,
+    extraction_method: extractionMethod,
     clipped_at: cleanString(record.clipped_at),
     tags: Array.isArray(record.tags) ? record.tags.map(cleanString).filter(Boolean).slice(0, 8) : [],
     sync_status: cleanString(record.sync_status) || "local_saved",
@@ -76,6 +78,14 @@ async function summarizeCapture(record, paths) {
     preview,
     sinks: publicSinks(record.sinks)
   };
+}
+
+function publicExtractionMethod(value, inputType) {
+  const allowed = new Set(["selection", "readability", "fallback", "element"]);
+  if (allowed.has(value)) {
+    return value;
+  }
+  return inputType === "selection" ? "selection" : inputType === "element" ? "element" : "legacy_page";
 }
 
 async function readCapturePreview(contentPath) {

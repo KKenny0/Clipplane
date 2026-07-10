@@ -90,6 +90,26 @@ test("listCaptureHistory returns a bounded preview for selection bodies", async 
   assert.match(item.preview, /^Selected text\n\nx+/);
 });
 
+test("listCaptureHistory exposes selected-area metadata and a bounded preview", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-element-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  await clipPayload({
+    inputType: "element",
+    extractionMethod: "element",
+    sourceUrl: "https://example.com/card",
+    sourceTitle: "Card feed",
+    title: "Card",
+    contentMarkdown: `Selected area\n\n${"x".repeat(800)}`
+  }, { notesDir, configDir });
+
+  const response = await listCaptureHistory({ notesDir, configDir });
+  const item = response.history.items[0];
+
+  assert.equal(item.input_type, "element");
+  assert.equal(item.extraction_method, "element");
+  assert.equal(item.preview.length, 500);
+});
+
 test("listCaptureHistory marks unsafe body paths without exposing them", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-unsafe-list-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));

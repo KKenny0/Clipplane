@@ -15,6 +15,18 @@ test("normalizePayload rejects empty content", () => {
   assert.throws(() => normalizePayload({ contentMarkdown: "" }), /Nothing to clip/);
 });
 
+test("normalizePayload preserves an explicit element capture method", () => {
+  const payload = normalizePayload({
+    inputType: "element",
+    extractionMethod: "element",
+    sourceUrl: "https://example.com/card",
+    contentMarkdown: "A selected card."
+  });
+
+  assert.equal(payload.inputType, "element");
+  assert.equal(payload.extractionMethod, "element");
+});
+
 test("markdownToOrg converts headings, links, bold, and code fences", () => {
   const org = markdownToOrg("# Title\n\nSee [site](https://example.com).\n\n**Bold**\n\n```js\nconsole.log(1)\n```");
   assert.match(org, /^\*\* Title/m);
@@ -63,11 +75,30 @@ test("clipPayload writes inbox and skips duplicates", async () => {
   const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
   assert.match(inbox, /\* Agent Notes :ai:/);
   assert.match(inbox, /:STATUS: inbox/);
+  assert.match(inbox, /:CAPTURE_METHOD: fallback/);
   assert.match(inbox, /\*\* Agent Notes/);
   assert.equal(await fileExists(first.capture.content_path), true);
 
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.equal(captures.trim().split(/\r?\n/).length, 1);
+});
+
+test("clipPayload records capture methods for selected areas", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-element-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const result = await clipPayload({
+    inputType: "element",
+    extractionMethod: "element",
+    sourceUrl: "https://example.com/card",
+    sourceTitle: "Card feed",
+    title: "A selected card",
+    contentMarkdown: "A selected card with useful context."
+  }, { notesDir, configDir });
+
+  assert.equal(result.capture.input_type, "element");
+  assert.equal(result.capture.extraction_method, "element");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  assert.match(inbox, /:CAPTURE_METHOD: element/);
 });
 
 test("clipPayload does not write keyboard shortcut boilerplate into inbox", async () => {

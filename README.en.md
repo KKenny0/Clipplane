@@ -92,8 +92,10 @@ If the popup says `Host unavailable`, copy the setup command shown in the popup 
 
 Open any page and click the Clipplane extension:
 
-- `Save local`: save only to local files.
-- `Save + sync`: save locally first, then sync to enabled external sinks.
+- `Selection`: save the current selected text; without a selection, it falls back to page capture.
+- `Page`: prefer readable article extraction and fall back to locally de-noised page content.
+- `Element`: click `Choose area`, then choose a paragraph, card, comment, or page region.
+- `Save local`: save only locally. `Save + sync`: save locally first, then sync to enabled external sinks.
 
 You can also select text and clip it from the context menu.
 
@@ -135,7 +137,7 @@ By default Clipplane writes:
 
 `inbox.org` is the human-readable source of truth. `captures.jsonl` and `captures/` are machine-readable audit, retry, and sync records. Clipplane skips duplicate clips by content hash.
 
-The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder, `History` to review recent clips, local body files, and sync status, and `Sync` to configure Notion or flomo. Normal users do not need environment variables or launcher edits.
+The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder, `History` to review recent clips, local body files, capture methods, and sync status, and `Sync` to configure Notion or flomo. Normal users do not need environment variables or launcher edits.
 
 ## External Sync
 
@@ -191,7 +193,7 @@ npm run doctor
 npm run package:extension
 ```
 
-`npm run package:extension` writes `dist/clipplane-extension-vX.zip` for GitHub Release assets. This zip only contains the browser extension. The native host still ships with the source package. The packaging script refuses to include `.pem`, `.key`, `.p12`, `.pfx`, `.env*`, or local Native Messaging manifest files.
+`npm run package:extension` writes `dist/clipplane-extension-vX.zip` for GitHub Release assets. The zip contains only the browser extension; the native host is still distributed with the source package. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license. The packaging script rejects `.pem`, `.key`, `.p12`, `.pfx`, `.env*`, and Native Messaging local manifests from the extension archive.
 
 <details>
 <summary>Advanced configuration</summary>
@@ -249,14 +251,15 @@ Config file shape:
 
 ## Current Scope
 
-Clipplane does not watch the clipboard, does not upload data by default, and does not run analysis skills automatically. It only clips when the user explicitly clicks the extension action or context menu, and it only syncs externally when the user clicks `Save + sync`.
+Clipplane does not watch the clipboard, does not upload data by default, and does not run analysis skills automatically. It only clips when the user explicitly clicks the extension action or context menu, and it only syncs externally when the user clicks `Save + sync`. Element-picker highlighting and event listeners exist only after the user starts choosing an area, and are removed after confirmation, cancellation, or timeout.
 
 ## Troubleshooting
 
 - `Specified native messaging host not found`: rerun the setup command for your browser, then run `npm run doctor`.
 - `Access to the specified native messaging host is forbidden`: confirm the extension ID is `mhgcfphfcgbgabhbegdonadkedfaddhc`, then rerun the setup command for that browser.
 - `Nothing to clip`: select text first or use `Page` mode so Clipplane can collect the page body.
-- Empty or noisy page clips: clip a selection. The current version uses a lightweight DOM extractor instead of a full readability engine.
+- Unsatisfactory page clips: use `Page` first; it prefers readable extraction and falls back automatically. For apps and non-article pages, use `Element` to choose the target region, or use `Selection` for exact text.
+- Element mode cannot start: browser internal pages, the Chrome Web Store, and cross-origin iframes are isolated by the browser and cannot be clipped.
 - `Capture history` says unreadable records were skipped: one line in `captures.jsonl` is likely malformed. Clipplane skips the bad line and keeps showing the rest of your local trail.
 
 ## Support

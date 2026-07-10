@@ -341,7 +341,7 @@ function renderHistoryItem(item) {
   meta.textContent = [
     item.source_host || "local",
     formatDateTime(item.clipped_at),
-    item.input_type || "page"
+    captureMethodLabel(item)
   ].filter(Boolean).join(" · ");
 
   const tags = document.createElement("div");
@@ -353,7 +353,7 @@ function renderHistoryItem(item) {
   }
 
   main.append(title, meta);
-  if (item.input_type === "selection" && item.preview) {
+  if (["selection", "element"].includes(item.input_type) && item.preview) {
     const preview = document.createElement("p");
     preview.className = "history-preview";
     preview.textContent = item.preview;
@@ -552,7 +552,10 @@ function historyStateClass(status) {
 
 function historyStatusLabel(item) {
   if (!item.content_exists) {
-    return item.input_type === "selection" ? "Text unavailable" : "Body missing";
+    if (item.input_type === "selection") {
+      return "Text unavailable";
+    }
+    return item.input_type === "element" ? "Content unavailable" : "Body missing";
   }
   const status = item.sync_status;
   if (status === "synced") {
@@ -569,9 +572,23 @@ function historyStatusLabel(item) {
 
 function historyOpenLabel(item) {
   if (!item.content_exists) {
-    return item.input_type === "selection" ? "Text unavailable" : "Body missing";
+    if (item.input_type === "selection") {
+      return "Text unavailable";
+    }
+    return item.input_type === "element" ? "Content unavailable" : "Body missing";
   }
-  return item.input_type === "selection" ? "Open text" : "Open body";
+  return ["selection", "element"].includes(item.input_type) ? "Open content" : "Open body";
+}
+
+function captureMethodLabel(item) {
+  const labels = {
+    selection: "Selected text",
+    readability: "Readable article",
+    fallback: "Page fallback",
+    element: "Selected area",
+    legacy_page: "Page"
+  };
+  return labels[item.extraction_method] || labels[item.input_type] || "Page";
 }
 
 function syncResultMessage(response) {

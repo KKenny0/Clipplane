@@ -16,7 +16,8 @@ const clipSyncButton = document.querySelector("#clip-sync");
 const buttons = [...document.querySelectorAll("button")];
 const modeButtons = {
   selection: document.querySelector("#mode-selection"),
-  page: document.querySelector("#mode-page")
+  page: document.querySelector("#mode-page"),
+  element: document.querySelector("#mode-element")
 };
 let mode = "selection";
 let hostAvailable = true;
@@ -24,6 +25,7 @@ let hasConfiguredSync = false;
 
 modeButtons.selection.addEventListener("click", () => setMode("selection"));
 modeButtons.page.addEventListener("click", () => setMode("page"));
+modeButtons.element.addEventListener("click", () => setMode("element"));
 clipLocalButton.addEventListener("click", () => clip(false));
 clipSyncButton.addEventListener("click", () => clip(true));
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
@@ -44,6 +46,12 @@ async function clip(sync) {
   setBusy(true);
   try {
     const response = await chrome.runtime.sendMessage({ type: "clip", mode, sync });
+    if (response?.pending) {
+      resultEl.className = "result";
+      resultEl.textContent = "Choose an area in the page.";
+      window.setTimeout(() => window.close(), 180);
+      return;
+    }
     renderResult(response);
     refreshStatus();
   } catch (error) {
@@ -75,6 +83,13 @@ function setMode(nextMode) {
     button.classList.toggle("active", key === mode);
     button.setAttribute("aria-pressed", String(key === mode));
   }
+  updateActionLabels();
+}
+
+function updateActionLabels() {
+  const choosingElement = mode === "element";
+  clipLocalButton.textContent = choosingElement ? "Choose area" : "Save local";
+  clipSyncButton.textContent = choosingElement ? "Choose area + sync" : "Save + sync";
 }
 
 function setBusy(isBusy) {
