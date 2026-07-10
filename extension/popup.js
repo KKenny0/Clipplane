@@ -7,6 +7,7 @@ import {
   openSetupGuide,
   safeErrorMessage
 } from "./setup-guide.js";
+import { getExternalSyncStatus } from "./src/sync-consent.js";
 
 const stateEl = document.querySelector("#state");
 const resultEl = document.querySelector("#result");
@@ -150,13 +151,18 @@ function renderSyncStatus(status) {
     return;
   }
 
-  const configured = Object.entries(status.sinks)
-    .filter(([name, sink]) => name !== "local-export" && sink.enabled && sink.configured)
-    .map(([name]) => name.replace("-api", ""));
+  const { configured, consented } = getExternalSyncStatus(status);
+  const configuredNames = configured.map((name) => name.replace("-api", ""));
 
-  hasConfiguredSync = configured.length > 0;
-  syncStatusEl.textContent = configured.length ? configured.join(", ") : "Not configured";
-  document.querySelector("#configure-sync").hidden = configured.length > 0;
+  hasConfiguredSync = consented.length > 0;
+  syncStatusEl.textContent = configuredNames.length === 0
+    ? "Not configured"
+    : consented.length === configured.length
+      ? `${configuredNames.join(", ")} ready`
+      : consented.length === 0
+        ? `${configuredNames.join(", ")} needs approval`
+        : `${consented.length} of ${configured.length} approved`;
+  document.querySelector("#configure-sync").hidden = hasConfiguredSync;
   updateActionButtons();
 }
 

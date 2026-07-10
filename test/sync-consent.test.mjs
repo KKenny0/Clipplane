@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSyncConsent, canSyncStatus, hasSyncConsent, SYNC_CONSENT_VERSION } from "../extension/src/sync-consent.js";
+import {
+  buildSyncConsent,
+  canSyncStatus,
+  getExternalSyncStatus,
+  hasSyncConsent,
+  SYNC_CONSENT_VERSION
+} from "../extension/src/sync-consent.js";
 
 test("buildSyncConsent requires an explicit confirmation before enabling a sink", () => {
   assert.throws(
@@ -43,4 +49,21 @@ test("sync status requires consent for every requested external sink", () => {
     sinks: { ...status.sinks, "notion-api": { enabled: true, configured: true, consent: true } }
   }), true);
   assert.equal(canSyncStatus(status, ["local-export"]), true);
+});
+
+test("external sync status keeps credential configuration distinct from consent", () => {
+  const status = {
+    ok: true,
+    sinks: {
+      "local-export": { enabled: true, configured: true },
+      "notion-api": { enabled: true, configured: true, consent: false },
+      "flomo-api": { enabled: true, configured: true, consent: true },
+      disabled: { enabled: false, configured: true, consent: true }
+    }
+  };
+
+  assert.deepEqual(getExternalSyncStatus(status), {
+    configured: ["notion-api", "flomo-api"],
+    consented: ["flomo-api"]
+  });
 });

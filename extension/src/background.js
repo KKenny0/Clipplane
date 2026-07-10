@@ -240,7 +240,6 @@ async function getStatusWithConsent() {
       continue;
     }
     sink.consent = hasSyncConsent(consent, name);
-    sink.configured = Boolean(sink.configured && sink.consent);
   }
   return status;
 }

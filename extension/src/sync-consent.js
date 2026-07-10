@@ -46,3 +46,22 @@ export function canSyncStatus(status, requestedSinks) {
     return Boolean(sink?.enabled && sink.configured && sink.consent);
   });
 }
+
+export function getExternalSyncStatus(status) {
+  if (!status?.ok || !status.sinks) {
+    return { configured: [], consented: [] };
+  }
+
+  const configured = [];
+  const consented = [];
+  for (const [name, sink] of Object.entries(status.sinks)) {
+    if (name === "local-export" || !sink.enabled || !sink.configured) {
+      continue;
+    }
+    configured.push(name);
+    if (sink.consent) {
+      consented.push(name);
+    }
+  }
+  return { configured, consented };
+}

@@ -312,7 +312,9 @@ function renderSettings(response) {
   fields.flomoConsent.checked = hasSyncConsent(syncConsent, "flomo-api");
   fields.flomoState.textContent = flomo.credentialMigrationRequired
     ? "Webhook uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
-    : flomoReady(flomo) ? "Ready" : "Paste a webhook URL to enable flomo sync.";
+    : flomoReady(flomo)
+      ? fields.flomoConsent.checked ? "Ready" : "Credentials saved. Confirm external data handling to enable sync."
+      : "Paste a webhook URL to enable flomo sync.";
 
   const notion = config.sinks["notion-api"];
   fields.notionEnabled.checked = notion.enabled;
@@ -321,10 +323,21 @@ function renderSettings(response) {
   fields.notionConsent.checked = hasSyncConsent(syncConsent, "notion-api");
   fields.notionState.textContent = notion.credentialMigrationRequired
     ? "Token uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
-    : notionReady(notion) ? "Ready" : "Add a page ID and integration token to enable Notion sync.";
+    : notionReady(notion)
+      ? fields.notionConsent.checked ? "Ready" : "Credentials saved. Confirm external data handling to enable sync."
+      : "Add a page ID and integration token to enable Notion sync.";
 
-  const readyCount = [flomoReady(flomo), notionReady(notion)].filter(Boolean).length;
-  setStatus(syncStatusEl, readyCount ? `${readyCount} ready` : "Not configured", readyCount ? "ready" : "warning");
+  const configuredSinks = [
+    { ready: flomoReady(flomo), consented: fields.flomoConsent.checked },
+    { ready: notionReady(notion), consented: fields.notionConsent.checked }
+  ].filter((sink) => sink.ready);
+  const approvedCount = configuredSinks.filter((sink) => sink.consented).length;
+  const syncSummary = configuredSinks.length === 0
+    ? { text: "Not configured", state: "warning" }
+    : approvedCount === configuredSinks.length
+      ? { text: `${approvedCount} ready`, state: "ready" }
+      : { text: `${configuredSinks.length} configured, ${approvedCount} approved`, state: "warning" };
+  setStatus(syncStatusEl, syncSummary.text, syncSummary.state);
 }
 
 function renderHistory(history) {
