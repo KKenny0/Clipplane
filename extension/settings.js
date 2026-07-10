@@ -5,6 +5,7 @@ import {
   openSetupGuide,
   safeErrorMessage
 } from "./setup-guide.js";
+import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
 
 const stateEl = document.querySelector("#settings-state");
 const resultEl = document.querySelector("#result");
@@ -22,10 +23,12 @@ const fields = {
   flomoEnabled: document.querySelector("#flomo-enabled"),
   flomoWebhook: document.querySelector("#flomo-webhook"),
   flomoTags: document.querySelector("#flomo-tags"),
+  flomoConsent: document.querySelector("#flomo-consent"),
   flomoState: document.querySelector("#flomo-state"),
   notionEnabled: document.querySelector("#notion-enabled"),
   notionPage: document.querySelector("#notion-page"),
   notionToken: document.querySelector("#notion-token"),
+  notionConsent: document.querySelector("#notion-consent"),
   notionState: document.querySelector("#notion-state"),
   storageNote: document.querySelector("#storage-note")
 };
@@ -35,9 +38,11 @@ const hostDependentControls = [
   fields.flomoEnabled,
   fields.flomoWebhook,
   fields.flomoTags,
+  fields.flomoConsent,
   fields.notionEnabled,
   fields.notionPage,
   fields.notionToken,
+  fields.notionConsent,
   document.querySelector("#save-storage"),
   document.querySelector("#open-folder"),
   document.querySelector("#refresh-history"),
@@ -47,6 +52,7 @@ let hostAvailable = true;
 let historyItems = [];
 let activeTab = "history";
 let historyLoaded = false;
+let syncConsent = { version: "", sinks: {} };
 
 for (const button of tabButtons) {
   button.addEventListener("click", () => setActiveTab(button.dataset.tab, { persist: true, updateHash: true }));
@@ -70,6 +76,7 @@ window.addEventListener("hashchange", () => {
 initSettings();
 
 async function initSettings() {
+  syncConsent = (await chrome.storage.local.get("syncConsent")).syncConsent || syncConsent;
   const preferred = tabFromHash() || await loadSavedTab() || "history";
   setActiveTab(preferred, { persist: false, updateHash: false });
   await loadSettings();
@@ -145,6 +152,21 @@ async function saveSync() {
       defaultSinks.push("notion-api");
     }
 
+    const nextConsent = buildSyncConsent(syncConsent, [
+      {
+        sink: "flomo-api",
+        label: "flomo",
+        enabled: fields.flomoEnabled.checked,
+        confirmed: fields.flomoConsent.checked
+      },
+      {
+        sink: "notion-api",
+        label: "Notion",
+        enabled: fields.notionEnabled.checked,
+        confirmed: fields.notionConsent.checked
+      }
+    ]);
+
     const response = await sendNative({
       type: "set_config",
       config: {
@@ -173,6 +195,8 @@ async function saveSync() {
     }
     fields.flomoWebhook.value = "";
     fields.notionToken.value = "";
+    syncConsent = nextConsent;
+    await chrome.storage.local.set({ syncConsent });
     renderSettings(response);
     showResult("Sync settings saved");
   } catch (error) {
@@ -285,6 +309,7 @@ function renderSettings(response) {
   fields.flomoEnabled.checked = flomo.enabled;
   fields.flomoWebhook.placeholder = flomo.webhookConfigured ? "Webhook saved" : "https://flomoapp.com/iwh/...";
   fields.flomoTags.value = flomo.tags.join(", ");
+  fields.flomoConsent.checked = hasSyncConsent(syncConsent, "flomo-api");
   fields.flomoState.textContent = flomo.credentialMigrationRequired
     ? "Webhook uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
     : flomoReady(flomo) ? "Ready" : "Paste a webhook URL to enable flomo sync.";
@@ -293,6 +318,7 @@ function renderSettings(response) {
   fields.notionEnabled.checked = notion.enabled;
   fields.notionPage.value = notion.parentId;
   fields.notionToken.placeholder = notion.tokenConfigured ? "Token saved" : "secret_xxx";
+  fields.notionConsent.checked = hasSyncConsent(syncConsent, "notion-api");
   fields.notionState.textContent = notion.credentialMigrationRequired
     ? "Token uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
     : notionReady(notion) ? "Ready" : "Add a page ID and integration token to enable Notion sync.";

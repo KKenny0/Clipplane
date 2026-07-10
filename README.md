@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.en.md">English README</a>
+  <a href="README.en.md">English README</a> · <a href="PRIVACY.md">隐私政策</a>
 </p>
 
 Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
@@ -141,7 +141,7 @@ npm run doctor
 
 ## 外部同步
 
-外部 sink 默认关闭。配置完成后，弹窗里的 `Save + sync` 才会可用。同步失败不会影响本地保存。
+外部 sink 默认关闭。启用时需要在 Settings 明确确认外部服务会收到的内容；确认和配置完成后，弹窗里的 `Save + sync` 才会可用。同步失败不会影响本地保存。完整数据边界见 [隐私政策](PRIVACY.md)。
 
 - flomo：开启 flomo，粘贴 incoming webhook URL，可选填写 tags。官方入口：[API & URL Scheme](https://help.flomoapp.com/advance/api.html)，webhook 页面：[flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook)。flomo API 需要 Pro 权限。
 - Notion：开启 Notion，填写 page ID 和 integration token。官方入口：[Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) 和 [Authorization](https://developers.notion.com/guides/get-started/authorization)。目标 page 需要授权给对应 connection，否则 API 无法写入。

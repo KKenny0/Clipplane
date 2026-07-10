@@ -235,6 +235,21 @@ button:disabled {
   font-weight: 700;
 }
 
+.consent-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin-top: 12px;
+  color: oklch(38% 0.028 245);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.consent-row input {
+  margin-top: 1px;
+}
+
 .sink-help {
   margin: 6px 0 0;
   color: oklch(48% 0.025 245);

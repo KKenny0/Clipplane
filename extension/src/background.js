@@ -4,6 +4,7 @@ import {
   removePendingElementCapture,
   savePendingElementCapture
 } from "./element-capture-state.js";
+import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
 
 const HOST_NAME = "com.clipplane.host";
 const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
@@ -33,7 +34,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (["status", "get_config", "set_config", "open_notes_dir", "history", "open_capture_body", "sync"].includes(message?.type)) {
+  if (message?.type === "status") {
+    getStatusWithConsent().then(sendResponse);
+    return true;
+  }
+
+  if (message?.type === "sync") {
+    syncCaptureWithConsent(message).then(sendResponse);
+    return true;
+  }
+
+  if (["get_config", "set_config", "open_notes_dir", "history", "open_capture_body"].includes(message?.type)) {
     sendNative(message).then(sendResponse);
     return true;
   }
@@ -184,9 +195,59 @@ async function finishElementCapture(message, sender) {
 }
 
 async function saveClip(payload, sync) {
-  const response = await sendNative({ type: "clip", payload, sync });
+  let response;
+  if (sync && !await hasConfiguredSyncConsent()) {
+    response = await sendNative({ type: "clip", payload, sync: false });
+    if (response.ok) {
+      response.sync = {
+        ok: false,
+        status: "sync_skipped",
+        requested: [],
+        results: [],
+        error: { code: "sync_consent_required", message: "Confirm external sync data handling in Settings." }
+      };
+    }
+  } else {
+    response = await sendNative({ type: "clip", payload, sync });
+  }
   await chrome.storage.local.set({ lastClipResult: response });
   return response;
+}
+
+async function getStatusWithConsent() {
+  const status = await sendNative({ type: "status" });
+  if (!status.ok || !status.sinks) {
+    return status;
+  }
+
+  const consent = (await chrome.storage.local.get("syncConsent")).syncConsent;
+  for (const [name, sink] of Object.entries(status.sinks)) {
+    if (name === "local-export") {
+      continue;
+    }
+    sink.consent = hasSyncConsent(consent, name);
+    sink.configured = Boolean(sink.configured && sink.consent);
+  }
+  return status;
+}
+
+async function hasConfiguredSyncConsent() {
+  const status = await getStatusWithConsent();
+  return canSyncStatus(status);
+}
+
+async function syncCaptureWithConsent(message) {
+  const status = await getStatusWithConsent();
+  if (!canSyncStatus(status, message.sinks)) {
+    return {
+      ok: false,
+      status: "sync_skipped",
+      requested: [],
+      results: [],
+      error: { code: "sync_consent_required", message: "Confirm external sync data handling in Settings." }
+    };
+  }
+  return sendNative(message);
 }
 
 async function storeClipError(error) {

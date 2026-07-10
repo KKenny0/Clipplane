@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">中文 README</a>
+  <a href="README.md">中文 README</a> · <a href="PRIVACY.md">Privacy Policy</a>
 </p>
 
 Clipplane is a local-first web clipper with two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.
@@ -141,7 +141,7 @@ The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `St
 
 ## External Sync
 
-External sinks are opt-in. After at least one sink is ready, `Save + sync` becomes available in the popup. Sync failure does not affect local save.
+External sinks are opt-in. Enabling one requires an explicit acknowledgement in Settings of what the external service receives. After consent and configuration are complete, `Save + sync` becomes available in the popup. Sync failure does not affect local save. See the [Privacy Policy](PRIVACY.md) for the full data boundary.
 
 - flomo: enable flomo, paste the incoming webhook URL, and optionally add tags. Official pages: [API & URL Scheme](https://help.flomoapp.com/advance/api.html) and [flomo incoming webhook](https://flomoapp.com/mine?source=incoming_webhook). flomo API access requires Pro.
 - Notion: enable Notion, then add a page ID and integration token. Official pages: [Notion API quickstart](https://developers.notion.com/guides/get-started/quick-start) and [Authorization](https://developers.notion.com/guides/get-started/authorization). Share the target page with the connection before syncing.

@@ -19,6 +19,7 @@
     "doctor:native:macos:edge": "bash scripts/check-native-host-macos.sh --browser edge",
     "smoke": "node scripts/smoke-clip.mjs",
     "package:extension": "npm run prepare:extension && node scripts/package-extension.mjs",
+    "verify:store": "node scripts/verify-store-package.mjs",
     "smoke:sync:local": "node scripts/smoke-sync-local.mjs"
   },
   "engines": {
