@@ -19,6 +19,9 @@
     "doctor:native:macos:edge": "bash scripts/check-native-host-macos.sh --browser edge",
     "smoke": "node scripts/smoke-clip.mjs",
     "package:extension": "npm run prepare:extension && node scripts/package-extension.mjs",
+    "package:host:windows": "node scripts/package-native-host.mjs --target windows",
+    "package:host:macos": "node scripts/package-native-host.mjs --target macos",
+    "smoke:host:bundle": "node scripts/smoke-native-host-bundle.mjs",
     "verify:store": "node scripts/verify-store-package.mjs",
     "smoke:sync:local": "node scripts/smoke-sync-local.mjs"
   },

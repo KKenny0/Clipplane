@@ -4,6 +4,7 @@ import { listCaptureHistory, openCaptureBody } from "./history-core.mjs";
 import { createNativeMessageParser, writeNativeMessage } from "./native-message.mjs";
 import { getSettings, openNotesDir, setSettings } from "./settings-core.mjs";
 import { getSyncStatus, syncCapture, syncClipResult } from "./sync-core.mjs";
+import { HOST_VERSION, PROTOCOL_VERSION } from "./version.mjs";
 
 const parser = createNativeMessageParser(async (message) => {
   const response = await handleMessage(message);
@@ -18,7 +19,11 @@ process.stdin.on("error", (error) => {
 async function handleMessage(message) {
   try {
     if (message?.type === "status") {
-      return await getSyncStatus();
+      return {
+        ...await getSyncStatus(),
+        host_version: HOST_VERSION,
+        protocol_version: PROTOCOL_VERSION
+      };
     }
 
     if (message?.type === "get_config") {

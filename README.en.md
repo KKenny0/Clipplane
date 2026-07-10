@@ -16,6 +16,8 @@
 
 Clipplane is a local-first web clipper with two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.
 
+The extension's first-install page checks the Host version and links to a version-matched GitHub Release asset. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
+
 ## Current Status
 
 Clipplane is still a dev preview:
@@ -191,9 +193,12 @@ npm run smoke
 npm run smoke:sync:local
 npm run doctor
 npm run package:extension
+npm run verify:store
 ```
 
-`npm run package:extension` writes `dist/clipplane-extension-vX.zip` for GitHub Release assets. The zip contains only the browser extension; the native host is still distributed with the source package. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license. The packaging script rejects `.pem`, `.key`, `.p12`, `.pfx`, `.env*`, and Native Messaging local manifests from the extension archive.
+`npm run package:extension` writes `dist/clipplane-extension-vX.zip`; `npm run verify:store` audits that final ZIP. The zip contains only the browser extension. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license. The package gate rejects private keys, `.env*`, Native Host files, executables, remote code, and permission expansion.
+
+On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.6.0`.
 
 <details>
 <summary>Advanced configuration</summary>
@@ -232,12 +237,10 @@ Config file shape:
     "notion-api": {
       "enabled": true,
       "parentType": "page",
-      "parentId": "NOTION_PAGE_ID",
-      "token": "secret_xxx"
+      "parentId": "NOTION_PAGE_ID"
     },
     "flomo-api": {
       "enabled": false,
-      "webhookUrl": "https://flomoapp.com/iwh/...",
       "tags": ["clipplane"]
     },
     "local-export": {
@@ -246,6 +249,8 @@ Config file shape:
   }
 }
 ```
+
+The Notion token and flomo webhook are intentionally absent from this file. On supported Windows and macOS systems they are stored in the operating system credential store. If that native backend is unavailable, external sync stays disabled rather than falling back to plaintext.
 
 </details>
 

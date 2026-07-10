@@ -19,10 +19,18 @@ export function openSetupGuide() {
   chrome.tabs.create({ url: SETUP_GUIDE_URL });
 }
 
+export function openOnboarding() {
+  chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+}
+
 export function isHostUnavailable(response) {
   const message = response?.error?.message || response?.message || "";
   return response?.error?.code === "host_unavailable" ||
     /native messaging host|receiving end does not exist|could not establish connection/i.test(message);
+}
+
+export function isHostOutdated(response) {
+  return response?.error?.code === "host_outdated";
 }
 
 export function safeErrorMessage(response, fallback = "Clipplane could not complete the request.") {

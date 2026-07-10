@@ -7,15 +7,20 @@ import {
 import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
 
 const HOST_NAME = "com.clipplane.host";
+const MIN_HOST_PROTOCOL = 1;
 const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
 const ELEMENT_CAPTURE_STATE_TTL_MS = 70_000;
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({
     id: "clipplane-selection",
     title: "Clip selection to Clipplane",
     contexts: ["selection"]
   });
+
+  if (details.reason === "install") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+  }
   chrome.contextMenus.create({
     id: "clipplane-page",
     title: "Clip page to Clipplane",
@@ -218,6 +223,15 @@ async function getStatusWithConsent() {
   const status = await sendNative({ type: "status" });
   if (!status.ok || !status.sinks) {
     return status;
+  }
+
+  if (!Number.isInteger(status.protocol_version) || status.protocol_version < MIN_HOST_PROTOCOL) {
+    return {
+      ok: false,
+      host_version: status.host_version || null,
+      protocol_version: status.protocol_version || null,
+      error: { code: "host_outdated", message: "Clipplane Host must be updated." }
+    };
   }
 
   const consent = (await chrome.storage.local.get("syncConsent")).syncConsent;

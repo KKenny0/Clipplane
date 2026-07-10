@@ -16,6 +16,8 @@
 
 Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
 
+扩展首次安装页会检查 Host 版本，并指向与当前扩展版本一致的 GitHub Release asset。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
+
 ## 当前状态
 
 Clipplane 仍是 dev preview：
@@ -191,9 +193,12 @@ npm run smoke
 npm run smoke:sync:local
 npm run doctor
 npm run package:extension
+npm run verify:store
 ```
 
-`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，用于 GitHub Release 附件。这个 zip 只包含浏览器扩展，native host 仍随源码包分发。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。打包脚本会拒绝 `.pem`、`.key`、`.p12`、`.pfx`、`.env*` 和 Native Messaging 本机 manifest 进入扩展包。
+`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，`npm run verify:store` 则审计最终 ZIP。这个 zip 只包含浏览器扩展。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。门禁会拒绝私钥、`.env*`、Native Host 文件、可执行文件、远程代码和权限扩张。
+
+在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.6.0` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
 
 <details>
 <summary>高级配置</summary>
@@ -232,12 +237,10 @@ bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
     "notion-api": {
       "enabled": true,
       "parentType": "page",
-      "parentId": "NOTION_PAGE_ID",
-      "token": "secret_xxx"
+      "parentId": "NOTION_PAGE_ID"
     },
     "flomo-api": {
       "enabled": false,
-      "webhookUrl": "https://flomoapp.com/iwh/...",
       "tags": ["clipplane"]
     },
     "local-export": {
@@ -246,6 +249,8 @@ bash scripts/setup-macos.sh --browser chrome --extension-id "<extension-id>"
   }
 }
 ```
+
+Notion token 和 flomo webhook 会刻意从这个文件中缺席。在支持的 Windows 和 macOS 上，它们进入操作系统凭据库；如果原生后端不可用，外部同步保持关闭，不会退回明文文件。
 
 </details>
 

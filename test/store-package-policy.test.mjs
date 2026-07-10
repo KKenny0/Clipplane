@@ -3,7 +3,11 @@ import test from "node:test";
 import { validateStorePackage } from "../scripts/store-package-policy.mjs";
 
 const requiredFiles = {
+  "onboarding.css": "body {}",
+  "onboarding.html": "<!doctype html>",
+  "onboarding.js": "export {};",
   "src/background.js": "export {};",
+  "src/host-distribution.js": "export {};",
   "src/sync-consent.js": "export {};",
   "src/dom-normalizer.js": "export {};",
   "src/element-capture-state.js": "export {};",

@@ -2,6 +2,8 @@ import {
   copySetupCommand,
   getSetupCommand,
   isHostUnavailable,
+  isHostOutdated,
+  openOnboarding,
   openSetupGuide,
   safeErrorMessage
 } from "./setup-guide.js";
@@ -29,6 +31,7 @@ modeButtons.element.addEventListener("click", () => setMode("element"));
 clipLocalButton.addEventListener("click", () => clip(false));
 clipSyncButton.addEventListener("click", () => clip(true));
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
+document.querySelector("#install-host").addEventListener("click", openOnboarding);
 document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
 document.querySelector("#retry-host").addEventListener("click", refreshStatus);
 document.querySelector("#open-settings").addEventListener("click", () => openSettings());
@@ -64,8 +67,8 @@ async function clip(sync) {
 async function refreshStatus() {
   try {
     const status = await chrome.runtime.sendMessage({ type: "status" });
-    if (isHostUnavailable(status)) {
-      renderHostUnavailable();
+    if (isHostUnavailable(status) || isHostOutdated(status)) {
+      renderHostUnavailable(isHostOutdated(status));
       return;
     }
     hostAvailable = true;
@@ -149,11 +152,12 @@ function updateActionButtons(forceDisabled = false) {
   clipSyncButton.disabled = forceDisabled || !hostAvailable || !hasConfiguredSync;
 }
 
-function renderHostUnavailable() {
+function renderHostUnavailable(outdated = false) {
   hostAvailable = false;
   hasConfiguredSync = false;
-  stateEl.textContent = "Host unavailable";
-  syncStatusEl.textContent = "Host unavailable";
+  stateEl.textContent = outdated ? "Host outdated" : "Host unavailable";
+  syncStatusEl.textContent = outdated ? "Update required" : "Host unavailable";
+  document.querySelector(".host-title").textContent = outdated ? "Local host update required" : "Local host unavailable";
   setupCommandEl.textContent = getSetupCommand();
   hostPanelEl.hidden = false;
   document.querySelector("#configure-sync").hidden = false;

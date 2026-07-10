@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set up Clipplane</title>
+    <link rel="icon" href="icons/icon-32.png">
+    <link rel="stylesheet" href="onboarding.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <img src="icons/icon-48.png" width="36" height="36" alt="">
+      <div>
+        <h1>Clipplane</h1>
+        <p>Local-first clipping setup</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="setup-band" aria-labelledby="host-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Required component</p>
+            <h2 id="host-title">Clipplane Host</h2>
+          </div>
+          <span id="host-state" class="status">Checking</span>
+        </div>
+        <p class="description">The host writes clips directly to your notes folder. It runs on your computer and does not send clips to Clipplane servers.</p>
+        <div class="actions">
+          <a id="download-host" class="primary" href="#">Download for this computer</a>
+          <button id="retry-host" type="button">Check again</button>
+          <a id="source-setup" class="text-link" href="https://github.com/KKenny0/Clipplane/blob/main/README.en.md#5-minute-start" target="_blank" rel="noreferrer">Source setup guide</a>
+        </div>
+        <p id="platform-note" class="note"></p>
+      </section>
+
+      <section class="next-band" aria-labelledby="next-title">
+        <div>
+          <p class="eyebrow">After installation</p>
+          <h2 id="next-title">Save locally first</h2>
+          <p class="description">Open a page, choose Selection, Page, or Element from the Clipplane popup, then use Save local.</p>
+        </div>
+        <div class="actions">
+          <button id="open-settings" type="button">Open settings</button>
+          <a class="text-link" href="https://github.com/KKenny0/Clipplane/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy policy</a>
+        </div>
+      </section>
+    </main>
+
+    <script src="onboarding.js" type="module"></script>
+  </body>
+</html>

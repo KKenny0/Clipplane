@@ -22,3 +22,25 @@ jobs:
       - run: npm run smoke:sync:local
       - run: npm run package:extension
       - run: npm run verify:store
+
+  host-bundle:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            command: npm run package:host:windows
+            target: windows
+          - os: macos-latest
+            command: npm run package:host:macos
+            target: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.command }}
+      - name: Smoke packaged Host
+        run: node scripts/smoke-native-host-bundle.mjs --target ${{ matrix.target }}

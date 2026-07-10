@@ -29,6 +29,8 @@ The v0.5 design keeps the local-first boundary intact:
 8. External sinks require versioned consent in Settings. Both new clips and History retries are blocked from external sync without that consent; local save still succeeds.
 9. `PRIVACY.md` documents collection, retention, deletion, external transfer, and the Limited Use commitment. The extension requests no persistent host permissions.
 10. `npm run verify:store` inspects the final extension ZIP and rejects expanded permissions, remote code, private keys, native executables, launchers, and local config.
+11. The Host status includes package and protocol versions. A fresh extension install opens onboarding once; missing and outdated Hosts share the version-aware setup path.
+12. Target-native Host bundle packaging requires Node 20.19+ in the Node 20 line, embeds that runtime, copies only production dependencies, and rejects private or local files.
 
 ## Verified Locally
 
@@ -44,10 +46,12 @@ git diff --check
 
 Latest results:
 
-- `npm test`: 52 passing tests, including capture quality, credential storage, malicious folder paths, URL redaction, flomo validation, sync consent, retry-sync consent, and final package policy.
+- `npm test`: 56 passing tests, including capture quality, credential storage, malicious folder paths, URL redaction, flomo validation, sync consent, retry-sync consent, package policy, Host protocol, versioned downloads, and Host runtime policy.
 - `npm run smoke` and `npm run smoke:sync:local`: passed with `extraction_method` preserved in capture records and org entries.
 - `npm run doctor`: passed core checks. Chrome and Edge Native Messaging manifests are not registered on this machine, which is expected until setup is run.
-- `npm run package:extension` and `npm run verify:store`: produced and verified the 20-file extension ZIP. It contains Readability and its license, but no private key, `.env`, native host manifest, launcher, executable, remote code, or expanded permission.
+- `npm run package:extension` and `npm run verify:store`: produced and verified the 24-file extension ZIP. It contains onboarding, Readability, and its license, but no private key, `.env`, native host manifest, launcher, executable, remote code, or expanded permission.
+- Windows Host bundle: built with Node `20.19.0`, checked 450 files, and passed a real framed `status` request from its bundled runtime as Host `0.5.0`, protocol `1`. No dev dependency, fixture, private key, local config, or credential material was found. macOS bundle execution remains a CI/real-mac verification item.
+- Onboarding: rendered at desktop and 375px widths with no horizontal overflow. Versioned installer links remain disabled for `0.5.x`, which has no signed installer, and become eligible at `0.6.0`.
 
 ## Required Before Release
 
@@ -59,6 +63,8 @@ Latest results:
 2. Repeat the same checks in Edge. Browser internal pages, the Chrome Web Store, and cross-origin iframes should fail clearly rather than capture.
 3. Rebuild the package after the final browser checks, run `npm run verify:store`, then publish the verified `0.5.0` GitHub Release if a standalone v0.5 release is still wanted.
 4. For Chrome Web Store work, the user must create an unpublished dashboard item and return only its public Item ID and public key. Canonical identity migration cannot be implemented safely before that value exists.
+5. Signed Windows `.exe` and notarized macOS `.pkg` installers still require the public Store ID plus the user's signing environments. Current Host ZIPs are verified installer inputs, not public end-user installers.
+6. Replace all bracketed fields in `CHROME_WEB_STORE_LISTING.md`, generate screenshots from the final Store-ID build, and run trusted-tester review before Public submission.
 
 ## Non-Scope
 

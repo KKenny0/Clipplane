@@ -10,9 +10,11 @@ Clipplane 继续采用“浏览器扩展 + 本地 Native Messaging Host”的架
 
 - 阶段 1 已完成代码收口并提交为 `76ae184`；真实 Chrome/Edge 验收仍由用户执行。
 - 阶段 2 已完成并提交为 `f743b6b`：命令边界、flomo 校验、来源 URL 脱敏和原生凭据存储均已有测试。
-- 阶段 3 已完成代码实施：公开隐私政策、逐 sink 显式同意、最低 Chrome 版本、最终 ZIP 审计与 CI 已落地。提交和真实 CI 结果在本轮实施结束时补记。
+- 阶段 3 已完成并提交为 `a5df1bb`：公开隐私政策、逐 sink 显式同意、最低 Chrome 版本、最终 ZIP 审计与 CI 已落地。
 - 人工关口 A 尚未完成，因此阶段 4 的 canonical Store ID 切换被明确阻塞；不得猜测或临时生成生产 ID。
-- 阶段 5 至 7 中不依赖 Store ID 和签名凭据的部分继续实施；签名、公证、真实商店素材和 Dashboard 提交保留为人工事项。
+- 阶段 5 的 Host bundle 基础已实现：目标系统必须使用 Node 20.19+ 的 Node 20 构建，自带 runtime，只收集生产依赖，并通过真实 Native Messaging status smoke。Windows x64 bundle 已在本机验证；macOS bundle 由 CI 和后续真实机器验证。
+- 阶段 6 的首次安装页、Host 协议版本和缺失/过旧状态已实现。真实 Chrome E2E、签名 installer 和最终截图仍受人工关口约束。
+- 阶段 7 的 `CHROME_WEB_STORE_LISTING.md` 已生成；其中 Store ID、签名 Host URL、review 凭据流程和最终截图必须在人工关口后补齐。
 
 ## 目标与成功标准
 

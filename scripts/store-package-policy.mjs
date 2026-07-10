@@ -2,7 +2,11 @@ import path from "node:path";
 
 const REQUIRED_FILES = new Set([
   "manifest.json",
+  "onboarding.css",
+  "onboarding.html",
+  "onboarding.js",
   "src/background.js",
+  "src/host-distribution.js",
   "src/sync-consent.js",
   "src/dom-normalizer.js",
   "src/element-capture-state.js",
