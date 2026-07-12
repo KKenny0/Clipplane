@@ -1,4 +1,4 @@
-const SETUP_GUIDE_URL = "https://github.com/KKenny0/Clipplane/blob/main/README.en.md#5-minute-start";
+const SETUP_GUIDE_URL = "https://kkenny0.github.io/Clipplane/setup/";
 
 export function getSetupCommand() {
   const browser = detectBrowser();

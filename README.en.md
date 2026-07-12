@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">中文 README</a> · <a href="PRIVACY.md">Privacy Policy</a>
+  <a href="README.md">中文 README</a> · <a href="https://kkenny0.github.io/Clipplane/">Product</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">Setup</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">Privacy</a> · <a href="https://kkenny0.github.io/Clipplane/support/">Support</a>
 </p>
 
 Clipplane is a local-first web clipper with two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.en.md">English README</a> · <a href="PRIVACY.md">隐私政策</a>
+  <a href="README.en.md">English README</a> · <a href="https://kkenny0.github.io/Clipplane/">产品页</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">安装</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">隐私</a> · <a href="https://kkenny0.github.io/Clipplane/support/">支持</a>
 </p>
 
 Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
