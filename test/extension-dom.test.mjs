@@ -24,12 +24,15 @@ test("popup exposes one primary Host recovery action and a structured result", a
 
 test("onboarding presents install, restart, and verification as ordered steps", async () => {
   const document = await loadDocument("extension/onboarding.html");
+  const css = await readFile(path.join(rootDir, "extension", "onboarding.css"), "utf8");
   assert.deepEqual(
     [...document.querySelectorAll(".setup-step")].map((step) => step.id),
     ["step-install", "step-restart", "step-check"]
   );
   assert.equal(document.querySelector("#host-state").getAttribute("aria-live"), "polite");
   assert.match(document.querySelector("#first-capture").textContent, /Save locally first/);
+  assert.equal(document.querySelector("#download-host").hidden, true);
+  assert.match(css, /\.primary\[hidden\]\s*\{\s*display:\s*none;/);
 });
 
 test("settings follows tab and keyboard accessibility structure", async () => {

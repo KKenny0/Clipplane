@@ -25,6 +25,7 @@ async function init() {
 
   if (asset) {
     downloadEl.href = getHostDownloadUrl(platform.os, platform.arch, version);
+    downloadEl.hidden = false;
     platformNoteEl.textContent = `${platformLabel(platform.os)} ${architectureLabel(platform.arch)}, Clipplane Host ${version}.`;
   } else {
     downloadEl.hidden = true;

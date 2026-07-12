@@ -180,6 +180,8 @@ button,
   transition: transform var(--cp-duration-fast) var(--cp-ease-out), background-color var(--cp-duration-fast) ease, border-color var(--cp-duration-fast) ease, color var(--cp-duration-fast) ease, opacity var(--cp-duration-fast) ease;
 }
 
+.primary[hidden] { display: none; }
+
 .primary { border-color: var(--cp-ink); background: var(--cp-ink); color: var(--cp-paper); }
 button:active,
 .primary:active { transform: scale(.97); }
