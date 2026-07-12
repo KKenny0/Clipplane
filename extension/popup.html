@@ -20,7 +20,7 @@
         </a>
         <div class="header-actions">
           <button id="open-settings" class="icon-button" type="button" aria-label="Open settings" title="Open settings">&#9881;</button>
-          <span id="state" class="state"><i class="status-dot" aria-hidden="true"></i>Ready</span>
+          <span id="state" class="state is-neutral"><i class="status-dot" aria-hidden="true"></i>Checking</span>
         </div>
       </header>
 
@@ -44,14 +44,20 @@
       <section id="host-panel" class="host-panel" aria-label="Local host setup" hidden>
         <div>
           <div class="host-title">Local host unavailable</div>
-          <code id="setup-command"></code>
+          <p id="host-detail" class="host-detail">Install the local Host to save clips into your notes folder.</p>
         </div>
         <div class="host-actions">
-          <button id="copy-setup" class="plain-button" type="button">Copy setup command</button>
-          <button id="install-host" class="plain-button" type="button">Install host</button>
-          <button id="open-guide" class="plain-button" type="button">Setup guide</button>
-          <button id="retry-host" class="plain-button" type="button">Retry</button>
+          <button id="install-host" class="host-primary" type="button">Install host</button>
+          <button id="retry-host" class="host-secondary" type="button">Check again</button>
         </div>
+        <details class="manual-setup">
+          <summary>Manual setup</summary>
+          <code id="setup-command"></code>
+          <div class="manual-actions">
+            <button id="copy-setup" class="plain-button" type="button">Copy command</button>
+            <button id="open-guide" class="plain-button" type="button">Open guide</button>
+          </div>
+        </details>
       </section>
 
       <section class="sync-panel" aria-label="Sync status">
@@ -62,7 +68,13 @@
         <button id="configure-sync" class="plain-button" type="button">Configure</button>
       </section>
 
-      <section id="result" class="result" aria-live="polite"></section>
+      <section id="result" class="result-card is-neutral" aria-live="polite" hidden>
+        <span id="result-label" class="result-label">Result</span>
+        <h2 id="result-title">Ready to clip</h2>
+        <p id="result-detail"></p>
+        <code id="result-path" hidden></code>
+        <button id="result-primary" class="result-primary" type="button" hidden></button>
+      </section>
     </main>
     <script src="popup.js" type="module"></script>
   </body>

@@ -5,15 +5,19 @@ import path from "node:path";
 import { resolveConfiguredPaths } from "../native-host/config.mjs";
 import { getSyncStatus } from "../native-host/sync-core.mjs";
 import { getDefaultExtensionId } from "./extension-identity.mjs";
+import { getNativeHostOrigins } from "./native-host-origins.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const platform = os.platform();
 let ok = true;
 let defaultExtensionId = "";
+let expectedNativeHostOrigins = [];
 
 try {
   defaultExtensionId = await getDefaultExtensionId(root);
+  expectedNativeHostOrigins = await getNativeHostOrigins(root);
   console.log(`PASS extension id: ${defaultExtensionId}`);
+  console.log(`PASS native host origins: ${expectedNativeHostOrigins.join(", ")}`);
 } catch (error) {
   ok = false;
   console.log(`FAIL extension id: ${error.message}`);
@@ -100,10 +104,10 @@ function checkWindowsRegistration(browser) {
     });
     const manifestPath = parseRegistryDefault(output);
     if (manifestPath && fs.existsSync(manifestPath)) {
-      if (manifestAllowsDefaultOrigin(manifestPath)) {
+      if (manifestHasExpectedOrigins(manifestPath)) {
         console.log(`PASS ${browser} native host registry: ${manifestPath}`);
       } else {
-        console.log(`WARN ${browser} native host registry exists but does not allow Clipplane extension ID: ${defaultExtensionId || "(unresolved)"}`);
+        console.log(`WARN ${browser} native host registry has stale or unexpected extension origins.`);
         console.log(`NEXT run: pwsh -NoLogo -NoProfile -File .\\scripts\\setup-windows.ps1 -Browser ${browser}`);
       }
       return;
@@ -121,10 +125,10 @@ function checkMacManifest(browser) {
     : path.join(os.homedir(), "Library", "Application Support", "Microsoft Edge", "NativeMessagingHosts", "com.clipplane.host.json");
 
   if (fs.existsSync(manifestPath)) {
-    if (manifestAllowsDefaultOrigin(manifestPath)) {
+    if (manifestHasExpectedOrigins(manifestPath)) {
       console.log(`PASS ${browser} native host manifest: ${manifestPath}`);
     } else {
-      console.log(`WARN ${browser} native host manifest exists but does not allow Clipplane extension ID: ${defaultExtensionId || "(unresolved)"}`);
+      console.log(`WARN ${browser} native host manifest has stale or unexpected extension origins.`);
       console.log(`NEXT run: bash scripts/setup-macos.sh --browser ${browser}`);
     }
     return;
@@ -143,14 +147,16 @@ function parseRegistryDefault(output) {
   return line?.replace(/^.*REG_SZ\s+/, "").trim() || "";
 }
 
-function manifestAllowsDefaultOrigin(manifestPath) {
-  if (!defaultExtensionId) {
+function manifestHasExpectedOrigins(manifestPath) {
+  if (!expectedNativeHostOrigins.length) {
     return false;
   }
 
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    return manifest.allowed_origins?.includes(`chrome-extension://${defaultExtensionId}/`) || false;
+    const actual = Array.isArray(manifest.allowed_origins) ? [...manifest.allowed_origins].sort() : [];
+    const expected = [...expectedNativeHostOrigins].sort();
+    return JSON.stringify(actual) === JSON.stringify(expected);
   } catch {
     return false;
   }

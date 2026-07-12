@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,6 +63,8 @@ if (target === "windows") {
     '"%BUNDLE_DIR%runtime\\node.exe" "%BUNDLE_DIR%app\\native-host\\host.mjs"',
     ""
   ].join("\r\n"), "ascii");
+  await cp(path.join(rootDir, "scripts", "install-bundled-host.ps1"), path.join(stageDir, "install-host.ps1"));
+  await cp(path.join(rootDir, "scripts", "uninstall-native-host.ps1"), path.join(stageDir, "uninstall-host.ps1"));
 } else {
   await mkdir(path.join(stageDir, "runtime", "bin"), { recursive: true });
   await cp(process.execPath, path.join(stageDir, "runtime", "bin", "node"));
@@ -73,6 +75,12 @@ if (target === "windows") {
     'exec "$BUNDLE_DIR/runtime/bin/node" "$BUNDLE_DIR/app/native-host/host.mjs"',
     ""
   ].join("\n"), { mode: 0o755 });
+  await cp(path.join(rootDir, "scripts", "install-bundled-host-macos.sh"), path.join(stageDir, "install-host.sh"));
+  await cp(path.join(rootDir, "scripts", "uninstall-native-host-macos.sh"), path.join(stageDir, "uninstall-host.sh"));
+  await Promise.all([
+    chmod(path.join(stageDir, "install-host.sh"), 0o755),
+    chmod(path.join(stageDir, "uninstall-host.sh"), 0o755)
+  ]);
 }
 
 await writeFile(path.join(stageDir, "allowed-origins.json"), `${JSON.stringify({

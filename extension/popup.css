@@ -42,6 +42,10 @@ body {
 }
 
 .state { color: var(--cp-muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.state.is-ready { color: var(--cp-moss); }
+.state.is-working,
+.state.is-warning { color: oklch(43% .1 55); }
+.state.is-error { color: var(--cp-danger); }
 .state .status-dot { vertical-align: 1px; }
 
 .capture-surface { padding: 16px 0 14px; }
@@ -69,7 +73,7 @@ button {
   font-weight: 670;
   cursor: pointer;
   touch-action: manipulation;
-  transition: transform 120ms cubic-bezier(.16, 1, .3, 1), background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  transition: transform var(--cp-duration-fast) var(--cp-ease-out), background-color var(--cp-duration-fast) ease, border-color var(--cp-duration-fast) ease, color var(--cp-duration-fast) ease, opacity var(--cp-duration-fast) ease;
 }
 
 @media (hover: hover) { button:hover { border-color: var(--cp-moss); } }
@@ -102,13 +106,32 @@ button:disabled { cursor: default; opacity: .48; transform: none; }
 
 .plain-button { min-height: 30px; padding: 0 9px; border-color: transparent; background: transparent; color: var(--cp-moss); font-size: 12px; }
 
-.host-panel { display: grid; gap: 9px; margin-top: 13px; padding: 12px; border: 1px solid oklch(82% .06 60); border-radius: var(--cp-radius); background: var(--cp-signal-soft); }
+.host-panel { display: grid; gap: 10px; margin-top: 13px; padding: 13px; border: 1px solid oklch(82% .06 60); border-radius: var(--cp-radius); background: var(--cp-signal-soft); }
 .host-panel[hidden] { display: none; }
 .host-title { color: oklch(38% .1 55); font-size: 12px; font-weight: 750; }
-#setup-command { display: block; margin-top: 5px; overflow-wrap: anywhere; color: var(--cp-ink); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; line-height: 1.45; }
-.host-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.host-detail { margin: 4px 0 0; color: var(--cp-ink); font-size: 12px; line-height: 1.45; text-wrap: pretty; }
+.host-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.host-primary { border-color: var(--cp-ink); background: var(--cp-ink); color: var(--cp-paper); }
+.host-secondary { padding-inline: 12px; background: transparent; }
+.manual-setup { color: var(--cp-muted); font-size: 11px; }
+.manual-setup summary { display: inline-flex; align-items: center; min-height: 40px; color: var(--cp-moss); cursor: pointer; font-weight: 700; }
+#setup-command { display: block; overflow-wrap: anywhere; color: var(--cp-ink); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 11px; line-height: 1.45; }
+.manual-actions { display: flex; gap: 4px; margin-top: 5px; }
 
-.result { min-height: 42px; margin-top: 13px; padding: 11px 0 0; color: var(--cp-ink); font-size: 12px; line-height: 1.5; white-space: pre-wrap; text-wrap: pretty; }
-.error { color: var(--cp-danger); }
+.result-card { margin-top: 13px; padding: 13px; border: 1px solid var(--cp-line); border-radius: var(--cp-radius); background: var(--cp-surface); color: var(--cp-ink); }
+.result-card[hidden] { display: none; }
+.result-card.is-ready { border-color: oklch(82% .05 160); background: var(--cp-moss-soft); }
+.result-card.is-warning { border-color: oklch(82% .06 60); background: var(--cp-signal-soft); }
+.result-card.is-error { border-color: oklch(82% .055 28); background: var(--cp-danger-soft); }
+.result-label { display: block; color: var(--cp-muted); font-size: 10px; font-weight: 760; letter-spacing: .02em; text-transform: uppercase; }
+.result-card.is-ready .result-label { color: var(--cp-moss); }
+.result-card.is-warning .result-label { color: oklch(43% .1 55); }
+.result-card.is-error .result-label { color: var(--cp-danger); }
+.result-card h2 { margin: 4px 0 0; color: var(--cp-ink-strong); font-family: var(--cp-display); font-size: 18px; line-height: 1.15; }
+.result-card p { margin: 5px 0 0; font-size: 12px; line-height: 1.5; text-wrap: pretty; }
+#result-path { display: block; margin-top: 7px; overflow-wrap: anywhere; color: var(--cp-muted); font-size: 10px; line-height: 1.4; }
+#result-path[hidden] { display: none; }
+.result-primary { min-height: 38px; margin-top: 10px; padding: 0 11px; border-color: var(--cp-ink); background: var(--cp-ink); color: var(--cp-paper); font-size: 12px; }
+.result-primary[hidden] { display: none; }
 
 @media (prefers-reduced-motion: reduce) { button { transition-duration: 0ms; } }

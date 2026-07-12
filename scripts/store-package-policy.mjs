@@ -73,6 +73,9 @@ export function validateStorePackage(files, packageVersion) {
   if (manifest.minimum_chrome_version !== "102") {
     errors.push("minimum_chrome_version must be 102");
   }
+  if (Object.hasOwn(manifest, "key")) {
+    errors.push("manifest.json must not contain a key field in a Chrome Web Store package");
+  }
   if (manifest.host_permissions?.length) {
     errors.push("host_permissions must remain empty");
   }

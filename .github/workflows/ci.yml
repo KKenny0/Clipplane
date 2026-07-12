@@ -21,6 +21,7 @@ jobs:
       - run: npm run smoke
       - run: npm run smoke:sync:local
       - run: npm run package:extension
+      - run: npm run package:store
       - run: npm run verify:store
 
   host-bundle:
@@ -41,6 +42,21 @@ jobs:
           node-version: 20.19.0
           cache: npm
       - run: npm ci
+      - name: Validate macOS install helpers
+        if: runner.os == 'macOS'
+        run: bash -n scripts/install-bundled-host-macos.sh scripts/uninstall-native-host-macos.sh
+      - name: Validate Windows install helpers
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          [scriptblock]::Create((Get-Content scripts/install-bundled-host.ps1 -Raw)) | Out-Null
+          [scriptblock]::Create((Get-Content scripts/uninstall-native-host.ps1 -Raw)) | Out-Null
       - run: ${{ matrix.command }}
       - name: Smoke packaged Host
         run: node scripts/smoke-native-host-bundle.mjs --target ${{ matrix.target }}
+      - name: Upload unsigned Host bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipplane-host-${{ matrix.target }}-${{ runner.arch }}
+          path: dist/clipplane-host-v*-${{ matrix.target }}-*.zip
+          if-no-files-found: error

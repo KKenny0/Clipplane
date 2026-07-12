@@ -10,12 +10,27 @@
   --cp-signal: oklch(68% 0.14 50);
   --cp-signal-soft: oklch(94% 0.04 55);
   --cp-danger: oklch(49% 0.14 28);
+  --cp-danger-soft: oklch(94% 0.035 28);
+  --cp-radius-sm: 5px;
   --cp-radius: 8px;
+  --cp-radius-lg: 12px;
+  --cp-space-1: 4px;
+  --cp-space-2: 8px;
+  --cp-space-3: 12px;
+  --cp-space-4: 16px;
+  --cp-space-5: 24px;
+  --cp-space-6: 32px;
+  --cp-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --cp-duration-fast: 120ms;
+  --cp-duration-state: 180ms;
   --cp-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --cp-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-html { background: var(--cp-paper); }
+html {
+  min-height: 100%;
+  background: var(--cp-paper);
+}
 
 .brand-lockup {
   display: inline-flex;
@@ -58,10 +73,15 @@ html { background: var(--cp-paper); }
   border-radius: 50%;
   background: var(--cp-moss);
   box-shadow: 0 0 0 3px var(--cp-moss-soft);
+  transition: background-color var(--cp-duration-state) ease, box-shadow var(--cp-duration-state) ease, opacity var(--cp-duration-state) ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .status-dot { animation: cp-status-pulse 2.8s ease-in-out infinite; }
-}
+.is-neutral .status-dot { background: var(--cp-muted); box-shadow: 0 0 0 3px oklch(93% .01 165); }
+.is-working .status-dot { background: var(--cp-signal); box-shadow: 0 0 0 3px var(--cp-signal-soft); }
+.is-ready .status-dot { background: var(--cp-moss); box-shadow: 0 0 0 3px var(--cp-moss-soft); }
+.is-warning .status-dot { background: var(--cp-signal); box-shadow: 0 0 0 3px var(--cp-signal-soft); }
+.is-error .status-dot { background: var(--cp-danger); box-shadow: 0 0 0 3px var(--cp-danger-soft); }
 
-@keyframes cp-status-pulse { 50% { opacity: .58; transform: scale(.85); } }
+@media (prefers-reduced-motion: reduce) {
+  .status-dot { transition-duration: 0ms; }
+}

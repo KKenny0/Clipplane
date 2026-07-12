@@ -5,6 +5,7 @@ import {
   savePendingElementCapture
 } from "./element-capture-state.js";
 import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
+import { capturablePage } from "./capture-policy.js";
 
 const HOST_NAME = "com.clipplane.host";
 const MIN_HOST_PROTOCOL = 1;
@@ -30,7 +31,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   const mode = info.menuItemId === "clipplane-selection" ? "selection" : "page";
-  clipTab(tab.id, mode).catch(storeClipError);
+  clipTab(tab.id, mode, false, tab.url).catch(storeClipError);
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -62,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!tab?.id) {
       throw new Error("No active tab found.");
     }
-    return clipTab(tab.id, message.mode || "selection", Boolean(message.sync));
+    return clipTab(tab.id, message.mode || "selection", Boolean(message.sync), tab.url);
   }).then(sendResponse).catch((error) => {
     sendResponse({ ok: false, error: { message: error.message } });
   });
@@ -70,7 +71,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-async function clipTab(tabId, mode, sync = false) {
+async function clipTab(tabId, mode, sync = false, tabUrl = "") {
+  const page = capturablePage(tabUrl);
+  if (!page.ok) {
+    return storeCaptureFailure(page.error);
+  }
   if (mode === "selection") {
     const selection = await captureSelection(tabId);
     if (selection) {
@@ -85,6 +90,9 @@ async function clipTab(tabId, mode, sync = false) {
   }
 
   const payload = await runPageCapture(tabId, mode);
+  if (payload?.__clipplaneError) {
+    return storeCaptureFailure(payload.__clipplaneError);
+  }
   return saveClip(payload, sync);
 }
 
@@ -264,12 +272,13 @@ async function syncCaptureWithConsent(message) {
 }
 
 async function storeClipError(error) {
-  await chrome.storage.local.set({
-    lastClipResult: {
-      ok: false,
-      error: { message: error.message }
-    }
-  });
+  await storeCaptureFailure({ code: error.code || "capture_failed", message: error.message });
+}
+
+async function storeCaptureFailure(error) {
+  const response = { ok: false, error };
+  await chrome.storage.local.set({ lastClipResult: response });
+  return response;
 }
 
 async function sendNative(message) {

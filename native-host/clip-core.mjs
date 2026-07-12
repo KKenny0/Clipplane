@@ -14,6 +14,7 @@ const TAG_RULES = [
   { tag: "life", patterns: [/habit/i, /life/i, /health/i, /\u751f\u6d3b/, /\u4e60\u60ef/, /\u5065\u5eb7/] },
   { tag: "read", patterns: [/book/i, /paper/i, /article/i, /reading/i, /\u8bfb\u4e66/, /\u8bba\u6587/, /\u9605\u8bfb/] }
 ];
+export const MAX_CAPTURE_CONTENT_BYTES = 4 * 1024 * 1024;
 
 export { getDefaultPaths };
 
@@ -57,6 +58,12 @@ export function normalizePayload(payload = {}) {
 
   if (!contentMarkdown) {
     throw new ClipplaneError("empty_content", "Nothing to clip.");
+  }
+  if (Buffer.byteLength(contentMarkdown, "utf8") > MAX_CAPTURE_CONTENT_BYTES) {
+    throw new ClipplaneError(
+      "capture_too_large",
+      "This clip is too large to save safely. Try Selection or Element instead."
+    );
   }
 
   const title = cleanTitle(stringOr(payload.title, sourceTitle));

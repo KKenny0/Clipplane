@@ -1,9 +1,17 @@
 import { isHostOutdated, isHostUnavailable, safeErrorMessage } from "./setup-guide.js";
 import { getHostAsset, getHostDownloadUrl } from "./src/host-distribution.js";
+import { getUiState, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 
 const stateEl = document.querySelector("#host-state");
+const setupStateEl = document.querySelector("#setup-state");
 const downloadEl = document.querySelector("#download-host");
 const platformNoteEl = document.querySelector("#platform-note");
+const firstCaptureEl = document.querySelector("#first-capture");
+const steps = {
+  install: document.querySelector("#step-install"),
+  restart: document.querySelector("#step-restart"),
+  check: document.querySelector("#step-check")
+};
 
 document.querySelector("#retry-host").addEventListener("click", refreshStatus);
 document.querySelector("#open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
@@ -17,31 +25,64 @@ async function init() {
 
   if (asset) {
     downloadEl.href = getHostDownloadUrl(platform.os, platform.arch, version);
-    platformNoteEl.textContent = `${platform.os} ${platform.arch} · Clipplane Host ${version}`;
+    platformNoteEl.textContent = `${platformLabel(platform.os)} ${architectureLabel(platform.arch)}, Clipplane Host ${version}.`;
   } else {
     downloadEl.hidden = true;
     platformNoteEl.textContent = ["win", "mac"].includes(platform.os)
-      ? "A signed installer is not published for this Clipplane version. Use the source setup guide."
-      : "Public Host installers are currently planned for Windows and macOS.";
+      ? "The signed installer for this release is not public yet. Use the source setup guide for this private candidate."
+      : "Public Host installers are available only for Windows and macOS.";
   }
 
   await refreshStatus();
 }
 
 async function refreshStatus() {
-  stateEl.className = "status";
-  stateEl.textContent = "Checking";
-  const status = await chrome.runtime.sendMessage({ type: "status" });
+  renderState(getUiState("checking"));
+  let status;
+  try {
+    status = await chrome.runtime.sendMessage({ type: "status" });
+  } catch (error) {
+    status = { ok: false, error: { code: "host_unavailable", message: safeErrorMessage(error) } };
+  }
 
   if (status?.ok) {
-    stateEl.className = "status ready";
-    stateEl.textContent = `Ready · ${status.host_version}`;
+    renderState(resolveHostUiState(status));
+    setStepState("complete", "complete", "complete");
+    firstCaptureEl.classList.remove("is-locked");
     return;
   }
 
-  stateEl.className = "status warning";
-  stateEl.textContent = isHostOutdated(status) ? "Update required" : "Not installed";
+  const uiState = resolveHostUiState(status);
+  renderState(uiState);
+  setStepState("current", "", "");
+  firstCaptureEl.classList.add("is-locked");
   if (!isHostUnavailable(status) && !isHostOutdated(status)) {
     platformNoteEl.textContent = safeErrorMessage(status);
   }
+}
+
+function renderState(uiState) {
+  stateEl.className = stateClassName("status", uiState);
+  stateEl.textContent = uiState.label;
+
+  const dot = document.createElement("i");
+  dot.className = "status-dot";
+  dot.setAttribute("aria-hidden", "true");
+  setupStateEl.className = stateClassName("onboarding-state", uiState);
+  setupStateEl.replaceChildren(dot, document.createTextNode(uiState.label));
+}
+
+function setStepState(install, restart, check) {
+  for (const [name, value] of Object.entries({ install, restart, check })) {
+    steps[name].classList.toggle("is-current", value === "current");
+    steps[name].classList.toggle("is-complete", value === "complete");
+  }
+}
+
+function platformLabel(os) {
+  return os === "win" ? "Windows" : os === "mac" ? "macOS" : os;
+}
+
+function architectureLabel(arch) {
+  return arch === "x86-64" ? "x64" : arch;
 }

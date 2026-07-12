@@ -55,8 +55,12 @@ fi
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 project_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 
+custom_extension_id="$extension_id"
 if [ -z "$extension_id" ]; then
   extension_id="$("$node_path" "$script_dir/extension-identity.mjs" id)"
+  allowed_origins_json="$("$node_path" "$script_dir/native-host-origins.mjs" json)"
+else
+  allowed_origins_json="$("$node_path" -e 'process.stdout.write(JSON.stringify([`chrome-extension://${process.argv[1]}/`]))' "$extension_id")"
 fi
 
 if ! printf '%s' "$extension_id" | grep -Eq '^[a-p]{32}$'; then
@@ -94,22 +98,26 @@ shell_quote() {
 
 chmod +x "$launcher_path"
 
-node - "$manifest_path" "$launcher_path" "$extension_id" <<'NODE'
+node - "$manifest_path" "$launcher_path" "$allowed_origins_json" <<'NODE'
 const fs = require("node:fs");
-const [manifestPath, launcherPath, extensionId] = process.argv.slice(2);
+const [manifestPath, launcherPath, allowedOriginsJson] = process.argv.slice(2);
 const manifest = {
   name: "com.clipplane.host",
   description: "Clipplane Native Messaging Host",
   path: launcherPath,
   type: "stdio",
-  allowed_origins: [`chrome-extension://${extensionId}/`]
+  allowed_origins: JSON.parse(allowedOriginsJson)
 };
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
 
 cp "$manifest_path" "$manifest_dir/com.clipplane.host.json"
 
-sh "$script_dir/check-native-host-macos.sh" --browser "$browser" --extension-id "$extension_id"
+if [ -n "$custom_extension_id" ]; then
+  sh "$script_dir/check-native-host-macos.sh" --browser "$browser" --extension-id "$custom_extension_id"
+else
+  sh "$script_dir/check-native-host-macos.sh" --browser "$browser"
+fi
 
 echo ""
 echo "NEXT open your browser extension popup and make a first Save local clip."

@@ -47,6 +47,32 @@ test("fallback capture keeps the content root and removes page chrome", async ()
   assert.doesNotMatch(content.markdown, /Home Explore|Accept cookies|Subscribe now|hidden draft|display-none|aria-hidden|Related stories|Privacy Terms|Share this/i);
 });
 
+test("documentation capture keeps code and removes navigation", async () => {
+  const payload = captureFromHtml(await readFixture("documentation.html"), "https://example.com/docs");
+  assert.match(payload.contentMarkdown, /Save a local clip/);
+  assert.match(payload.contentMarkdown, /```[\s\S]*saveLocal\(capture\)/);
+  assert.doesNotMatch(payload.contentMarkdown, /Overview Installation Changelog/);
+});
+
+test("table and code pages keep structural content", async () => {
+  const payload = captureFromHtml(await readFixture("table-code.html"), "https://example.com/reference");
+  assert.match(payload.contentMarkdown, /\| State \| Meaning \|/);
+  assert.match(payload.contentMarkdown, /saved_local/);
+  assert.match(payload.contentMarkdown, /if \(localSaved\) return capture/);
+});
+
+test("dynamic shells keep activity content and remove controls", async () => {
+  const payload = captureFromHtml(await readFixture("dynamic-shell.html"), "https://example.com/app");
+  assert.match(payload.contentMarkdown, /Release candidate saved/);
+  assert.doesNotMatch(payload.contentMarkdown, /Open menu|Projects Settings Account|Subscribe to updates/);
+});
+
+test("malformed markup degrades to meaningful safe content", async () => {
+  const payload = captureFromHtml(await readFixture("malformed-markup.html"), "https://example.com/broken");
+  assert.match(payload.contentMarkdown, /malformed page should still retain meaningful local content/i);
+  assert.doesNotMatch(payload.contentMarkdown, /javascript:|Hidden draft/i);
+});
+
 test("page capture keeps selected text exact and does not require Readability", () => {
   const dom = createDom("<title>Document</title><p>Choose this precise text.</p>", "https://example.com/document");
   const text = dom.window.document.querySelector("p").firstChild;
@@ -102,6 +128,8 @@ test("element picker sends only the confirmed payload and removes its temporary 
   };
 
   dom.window.__clipplaneCapture.startElementPicker("picker-test");
+  assert.equal(dom.window.document.documentElement.getAttribute("data-clipplane-picker-active"), "true");
+  assert.match(dom.window.document.querySelector("style").textContent, /Esc to cancel/);
   const card = dom.window.document.querySelector("#card");
   card.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
 
@@ -110,6 +138,25 @@ test("element picker sends only the confirmed payload and removes its temporary 
   assert.equal(messages[0].requestId, "picker-test");
   assert.equal(messages[0].payload.inputType, "element");
   assert.equal(dom.window.document.querySelectorAll("style").length, 0);
+  assert.equal(dom.window.document.documentElement.hasAttribute("data-clipplane-picker-active"), false);
+});
+
+test("capture budget failures return actionable zero-write errors", () => {
+  const timedOut = createDom(
+    "<main><p>This page has enough content to enter the fallback capture path safely.</p></main>",
+    "https://example.com/slow",
+    { processingBudgetMs: 0 }
+  ).window.__clipplaneCapture.capture("page");
+  assert.equal(timedOut.__clipplaneError.code, "capture_timed_out");
+  assert.match(timedOut.__clipplaneError.message, /Selection or Element/);
+
+  const tooLarge = createDom(
+    "<main><p>This compact page deliberately exceeds a tiny injected test budget.</p></main>",
+    "https://example.com/large",
+    { payloadBytes: 80 }
+  ).window.__clipplaneCapture.capture("page");
+  assert.equal(tooLarge.__clipplaneError.code, "capture_too_large");
+  assert.match(tooLarge.__clipplaneError.message, /Selection or Element/);
 });
 
 function captureFromHtml(html, url) {
@@ -117,8 +164,11 @@ function captureFromHtml(html, url) {
   return dom.window.__clipplaneCapture.capture("page");
 }
 
-function createDom(html, url) {
+function createDom(html, url, captureConfig = null) {
   const dom = new JSDOM(html, { runScripts: "outside-only", url });
+  if (captureConfig) {
+    dom.window.__clipplaneCaptureConfig = captureConfig;
+  }
   dom.window.eval(readabilitySource);
   dom.window.eval(normalizerSource);
   dom.window.eval(captureSource);

@@ -1,7 +1,9 @@
 const RELEASES_BASE = "https://github.com/KKenny0/Clipplane/releases/download";
+const PUBLISHED_HOST_RELEASES = new Set();
 
-export function getHostAsset(os, arch, version) {
-  if (!hasPublicInstaller(version)) {
+export function getHostAsset(os, arch, version, options = {}) {
+  const publishedVersions = options.publishedVersions || PUBLISHED_HOST_RELEASES;
+  if (!publishedVersions.has(String(version))) {
     return null;
   }
   if (os === "win" && ["x86-64", "arm64"].includes(arch)) {
@@ -13,12 +15,7 @@ export function getHostAsset(os, arch, version) {
   return null;
 }
 
-function hasPublicInstaller(version) {
-  const [major, minor] = String(version).split(".").map(Number);
-  return major > 0 || (major === 0 && minor >= 6);
-}
-
-export function getHostDownloadUrl(os, arch, version) {
-  const asset = getHostAsset(os, arch, version);
+export function getHostDownloadUrl(os, arch, version, options = {}) {
+  const asset = getHostAsset(os, arch, version, options);
   return asset ? `${RELEASES_BASE}/v${version}/${asset}` : null;
 }

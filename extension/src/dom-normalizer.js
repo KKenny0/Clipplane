@@ -260,7 +260,38 @@
   }
 
   function elementText(element) {
-    return cleanText(element?.innerText || element?.textContent);
+    if (!element) {
+      return "";
+    }
+    const chunks = [];
+    const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      if (!hasHiddenTextAncestor(node.parentElement, element)) {
+        chunks.push(node.nodeValue || "");
+      }
+      node = walker.nextNode();
+    }
+    return cleanText(chunks.join(" "));
+  }
+
+  function hasHiddenTextAncestor(start, boundary) {
+    let element = start;
+    while (element) {
+      const tag = element.tagName.toLowerCase();
+      const inlineStyle = element.getAttribute("style") || "";
+      if (NON_CONTENT_TAGS.has(tag)
+        || element.hasAttribute("hidden")
+        || element.getAttribute("aria-hidden") === "true"
+        || /display\s*:\s*none|visibility\s*:\s*hidden/i.test(inlineStyle)) {
+        return true;
+      }
+      if (element === boundary) {
+        break;
+      }
+      element = element.parentElement;
+    }
+    return false;
   }
 
   function cleanText(value) {

@@ -17,9 +17,17 @@ const bundleArg = readOptionalArgument(args, "--bundle")
   || path.join("dist", `clipplane-host-v${packageJson.version}-${target}-${arch}`);
 const bundleDir = path.resolve(rootDir, bundleArg);
 const launcher = path.join(bundleDir, process.platform === "win32" ? "clipplane-host.cmd" : "clipplane-host");
+const installHelper = path.join(bundleDir, process.platform === "win32" ? "install-host.ps1" : "install-host.sh");
+const uninstallHelper = path.join(bundleDir, process.platform === "win32" ? "uninstall-host.ps1" : "uninstall-host.sh");
 
 if (!existsSync(launcher)) {
   throw new Error(`Native Host bundle launcher not found: ${launcher}`);
+}
+if (!existsSync(installHelper) || !existsSync(uninstallHelper)) {
+  throw new Error("Native Host bundle is missing its install or uninstall helper.");
+}
+if (!existsSync(path.join(bundleDir, "app", "native-host", "credential-maintenance.mjs"))) {
+  throw new Error("Native Host bundle is missing credential maintenance required by uninstall.");
 }
 
 const child = process.platform === "win32"

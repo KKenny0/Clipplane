@@ -8,6 +8,7 @@ import {
   cleanCapturedMarkdown,
   clipPayload,
   markdownToOrg,
+  MAX_CAPTURE_CONTENT_BYTES,
   normalizePayload
 } from "../native-host/clip-core.mjs";
 
@@ -25,6 +26,22 @@ test("normalizePayload preserves an explicit element capture method", () => {
 
   assert.equal(payload.inputType, "element");
   assert.equal(payload.extractionMethod, "element");
+});
+
+test("oversized captures fail before any local file is written", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-oversized-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const payload = {
+    sourceUrl: "https://example.com/large",
+    title: "Large page",
+    contentMarkdown: "x".repeat(MAX_CAPTURE_CONTENT_BYTES + 1)
+  };
+
+  await assert.rejects(
+    clipPayload(payload, { notesDir, configDir }),
+    (error) => error.code === "capture_too_large" && /Selection or Element/.test(error.message)
+  );
+  assert.deepEqual(await fs.readdir(notesDir), []);
 });
 
 test("markdownToOrg converts headings, links, bold, and code fences", () => {

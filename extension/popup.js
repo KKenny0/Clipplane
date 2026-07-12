@@ -8,9 +8,15 @@ import {
   safeErrorMessage
 } from "./setup-guide.js";
 import { getExternalSyncStatus } from "./src/sync-consent.js";
+import { getUiState, resolveClipUiState, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 
 const stateEl = document.querySelector("#state");
 const resultEl = document.querySelector("#result");
+const resultLabelEl = document.querySelector("#result-label");
+const resultTitleEl = document.querySelector("#result-title");
+const resultDetailEl = document.querySelector("#result-detail");
+const resultPathEl = document.querySelector("#result-path");
+const resultPrimaryEl = document.querySelector("#result-primary");
 const syncStatusEl = document.querySelector("#sync-status");
 const hostPanelEl = document.querySelector("#host-panel");
 const setupCommandEl = document.querySelector("#setup-command");
@@ -25,6 +31,7 @@ const modeButtons = {
 let mode = "selection";
 let hostAvailable = true;
 let hasConfiguredSync = false;
+let currentResult = null;
 
 modeButtons.selection.addEventListener("click", () => setMode("selection"));
 modeButtons.page.addEventListener("click", () => setMode("page"));
@@ -37,6 +44,7 @@ document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
 document.querySelector("#retry-host").addEventListener("click", refreshStatus);
 document.querySelector("#open-settings").addEventListener("click", () => openSettings());
 document.querySelector("#configure-sync").addEventListener("click", () => openSettings("sync"));
+resultPrimaryEl.addEventListener("click", handleResultAction);
 
 chrome.storage.local.get("lastClipResult").then(({ lastClipResult }) => {
   if (lastClipResult) {
@@ -51,13 +59,12 @@ async function clip(sync) {
   try {
     const response = await chrome.runtime.sendMessage({ type: "clip", mode, sync });
     if (response?.pending) {
-      resultEl.className = "result";
-      resultEl.textContent = "Choose an area in the page.";
+      renderResult(response);
       window.setTimeout(() => window.close(), 180);
       return;
     }
     renderResult(response);
-    refreshStatus();
+    await refreshStatus({ preserveState: true });
   } catch (error) {
     renderResult({ ok: false, error: { message: safeErrorMessage(error) } });
   } finally {
@@ -65,7 +72,7 @@ async function clip(sync) {
   }
 }
 
-async function refreshStatus() {
+async function refreshStatus(options = {}) {
   try {
     const status = await chrome.runtime.sendMessage({ type: "status" });
     if (isHostUnavailable(status) || isHostOutdated(status)) {
@@ -74,7 +81,9 @@ async function refreshStatus() {
     }
     hostAvailable = true;
     hostPanelEl.hidden = true;
-    setPopupState("Ready");
+    if (!options.preserveState) {
+      setPopupState(resolveHostUiState(status));
+    }
     renderSyncStatus(status);
   } catch (error) {
     renderHostUnavailable();
@@ -110,7 +119,9 @@ function setActionLabel(button, label, detail) {
 }
 
 function setBusy(isBusy) {
-  setPopupState(isBusy ? "Clipping" : (hostAvailable ? "Ready" : "Host unavailable"));
+  if (isBusy) {
+    setPopupState(getUiState("working"));
+  }
   for (const button of buttons) {
     button.disabled = isBusy;
   }
@@ -118,24 +129,27 @@ function setBusy(isBusy) {
 }
 
 function renderResult(response) {
-  if (!response?.ok) {
-    resultEl.className = "result error";
-    if (isHostUnavailable(response)) {
-      renderHostUnavailable();
-      resultEl.textContent = "Run local host setup, then retry.";
-      return;
-    }
-    resultEl.textContent = safeErrorMessage(response, "Clip failed.");
-    return;
+  currentResult = response;
+  const uiState = resolveClipUiState(response);
+  if (!response?.ok && ["error", "unsupported"].includes(uiState.key)) {
+    uiState.detail = safeErrorMessage(response, uiState.detail);
   }
 
-  resultEl.className = "result";
-  const capture = response.capture;
-  const duplicate = response.duplicate ? "Duplicate skipped" : "Saved";
-  const sync = summarizeSync(response.sync);
-  resultEl.textContent = sync
-    ? `${duplicate}\n${sync}\n${capture.title}`
-    : `${duplicate}\n${capture.title}\n${capture.local_path}`;
+  resultEl.hidden = false;
+  resultEl.className = stateClassName("result-card", uiState);
+  resultLabelEl.textContent = uiState.label;
+  resultTitleEl.textContent = uiState.title;
+  resultDetailEl.textContent = response?.capture?.title
+    ? `${uiState.detail} ${response.capture.title}`
+    : uiState.detail;
+
+  const localPath = response?.capture?.local_path || "";
+  resultPathEl.hidden = !localPath;
+  resultPathEl.textContent = localPath;
+
+  resultPrimaryEl.hidden = !uiState.action;
+  resultPrimaryEl.textContent = uiState.action;
+  setPopupState(uiState);
 }
 
 function renderSyncStatus(status) {
@@ -172,11 +186,14 @@ function updateActionButtons(forceDisabled = false) {
 }
 
 function renderHostUnavailable(outdated = false) {
+  const uiState = getUiState(outdated ? "host-outdated" : "host-missing");
   hostAvailable = false;
   hasConfiguredSync = false;
-  setPopupState(outdated ? "Host outdated" : "Host unavailable");
-  syncStatusEl.textContent = outdated ? "Update required" : "Host unavailable";
-  document.querySelector(".host-title").textContent = outdated ? "Local host update required" : "Local host unavailable";
+  setPopupState(uiState);
+  syncStatusEl.textContent = uiState.label;
+  document.querySelector(".host-title").textContent = uiState.title;
+  document.querySelector("#host-detail").textContent = uiState.detail;
+  document.querySelector("#install-host").textContent = uiState.action;
   setupCommandEl.textContent = getSetupCommand();
   hostPanelEl.hidden = false;
   document.querySelector("#configure-sync").hidden = false;
@@ -186,11 +203,9 @@ function renderHostUnavailable(outdated = false) {
 async function copySetup() {
   try {
     await copySetupCommand();
-    resultEl.className = "result";
-    resultEl.textContent = "Setup command copied.";
+    showTransientResult("Command copied", "Paste it into a terminal from the Clipplane source folder.");
   } catch {
-    resultEl.className = "result error";
-    resultEl.textContent = "Could not copy. Select the command shown above.";
+    showTransientResult("Command not copied", "Select the command and copy it manually.", "error");
   }
 }
 
@@ -201,25 +216,61 @@ async function openSettings(tab) {
   await chrome.runtime.openOptionsPage();
 }
 
-function summarizeSync(sync) {
-  if (!sync || sync.status === "no_sinks") {
-    return "";
+async function handleResultAction() {
+  const state = resolveClipUiState(currentResult);
+  if (["saved-local", "duplicate"].includes(state.key)) {
+    const captureId = currentResult?.capture?.capture_id;
+    if (!captureId) {
+      return;
+    }
+    const response = await chrome.runtime.sendMessage({ type: "open_capture_body", captureId });
+    if (!response?.ok) {
+      renderResult(response);
+    } else {
+      showTransientResult("Local copy opened", "Clipplane opened the saved body from your capture trail.");
+    }
+    return;
   }
-  if (sync.status === "synced") {
-    return "Synced";
+  if (state.key === "saved-local-sync-failed") {
+    const captureId = currentResult?.capture?.capture_id;
+    if (!captureId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "sync", captureId });
+      renderResult({ ...currentResult, sync: response });
+    } finally {
+      setBusy(false);
+    }
+    return;
   }
-  if (sync.status === "sync_failed") {
-    return "Saved locally, sync failed";
+  if (state.key === "consent-required") {
+    await openSettings("sync");
+    return;
   }
-  if (sync.status === "sync_skipped") {
-    return "Saved locally, sync skipped";
+  if (["host-missing", "host-outdated"].includes(state.key)) {
+    openOnboarding();
   }
-  return "";
 }
 
-function setPopupState(label) {
+function showTransientResult(title, detail, tone = "ready") {
+  const uiState = { ...getUiState(tone === "error" ? "error" : "ready"), title, detail, tone, action: "" };
+  currentResult = null;
+  resultEl.hidden = false;
+  resultEl.className = stateClassName("result-card", uiState);
+  resultLabelEl.textContent = tone === "error" ? "Action failed" : "Done";
+  resultTitleEl.textContent = title;
+  resultDetailEl.textContent = detail;
+  resultPathEl.hidden = true;
+  resultPrimaryEl.hidden = true;
+  setPopupState(uiState);
+}
+
+function setPopupState(uiState) {
   const dot = document.createElement("i");
   dot.className = "status-dot";
   dot.setAttribute("aria-hidden", "true");
-  stateEl.replaceChildren(dot, document.createTextNode(label));
+  stateEl.className = stateClassName("state", uiState);
+  stateEl.replaceChildren(dot, document.createTextNode(uiState.label));
 }

@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Resolve-ClipplaneExtensionId {
+function Resolve-ClipplaneExtensionIds {
   param(
     [string]$ExtensionId,
     [Parameter(Mandatory = $true)]
@@ -18,24 +18,26 @@ function Resolve-ClipplaneExtensionId {
   )
 
   if ($ExtensionId) {
-    return $ExtensionId
+    return @($ExtensionId)
   }
 
-  $identityScript = Join-Path $ProjectRoot "scripts\extension-identity.mjs"
-  $resolved = & $NodePath $identityScript id
+  $originsScript = Join-Path $ProjectRoot "scripts\native-host-origins.mjs"
+  $resolved = @(& $NodePath $originsScript ids)
   if ($LASTEXITCODE -ne 0 -or -not $resolved) {
-    throw "ExtensionId was not provided and the default Clipplane extension ID could not be resolved. Pass -ExtensionId for development builds."
+    throw "ExtensionId was not provided and Clipplane extension IDs could not be resolved. Pass -ExtensionId for development builds."
   }
 
-  return $resolved.Trim()
+  return @($resolved | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $node = Get-Command node -ErrorAction Stop
-$ExtensionId = Resolve-ClipplaneExtensionId -ExtensionId $ExtensionId -NodePath $node.Source -ProjectRoot $projectRoot
+$ExtensionIds = @(Resolve-ClipplaneExtensionIds -ExtensionId $ExtensionId -NodePath $node.Source -ProjectRoot $projectRoot)
 
-if ($ExtensionId -notmatch "^[a-p]{32}$") {
-  throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+foreach ($ResolvedExtensionId in $ExtensionIds) {
+  if ($ResolvedExtensionId -notmatch "^[a-p]{32}$") {
+    throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+  }
 }
 
 $registryPath = if ($Browser -eq "chrome") {
@@ -70,13 +72,14 @@ if (-not (Test-Path -LiteralPath $manifest.path)) {
   throw "Native host launcher does not exist: $($manifest.path)"
 }
 
-$origin = "chrome-extension://$ExtensionId/"
-if ($manifest.allowed_origins -notcontains $origin) {
-  throw "Manifest does not allow extension origin: $origin"
+$expectedOrigins = @($ExtensionIds | ForEach-Object { "chrome-extension://$_/" } | Sort-Object)
+$actualOrigins = @($manifest.allowed_origins | Sort-Object)
+if (Compare-Object -ReferenceObject $expectedOrigins -DifferenceObject $actualOrigins) {
+  throw "Native host allowed origins mismatch. Expected $($expectedOrigins -join ', '); got $($actualOrigins -join ', ')"
 }
 
 Write-Host "PASS registry: $registryPath"
 Write-Host "PASS manifest: $manifestPath"
 Write-Host "PASS launcher: $($manifest.path)"
 Write-Host "PASS node: $($node.Source)"
-Write-Host "PASS allowed origin: chrome-extension://$ExtensionId/"
+Write-Host "PASS allowed origins: $($actualOrigins -join ', ')"

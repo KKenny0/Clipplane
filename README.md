@@ -20,15 +20,16 @@ Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Nat
 
 ## 当前状态
 
-Clipplane 仍是 dev preview：
+Clipplane 的公开版本仍是 GitHub dev preview；当前源码已进入 `0.6.0` Chrome Web Store 候选阶段：
 
 - GitHub Release 提供打包好的扩展 zip，用于手动 `Load unpacked`，扩展 ID 固定为 `mhgcfphfcgbgabhbegdonadkedfaddhc`。
+- 当前 `0.6.0` 源码和 Chrome Web Store 草稿的 canonical extension ID 是 `emacefnmbogjdcblglmipolnickjnmbl`。
 - 本地 host 和 setup 脚本来自源码仓库，或 Release 自带的 `Source code` 包。
-- 目前还没有上架 Chrome Web Store 或 Edge Add-ons；Chrome Web Store 不是 v0.4 的依赖。
-- setup 默认使用固定 extension ID，普通用户不需要复制浏览器生成的 ID。
+- Chrome Web Store 条目尚未提交审核或公开发布；Edge Add-ons 也尚未上架。
+- setup 默认同时允许 canonical Store ID 和旧 GitHub dev-preview ID，迁移用户不需要手动复制 ID。
 - Edge Add-ons 可以作为后续免费商店分发路径单独推进。
 
-Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。Clipplane 的 `manifest.key` 是公开身份 key，用于让手动加载的扩展保持稳定 ID；它不是签名私钥，仓库也不保存 `.pem` 或其他私钥文件。
+Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。Clipplane 的 `manifest.key` 是 Chrome Web Store 提供的公开身份 key，用于让本地加载的 `0.6.0` 候选与 Store Item ID 保持一致；它不是签名私钥，仓库也不保存 `.pem` 或其他私钥文件。Store 上传 ZIP 会在 staging 副本中移除该字段。
 
 ## 5 分钟开始
 
@@ -54,7 +55,7 @@ npm run smoke
 2. 开启 `Developer mode`。
 3. 点击 `Load unpacked`。
 4. 选择解压后的 `clipplane-extension-vX` 目录，或源码仓库里的 `extension` 目录。
-5. 确认浏览器显示的 extension ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`。
+5. 当前源码或 `0.6.0` 候选应显示 `emacefnmbogjdcblglmipolnickjnmbl`；已发布的 `v0.5.0` dev-preview 包仍显示 legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`。
 
 ### 3. 注册本地 host
 
@@ -193,10 +194,11 @@ npm run smoke
 npm run smoke:sync:local
 npm run doctor
 npm run package:extension
+npm run package:store
 npm run verify:store
 ```
 
-`npm run package:extension` 会生成 `dist/clipplane-extension-vX.zip`，`npm run verify:store` 则审计最终 ZIP。这个 zip 只包含浏览器扩展。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。门禁会拒绝私钥、`.env*`、Native Host 文件、可执行文件、远程代码和权限扩张。
+`npm run package:extension` 会生成保留公开身份 key、供本地候选测试使用的 `dist/clipplane-extension-vX.zip`。首次及后续 Chrome Web Store 上传使用 `npm run package:store` 生成的 `dist/clipplane-store-vX.zip`；它会从副本清单移除 `key`，不改动源码清单。`npm run verify:store` 审计这个 Store ZIP，并拒绝 `key`、私钥、`.env*`、Native Host 文件、可执行文件、远程代码和权限扩张。两个 ZIP 都只包含浏览器扩展。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。
 
 在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.6.0` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
 
@@ -261,7 +263,7 @@ Clipplane 不监听剪贴板，不默认上传内容，也不会自动运行分�
 ## 排查
 
 - `Specified native messaging host not found`：对当前浏览器重新运行 setup 命令，再运行 `npm run doctor`。
-- `Access to the specified native messaging host is forbidden`：确认扩展 ID 是 `mhgcfphfcgbgabhbegdonadkedfaddhc`，然后重新运行对应浏览器的 setup 命令。
+- `Access to the specified native messaging host is forbidden`：确认扩展 ID 是 canonical `emacefnmbogjdcblglmipolnickjnmbl` 或迁移期 legacy `mhgcfphfcgbgabhbegdonadkedfaddhc`，然后重新运行对应浏览器的 setup 命令。
 - `Nothing to clip`：先选中文本，或使用 `Page` 模式让 Clipplane 抓取页面正文。
 - 页面剪藏不理想：先使用 `Page` 模式，它会优先提取正文并自动回退；文章、文档以外的页面可改用 `Element` 点选目标区域，或使用 `Selection` 保存精确文本。
 - `Element` 模式无法启动：浏览器内部页、Chrome Web Store 和跨域 iframe 受到浏览器隔离限制，无法剪藏。

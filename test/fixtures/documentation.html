@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head><title>Clipplane API guide</title></head>
+  <body>
+    <nav>Overview Installation Changelog</nav>
+    <main role="main">
+      <h1>Save a local clip</h1>
+      <p>Call the local Host only after the user chooses a capture mode. The local write finishes before optional external sync begins.</p>
+      <h2>Failure behavior</h2>
+      <p>If an external destination fails, keep the confirmed local copy and expose one retry action.</p>
+      <pre><code>await saveLocal(capture);</code></pre>
+    </main>
+  </body>
+</html>

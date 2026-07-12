@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Resolve-ClipplaneExtensionId {
+function Resolve-ClipplaneExtensionIds {
   param(
     [string]$ExtensionId,
     [Parameter(Mandatory = $true)]
@@ -20,16 +20,16 @@ function Resolve-ClipplaneExtensionId {
   )
 
   if ($ExtensionId) {
-    return $ExtensionId
+    return @($ExtensionId)
   }
 
-  $identityScript = Join-Path $ProjectRoot "scripts\extension-identity.mjs"
-  $resolved = & $NodePath $identityScript id
+  $originsScript = Join-Path $ProjectRoot "scripts\native-host-origins.mjs"
+  $resolved = @(& $NodePath $originsScript ids)
   if ($LASTEXITCODE -ne 0 -or -not $resolved) {
-    throw "ExtensionId was not provided and the default Clipplane extension ID could not be resolved. Pass -ExtensionId for development builds."
+    throw "ExtensionId was not provided and Clipplane extension IDs could not be resolved. Pass -ExtensionId for development builds."
   }
 
-  return $resolved.Trim()
+  return @($resolved | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -38,10 +38,12 @@ $launcherPath = Join-Path $hostDir "clipplane-host.cmd"
 $manifestPath = Join-Path $hostDir "com.clipplane.host.json"
 $nodePath = (Get-Command node -ErrorAction Stop).Source
 
-$ExtensionId = Resolve-ClipplaneExtensionId -ExtensionId $ExtensionId -NodePath $nodePath -ProjectRoot $projectRoot
+$ExtensionIds = @(Resolve-ClipplaneExtensionIds -ExtensionId $ExtensionId -NodePath $nodePath -ProjectRoot $projectRoot)
 
-if ($ExtensionId -notmatch "^[a-p]{32}$") {
-  throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+foreach ($ResolvedExtensionId in $ExtensionIds) {
+  if ($ResolvedExtensionId -notmatch "^[a-p]{32}$") {
+    throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."
+  }
 }
 
 if ($NotesDir -and $NotesDir -match "[`"`r`n]") {
@@ -63,7 +65,7 @@ $manifest = [ordered]@{
   description = "Clipplane Native Messaging Host"
   path = $launcherPath
   type = "stdio"
-  allowed_origins = @("chrome-extension://$ExtensionId/")
+  allowed_origins = @($ExtensionIds | ForEach-Object { "chrome-extension://$_/" })
 }
 
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
@@ -84,4 +86,4 @@ if ($registeredManifest -ne $manifestPath) {
 
 Write-Host "Installed Clipplane native host for $Browser"
 Write-Host "Manifest: $manifestPath"
-Write-Host "Allowed origin: chrome-extension://$ExtensionId/"
+Write-Host "Allowed origins: $($manifest.allowed_origins -join ', ')"

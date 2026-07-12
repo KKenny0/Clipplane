@@ -4,6 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const EXTENSION_ID_PATTERN = /^[a-p]{32}$/;
+export const LEGACY_EXTENSION_IDS = Object.freeze([
+  "mhgcfphfcgbgabhbegdonadkedfaddhc"
+]);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRootDir = path.resolve(__dirname, "..");
@@ -41,7 +44,8 @@ export async function getExtensionIdentity(rootDir = defaultRootDir) {
   const id = deriveExtensionIdFromKey(manifest.key);
   return {
     id,
-    key: manifest.key
+    key: manifest.key,
+    legacyIds: [...LEGACY_EXTENSION_IDS]
   };
 }
 

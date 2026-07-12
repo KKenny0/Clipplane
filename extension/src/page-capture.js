@@ -1,7 +1,14 @@
 (() => {
   const PICKER_ATTRIBUTE = "data-clipplane-picker-target";
+  const PICKER_ACTIVE_ATTRIBUTE = "data-clipplane-picker-active";
   const PICKER_TIMEOUT_MS = 60_000;
   const MIN_READABILITY_TEXT_LENGTH = 160;
+  const DEFAULT_CAPTURE_PROCESSING_BUDGET_MS = 1_500;
+  const DEFAULT_CAPTURE_PAYLOAD_BYTES = 4 * 1024 * 1024;
+  const captureLimits = {
+    processingBudgetMs: positiveLimit(globalThis.__clipplaneCaptureConfig?.processingBudgetMs, DEFAULT_CAPTURE_PROCESSING_BUDGET_MS),
+    payloadBytes: positiveLimit(globalThis.__clipplaneCaptureConfig?.payloadBytes, DEFAULT_CAPTURE_PAYLOAD_BYTES)
+  };
   let activePicker = null;
 
   globalThis.__clipplaneCapture?.cancelElementPicker?.("superseded");
@@ -13,12 +20,13 @@
   };
 
   function capture(mode) {
+    const startedAt = performance.now();
     const selectedText = String(window.getSelection?.() || "").trim();
     const sourceUrl = location.href;
     const sourceTitle = document.title || sourceUrl;
 
     if (mode === "selection" && selectedText) {
-      return {
+      return finalizeCapture({
         inputType: "selection",
         extractionMethod: "selection",
         sourceUrl,
@@ -26,10 +34,10 @@
         title: firstLine(selectedText, sourceTitle),
         contentMarkdown: selectedText,
         contentText: selectedText
-      };
+      }, startedAt);
     }
 
-    return capturePage(sourceUrl, sourceTitle);
+    return finalizeCapture(capturePage(sourceUrl, sourceTitle), startedAt);
   }
 
   function capturePage(sourceUrl, sourceTitle) {
@@ -56,7 +64,11 @@
     }
 
     try {
-      const article = new globalThis.Readability(document.cloneNode(true), {
+      const readableDocument = document.cloneNode(true);
+      for (const hidden of readableDocument.querySelectorAll('[hidden], [aria-hidden="true"], [style*="display:none" i], [style*="display: none" i], [style*="visibility:hidden" i], [style*="visibility: hidden" i]')) {
+        hidden.remove();
+      }
+      const article = new globalThis.Readability(readableDocument, {
         charThreshold: MIN_READABILITY_TEXT_LENGTH
       }).parse();
       if (!article || cleanText(article.textContent).length < MIN_READABILITY_TEXT_LENGTH) {
@@ -92,6 +104,7 @@
     activePicker?.finish({ cancelled: true, reason: "superseded" });
 
     const style = ensurePickerStyle();
+    document.documentElement.setAttribute(PICKER_ACTIVE_ATTRIBUTE, "true");
     let highlighted = null;
     let originalHighlight = null;
     let finished = false;
@@ -135,6 +148,7 @@
       document.removeEventListener("keydown", cancelOnEscape, true);
       clearHighlight();
       style.remove();
+      document.documentElement.removeAttribute(PICKER_ACTIVE_ATTRIBUTE);
       if (activePicker?.requestId === requestId) {
         activePicker = null;
       }
@@ -158,6 +172,10 @@
       event.stopImmediatePropagation();
 
       const payload = captureElement(target);
+      if (payload.__clipplaneError) {
+        finish({ error: payload.__clipplaneError });
+        return;
+      }
       if (!payload.contentMarkdown) {
         finish({ error: { code: "empty_element", message: "That area has no capturable text." } });
         return;
@@ -186,11 +204,12 @@
   }
 
   function captureElement(element) {
+    const startedAt = performance.now();
     const sourceUrl = location.href;
     const sourceTitle = document.title || sourceUrl;
     const content = domNormalizer().normalizeElement(element, { profile: "element", sourceUrl });
 
-    return {
+    return finalizeCapture({
       inputType: "element",
       extractionMethod: "element",
       sourceUrl,
@@ -198,7 +217,7 @@
       title: firstLine(content.text, sourceTitle),
       contentMarkdown: content.markdown || content.text,
       contentText: content.text
-    };
+    }, startedAt);
   }
 
   function findCaptureTarget(start) {
@@ -219,8 +238,8 @@
   function ensurePickerStyle() {
     const style = document.createElement("style");
     style.textContent = `
-      [${PICKER_ATTRIBUTE}] { outline: 3px solid #168aad !important; outline-offset: 3px !important; cursor: crosshair !important; }
-      [${PICKER_ATTRIBUTE}]::after { content: "Clipplane"; position: absolute; z-index: 2147483647; margin-top: -24px; padding: 3px 7px; border-radius: 4px; background: #168aad; color: #fff; font: 600 12px/1.2 system-ui, sans-serif; pointer-events: none; }
+      [${PICKER_ATTRIBUTE}] { outline: 3px solid oklch(68% .14 50) !important; outline-offset: 3px !important; cursor: crosshair !important; }
+      html[${PICKER_ACTIVE_ATTRIBUTE}]::before { content: "Clipplane · Click an area to save · Esc to cancel"; position: fixed; z-index: 2147483647; top: 14px; left: 50%; max-width: calc(100vw - 28px); padding: 9px 12px; border: 1px solid oklch(68% .14 50); border-radius: 8px; background: oklch(21% .04 163); color: oklch(98% .006 165); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); font: 700 12px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: center; transform: translateX(-50%); pointer-events: none; }
     `;
     (document.head || document.documentElement).append(style);
     return style;
@@ -244,5 +263,31 @@
   function firstLine(text, fallback) {
     const line = String(text || "").split(/\r?\n/).find(Boolean) || fallback;
     return cleanText(line).slice(0, 80) || fallback;
+  }
+
+  function finalizeCapture(payload, startedAt) {
+    const elapsed = performance.now() - startedAt;
+    if (elapsed > captureLimits.processingBudgetMs) {
+      return captureError(
+        "capture_timed_out",
+        "This page took too long to process. Try Selection or Element instead."
+      );
+    }
+    if (new Blob([JSON.stringify(payload)]).size > captureLimits.payloadBytes) {
+      return captureError(
+        "capture_too_large",
+        "This page is too large to save as one clip. Try Selection or Element instead."
+      );
+    }
+    return payload;
+  }
+
+  function captureError(code, message) {
+    return { __clipplaneError: { code, message } };
+  }
+
+  function positiveLimit(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
   }
 })();

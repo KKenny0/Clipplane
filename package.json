@@ -1,6 +1,6 @@
 {
   "name": "clipplane",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Local-first browser clipper that saves web pages and selections into an org-mode inbox.",
@@ -19,6 +19,7 @@
     "doctor:native:macos:edge": "bash scripts/check-native-host-macos.sh --browser edge",
     "smoke": "node scripts/smoke-clip.mjs",
     "package:extension": "npm run prepare:extension && node scripts/package-extension.mjs",
+    "package:store": "npm run prepare:extension && node scripts/package-extension.mjs --store",
     "package:host:windows": "node scripts/package-native-host.mjs --target windows",
     "package:host:macos": "node scripts/package-native-host.mjs --target macos",
     "smoke:host:bundle": "node scripts/smoke-native-host-bundle.mjs",

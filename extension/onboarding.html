@@ -17,35 +17,57 @@
           <span class="brand-kicker">Local capture trail</span>
         </span>
       </a>
-      <span class="onboarding-state"><i class="status-dot" aria-hidden="true"></i>Setup workspace</span>
+      <span id="setup-state" class="onboarding-state is-neutral"><i class="status-dot" aria-hidden="true"></i>Checking setup</span>
     </header>
 
     <main>
       <section class="setup-band" aria-labelledby="host-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">01 / Local component</p>
-            <h2 id="host-title">Keep the trail on your machine.</h2>
+            <p class="eyebrow">Local Host</p>
+            <h1 id="host-title">Keep the trail on your machine.</h1>
           </div>
-          <span id="host-state" class="status">Checking</span>
+          <span id="host-state" class="status is-neutral" aria-live="polite">Checking</span>
         </div>
         <p class="description">Clipplane Host writes every capture directly into your notes folder. It runs on your computer and does not send clips to Clipplane servers.</p>
-        <div class="actions">
-          <a id="download-host" class="primary" href="#">Download for this computer</a>
-          <button id="retry-host" type="button">Check again</button>
-          <a id="source-setup" class="text-link" href="https://github.com/KKenny0/Clipplane/blob/main/README.en.md#5-minute-start" target="_blank" rel="noreferrer">Source setup guide</a>
-        </div>
-        <p id="platform-note" class="note"></p>
+        <ol class="setup-steps">
+          <li id="step-install" class="setup-step is-current">
+            <span class="step-number">1</span>
+            <div>
+              <strong>Install Clipplane Host</strong>
+              <p id="platform-note" class="note">Finding the correct installer for this computer.</p>
+              <div class="actions">
+                <a id="download-host" class="primary" href="#">Download Host</a>
+                <a id="source-setup" class="text-link" href="https://github.com/KKenny0/Clipplane/blob/main/README.en.md#5-minute-start" target="_blank" rel="noreferrer">Source setup guide</a>
+              </div>
+            </div>
+          </li>
+          <li id="step-restart" class="setup-step">
+            <span class="step-number">2</span>
+            <div>
+              <strong>Restart Chrome</strong>
+              <p class="note">Close every Chrome window, reopen the browser, then return here.</p>
+            </div>
+          </li>
+          <li id="step-check" class="setup-step">
+            <span class="step-number">3</span>
+            <div>
+              <strong>Confirm the local connection</strong>
+              <p class="note">Clipplane checks the Host version without reading your notes.</p>
+              <button id="retry-host" type="button">Check again</button>
+            </div>
+          </li>
+        </ol>
       </section>
 
-      <section class="next-band" aria-labelledby="next-title">
+      <section id="first-capture" class="next-band" aria-labelledby="next-title">
         <div>
-          <p class="eyebrow">02 / First capture</p>
+          <p class="eyebrow">First capture</p>
           <h2 id="next-title">Save locally first.</h2>
-          <p class="description">Open a page, choose Selection, Page, or Element from the Clipplane popup, then use Save local.</p>
+          <p class="description">After the Host is ready, open any normal webpage. Choose Selection, Page, or Element in the popup, then use Save local.</p>
         </div>
         <div class="actions">
-          <button id="open-settings" type="button">Open settings</button>
+          <button id="open-settings" type="button">Choose storage folder</button>
           <a class="text-link" href="https://github.com/KKenny0/Clipplane/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy policy</a>
         </div>
       </section>

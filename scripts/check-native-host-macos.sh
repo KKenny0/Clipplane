@@ -65,12 +65,9 @@ fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 if [ -z "$extension_id" ]; then
-  extension_id="$("$node_path" "$script_dir/extension-identity.mjs" id)"
-fi
-
-if ! printf '%s' "$extension_id" | grep -Eq '^[a-p]{32}$'; then
-  echo "Extension ID must be a 32-character Chrome extension ID using letters a-p." >&2
-  exit 2
+  expected_origins_json="$("$node_path" "$script_dir/native-host-origins.mjs" json)"
+else
+  expected_origins_json="$("$node_path" -e 'process.stdout.write(JSON.stringify([`chrome-extension://${process.argv[1]}/`]))' "$extension_id")"
 fi
 
 manifest_name="$(node -e "const fs=require('node:fs'); const m=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); process.stdout.write(m.name || '')" "$manifest_path")"
@@ -90,13 +87,14 @@ if [ ! -x "$launcher_path" ]; then
   exit 1
 fi
 
-origin="chrome-extension://$extension_id/"
-node - "$manifest_path" "$origin" <<'NODE'
+node - "$manifest_path" "$expected_origins_json" <<'NODE'
 const fs = require("node:fs");
-const [manifestPath, origin] = process.argv.slice(2);
+const [manifestPath, expectedOriginsJson] = process.argv.slice(2);
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-if (!Array.isArray(manifest.allowed_origins) || !manifest.allowed_origins.includes(origin)) {
-  console.error(`FAIL manifest does not allow extension origin: ${origin}`);
+const actual = Array.isArray(manifest.allowed_origins) ? [...manifest.allowed_origins].sort() : [];
+const expected = [...JSON.parse(expectedOriginsJson)].sort();
+if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+  console.error(`FAIL allowed origins mismatch. Expected ${expected.join(", ")}; got ${actual.join(", ") || "(none)"}`);
   process.exit(1);
 }
 NODE
@@ -104,4 +102,4 @@ NODE
 echo "PASS manifest: $manifest_path"
 echo "PASS launcher: $launcher_path"
 echo "PASS node: $node_path"
-echo "PASS allowed origin: chrome-extension://$extension_id/"
+echo "PASS allowed origins: $expected_origins_json"

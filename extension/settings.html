@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="settings.css">
   </head>
   <body>
-    <main>
+    <a class="skip-link" href="#main-content">Skip to settings</a>
+    <main id="main-content">
       <header class="page-header">
         <div class="workspace-identity">
           <a class="brand-lockup" href="popup.html" aria-label="Back to Clipplane clipper">
@@ -27,14 +28,21 @@
       <section id="host-panel" class="section host-panel" aria-labelledby="host-title" hidden>
         <div class="section-heading">
           <h2 id="host-title">Local host unavailable</h2>
-          <span class="status-pill warning">Action needed</span>
+          <span id="host-status" class="status-pill is-warning">Action needed</span>
         </div>
-        <code id="setup-command"></code>
+        <p id="host-detail" class="note">Install the local Host to manage storage, history, and sync.</p>
         <div class="button-row">
-          <button id="copy-setup" class="secondary" type="button">Copy setup command</button>
-          <button id="open-guide" class="secondary" type="button">Setup guide</button>
-          <button id="retry-host" class="primary" type="button">Retry</button>
+          <button id="install-host" class="primary" type="button">Install host</button>
+          <button id="retry-host" class="secondary" type="button">Check again</button>
         </div>
+        <details class="manual-setup">
+          <summary>Manual setup</summary>
+          <code id="setup-command"></code>
+          <div class="button-row compact-row">
+            <button id="copy-setup" class="secondary" type="button">Copy command</button>
+            <button id="open-guide" class="secondary" type="button">Open guide</button>
+          </div>
+        </details>
       </section>
 
       <nav class="settings-tabs" aria-label="Settings sections">
@@ -147,7 +155,10 @@
         </section>
       </div>
 
-      <section id="result" class="result" aria-live="polite"></section>
+      <section id="result" class="result is-neutral" aria-live="polite" hidden>
+        <i class="status-dot" aria-hidden="true"></i>
+        <span id="result-message"></span>
+      </section>
     </main>
     <script src="settings.js" type="module"></script>
   </body>

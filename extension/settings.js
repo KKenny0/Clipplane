@@ -2,13 +2,17 @@ import {
   copySetupCommand,
   getSetupCommand,
   isHostUnavailable,
+  isHostOutdated,
+  openOnboarding,
   openSetupGuide,
   safeErrorMessage
 } from "./setup-guide.js";
 import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
+import { getUiState, nextTabIndex, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 
 const stateEl = document.querySelector("#settings-state");
 const resultEl = document.querySelector("#result");
+const resultMessageEl = document.querySelector("#result-message");
 const storageStatusEl = document.querySelector("#storage-status");
 const syncStatusEl = document.querySelector("#sync-status");
 const historyStatusEl = document.querySelector("#history-status");
@@ -56,6 +60,7 @@ let syncConsent = { version: "", sinks: {} };
 
 for (const button of tabButtons) {
   button.addEventListener("click", () => setActiveTab(button.dataset.tab, { persist: true, updateHash: true }));
+  button.addEventListener("keydown", handleTabKeydown);
 }
 document.querySelector("#save-storage").addEventListener("click", saveStorage);
 document.querySelector("#open-folder").addEventListener("click", openFolder);
@@ -65,6 +70,7 @@ document.querySelector("#sync-form").addEventListener("submit", (event) => event
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
 document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
 document.querySelector("#retry-host").addEventListener("click", loadSettings);
+document.querySelector("#install-host").addEventListener("click", openOnboarding);
 historyListEl.addEventListener("click", handleHistoryAction);
 window.addEventListener("hashchange", () => {
   const tab = tabFromHash();
@@ -86,10 +92,18 @@ async function loadSettings() {
   setBusy(true, "Loading");
   let loaded = false;
   try {
+    const hostStatus = await sendNative({ type: "status" });
+    if (!hostStatus.ok) {
+      if (isHostUnavailable(hostStatus) || isHostOutdated(hostStatus)) {
+        renderHostUnavailable(isHostOutdated(hostStatus));
+        return;
+      }
+      throw new Error(hostStatus.error?.message || "Could not check the local Host.");
+    }
     const response = await sendNative({ type: "get_config" });
     if (!response.ok) {
-      if (isHostUnavailable(response)) {
-        renderHostUnavailable();
+      if (isHostUnavailable(response) || isHostOutdated(response)) {
+        renderHostUnavailable(isHostOutdated(response));
         return;
       }
       throw new Error(response.error?.message || "Could not load settings.");
@@ -105,9 +119,9 @@ async function loadSettings() {
   } catch (error) {
     showResult(safeErrorMessage(error), true);
     if (!hostAvailable) {
-      setWorkspaceState("Host unavailable");
+      setWorkspaceState("host-missing");
     } else {
-      setWorkspaceState("Error");
+      setWorkspaceState("error");
     }
   } finally {
     setBusy(false, loaded ? "Ready" : stateEl.textContent);
@@ -133,7 +147,7 @@ async function saveStorage() {
       throw new Error(response.error?.message || "Could not save folder.");
     }
     renderSettings(response);
-    showResult("Folder saved");
+    showResult("Storage folder saved");
   } catch (error) {
     showResult(safeErrorMessage(error), true);
   } finally {
@@ -217,7 +231,7 @@ async function openFolder() {
       }
       throw new Error(response.error?.message || "Could not open folder.");
     }
-    showResult(`Folder opened at ${formatTime(response.opened_at)}`);
+    showResult(`Storage folder opened at ${formatTime(response.opened_at)}`);
   } catch (error) {
     showResult(safeErrorMessage(error), true);
   } finally {
@@ -354,7 +368,7 @@ function renderHistory(history) {
   }
 
   if (!items.length) {
-    setStatus(historyStatusEl, "Empty", "warning");
+    setStatus(historyStatusEl, "Empty", "neutral");
     const empty = document.createElement("div");
     empty.className = "history-empty";
     empty.textContent = "No local clips yet. Save a page or selection to start a trail.";
@@ -448,7 +462,7 @@ function notionReady(notion) {
 
 function setStatus(element, text, state) {
   element.textContent = text;
-  element.className = `status-pill ${state || ""}`.trim();
+  element.className = `status-pill ${state ? `is-${state}` : "is-neutral"}`;
 }
 
 function setBusy(isBusy, label) {
@@ -461,8 +475,10 @@ function setBusy(isBusy, label) {
 }
 
 function showResult(message, isError = false) {
-  resultEl.textContent = message;
-  resultEl.className = isError ? "result error" : "result";
+  resultEl.hidden = !message;
+  resultMessageEl.textContent = message;
+  const uiState = getUiState(isError ? "error" : "saved-local");
+  resultEl.className = stateClassName("result", uiState);
 }
 
 function splitTags(value) {
@@ -497,13 +513,19 @@ function sendNative(message) {
   return chrome.runtime.sendMessage(message);
 }
 
-function renderHostUnavailable() {
+function renderHostUnavailable(outdated = false) {
+  const uiState = resolveHostUiState({ ok: false, error: { code: outdated ? "host_outdated" : "host_unavailable" } });
   hostAvailable = false;
   hostPanelEl.hidden = false;
   setupCommandEl.textContent = getSetupCommand();
-  setWorkspaceState("Host unavailable");
-  setStatus(storageStatusEl, "Unavailable", "warning");
-  setStatus(syncStatusEl, "Unavailable", "warning");
+  document.querySelector("#host-title").textContent = uiState.title;
+  document.querySelector("#host-detail").textContent = uiState.detail;
+  document.querySelector("#host-status").textContent = uiState.label;
+  document.querySelector("#host-status").className = `status-pill is-${uiState.tone}`;
+  document.querySelector("#install-host").textContent = uiState.action;
+  setWorkspaceState(uiState.key);
+  setStatus(storageStatusEl, uiState.label, "warning");
+  setStatus(syncStatusEl, uiState.label, "warning");
   renderHistoryUnavailable();
   updateHostDependentControls();
 }
@@ -565,7 +587,7 @@ function updateHostDependentControls(isBusy = false) {
 function renderHistoryUnavailable() {
   setStatus(historyStatusEl, "Unavailable", "warning");
   historyWarningEl.hidden = true;
-  historyListEl.innerHTML = '<div class="history-empty">Install the local host to inspect your capture trail.</div>';
+  historyListEl.innerHTML = '<div class="history-empty">Install the local Host to inspect your capture trail.</div>';
 }
 
 function renderHistoryUpgradeRequired() {
@@ -610,7 +632,7 @@ function historyStatusLabel(item) {
   if (status === "sync_skipped") {
     return "Sync skipped";
   }
-  return "Saved local";
+    return "Saved locally";
 }
 
 function historyOpenLabel(item) {
@@ -639,7 +661,7 @@ function syncResultMessage(response) {
     return "Sync retried successfully";
   }
   if (response.status === "sync_failed") {
-    return "Saved locally, sync still failed";
+    return "Saved locally. Sync still failed.";
   }
   if (response.status === "sync_skipped") {
     return "Sync skipped";
@@ -650,7 +672,7 @@ function syncResultMessage(response) {
 async function copySetup() {
   try {
     await copySetupCommand();
-    showResult("Setup command copied.");
+    showResult("Setup command copied");
   } catch {
     showResult("Could not copy. Select the command shown above.", true);
   }
@@ -661,9 +683,35 @@ function isUnsupportedMessage(response) {
     || /Unsupported native host message/i.test(response?.error?.message || "");
 }
 
-function setWorkspaceState(label) {
+function setWorkspaceState(value) {
+  const aliases = {
+    Loading: "checking",
+    Saving: "working",
+    Opening: "working",
+    Ready: "ready",
+    Checking: "checking",
+    Error: "error",
+    Failed: "error",
+    "Host unavailable": "host-missing",
+    "Host missing": "host-missing",
+    "Update required": "host-outdated"
+  };
+  const uiState = getUiState(aliases[value] || value);
   const dot = document.createElement("i");
   dot.className = "status-dot";
   dot.setAttribute("aria-hidden", "true");
-  stateEl.replaceChildren(dot, document.createTextNode(label));
+  stateEl.className = stateClassName("muted", uiState);
+  stateEl.replaceChildren(dot, document.createTextNode(uiState.label));
+}
+
+function handleTabKeydown(event) {
+  const currentIndex = tabButtons.indexOf(event.currentTarget);
+  const nextIndex = nextTabIndex(event.key, currentIndex, tabButtons.length);
+  if (nextIndex === null) {
+    return;
+  }
+  event.preventDefault();
+  const next = tabButtons[nextIndex];
+  setActiveTab(next.dataset.tab, { persist: true, updateHash: true });
+  next.focus();
 }

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,8 +15,10 @@ const packageJson = JSON.parse(
 const version = packageJson.version;
 const extensionDir = path.join(rootDir, "extension");
 const distDir = path.join(rootDir, "dist");
-const stageDir = path.join(distDir, `clipplane-extension-v${version}`);
-const zipPath = path.join(distDir, `clipplane-extension-v${version}.zip`);
+const isStorePackage = process.argv.includes("--store");
+const packageName = isStorePackage ? "clipplane-store" : "clipplane-extension";
+const stageDir = path.join(distDir, `${packageName}-v${version}`);
+const zipPath = path.join(distDir, `${packageName}-v${version}.zip`);
 
 if (!existsSync(extensionDir)) {
   throw new Error(`Extension directory not found: ${extensionDir}`);
@@ -26,6 +28,9 @@ await rm(stageDir, { recursive: true, force: true });
 await rm(zipPath, { force: true });
 await mkdir(distDir, { recursive: true });
 await cp(extensionDir, stageDir, { recursive: true });
+if (isStorePackage) {
+  await removeManifestKey(stageDir);
+}
 await assertNoForbiddenFiles(stageDir);
 
 if (os.platform() === "win32") {
@@ -40,7 +45,18 @@ if (os.platform() === "win32") {
 }
 
 console.log(`Wrote ${path.relative(rootDir, zipPath)}`);
-console.log(`Extension ID: ${await getDefaultExtensionId(rootDir)}`);
+if (isStorePackage) {
+  console.log("Store package manifest key: omitted");
+} else {
+  console.log(`Extension ID: ${await getDefaultExtensionId(rootDir)}`);
+}
+
+async function removeManifestKey(directory) {
+  const manifestPath = path.join(directory, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete manifest.key;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
 
 async function assertNoForbiddenFiles(directory) {
   const forbidden = [];

@@ -7,7 +7,7 @@ import { validateStorePackage } from "./store-package-policy.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(await readFile(path.join(rootDir, "package.json"), "utf8"));
-const archive = path.join(rootDir, "dist", `clipplane-extension-v${packageJson.version}.zip`);
+const archive = path.join(rootDir, "dist", `clipplane-store-v${packageJson.version}.zip`);
 const extractDir = await mkdtemp(path.join(os.tmpdir(), "clipplane-store-package-"));
 
 try {
