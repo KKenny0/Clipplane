@@ -23,6 +23,8 @@
     "verify:pages": "node scripts/verify-pages.mjs",
     "package:host:windows": "node scripts/package-native-host.mjs --target windows",
     "package:host:macos": "node scripts/package-native-host.mjs --target macos",
+    "package:host:macos:pkg": "bash scripts/package-native-host-macos-pkg.sh",
+    "notarize:host:macos": "bash scripts/notarize-native-host-macos-pkg.sh",
     "smoke:host:bundle": "node scripts/smoke-native-host-bundle.mjs",
     "verify:store": "node scripts/verify-store-package.mjs",
     "smoke:sync:local": "node scripts/smoke-sync-local.mjs"
