@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { withCaptureMutationLock } from "./capture-lock.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
 import { getDefaultPaths } from "./paths.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
@@ -21,14 +22,23 @@ export { getDefaultPaths };
 export async function clipPayload(payload, options = {}) {
   const { paths } = await resolveConfiguredPaths(options);
   const normalized = normalizePayload(payload);
+  return withCaptureMutationLock(paths, () => clipPayloadLocked(normalized, paths));
+}
+
+async function clipPayloadLocked(normalized, paths) {
   const contentHash = createContentHash(normalized);
   const existing = await findExistingCapture(paths.capturesPath, contentHash);
 
   if (existing) {
-    const capture = await ensureDuplicateCaptureBody(paths, existing, normalized.contentMarkdown);
+    let capture = await ensureDuplicateCaptureBody(paths, existing, normalized.contentMarkdown);
+    const reactivated = capture.lifecycle_status === "processed";
+    if (reactivated) {
+      capture = await reactivateCapture(paths, capture, normalized.contentMarkdown);
+    }
     return {
       ok: true,
       duplicate: true,
+      reactivated,
       capture
     };
   }
@@ -49,6 +59,26 @@ export async function clipPayload(payload, options = {}) {
     duplicate: false,
     capture
   };
+}
+
+async function reactivateCapture(paths, capture, markdown) {
+  await ensureInbox(paths.inboxPath);
+  if (!await inboxContainsCapture(paths.inboxPath, capture.capture_id)) {
+    await fs.appendFile(paths.inboxPath, `\n${buildOrgEntry(capture, markdown)}`, "utf8");
+  }
+
+  const updated = { ...capture };
+  delete updated.lifecycle_status;
+  delete updated.lifecycle_started_at;
+  delete updated.processed_at;
+  await replaceCaptureRecord(paths.capturesPath, updated);
+  return updated;
+}
+
+async function inboxContainsCapture(inboxPath, captureId) {
+  const text = await fs.readFile(inboxPath, "utf8");
+  const escaped = String(captureId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^:CAPTURE_ID:\\s*${escaped}\\s*$`, "m").test(text);
 }
 
 export function normalizePayload(payload = {}) {

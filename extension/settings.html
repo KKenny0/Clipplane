@@ -79,6 +79,10 @@
             <span id="history-status" class="status-pill">Loading</span>
           </div>
           <div class="history-toolbar">
+            <div class="history-filters" role="group" aria-label="Capture lifecycle">
+              <button class="history-filter is-active" type="button" data-history-filter="active" aria-pressed="true">Active</button>
+              <button class="history-filter" type="button" data-history-filter="processed" aria-pressed="false">Processed</button>
+            </div>
             <button id="refresh-history" class="secondary" type="button">Refresh</button>
           </div>
           <p id="history-warning" class="note history-warning" hidden></p>

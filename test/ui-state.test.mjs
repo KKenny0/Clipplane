@@ -30,6 +30,12 @@ test("sync consent keeps the confirmed local copy visible", () => {
   assert.equal(state.action, "Open Sync settings");
 });
 
+test("re-clipping processed content reports that it returned to the inbox", () => {
+  const state = resolveClipUiState({ ok: true, duplicate: true, reactivated: true });
+  assert.equal(state.key, "reactivated");
+  assert.equal(state.title, "Returned to your inbox");
+});
+
 test("missing and outdated Hosts have separate recovery states", () => {
   assert.equal(resolveHostUiState({ ok: false, error: { code: "host_unavailable" } }).key, "host-missing");
   assert.equal(resolveHostUiState({ ok: false, error: { code: "host_outdated" } }).key, "host-outdated");

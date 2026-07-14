@@ -4,7 +4,23 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { clipPayload } from "../native-host/clip-core.mjs";
-import { listCaptureHistory, openCaptureBody } from "../native-host/history-core.mjs";
+import {
+  deleteCapture,
+  listCaptureHistory,
+  markCaptureProcessed,
+  openCaptureBody
+} from "../native-host/history-core.mjs";
+import { syncCapture } from "../native-host/sync-core.mjs";
+
+test("reading empty history does not create capture state", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-empty-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+
+  const response = await listCaptureHistory({ notesDir, configDir });
+
+  assert.deepEqual(response.history.items, []);
+  assert.deepEqual(await fs.readdir(notesDir), []);
+});
 
 test("listCaptureHistory returns recent captures with warnings for bad jsonl lines", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-"));
@@ -189,3 +205,256 @@ test("openCaptureBody rejects stale records pointing outside the capture body di
     /outside the Clipplane notes folder/
   );
 });
+
+test("markCaptureProcessed removes one complete org subtree and keeps internal history", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-process-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const first = await clipPayload({
+    inputType: "page",
+    sourceUrl: "https://example.com/process",
+    sourceTitle: "Process",
+    title: "Processed clip",
+    contentMarkdown: "# Nested heading\n\nProcessed body"
+  }, { notesDir, configDir });
+  const second = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/keep",
+    sourceTitle: "Keep",
+    title: "Active clip",
+    contentMarkdown: "Keep this body"
+  }, { notesDir, configDir });
+
+  const result = await markCaptureProcessed(first.capture.capture_id, { notesDir, configDir });
+
+  assert.equal(result.lifecycle_status, "processed");
+  assert.equal(await fileExists(first.capture.content_path), true);
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  assert.doesNotMatch(inbox, new RegExp(first.capture.capture_id));
+  assert.doesNotMatch(inbox, /Processed body/);
+  assert.match(inbox, new RegExp(second.capture.capture_id));
+  assert.match(inbox, /Keep this body/);
+
+  const active = await listCaptureHistory({ notesDir, configDir, lifecycle: "active" });
+  const processed = await listCaptureHistory({ notesDir, configDir, lifecycle: "processed" });
+  assert.deepEqual(active.history.items.map((item) => item.capture_id), [second.capture.capture_id]);
+  assert.deepEqual(processed.history.items.map((item) => item.capture_id), [first.capture.capture_id]);
+  assert.equal(processed.history.items[0].inbox_state, "missing");
+  assert.ok(processed.history.items[0].processed_at);
+});
+
+test("markCaptureProcessed finishes cleanup when the user already removed the inbox entry", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-reconcile-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/reconcile",
+    sourceTitle: "Reconcile",
+    title: "Already removed",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  await fs.writeFile(path.join(notesDir, "inbox.org"), "#+title: Inbox\n", "utf8");
+
+  const before = await listCaptureHistory({ notesDir, configDir });
+  assert.equal(before.history.items[0].inbox_state, "missing");
+
+  await markCaptureProcessed(clip.capture.capture_id, { notesDir, configDir });
+  const processed = await listCaptureHistory({ notesDir, configDir, lifecycle: "processed" });
+  assert.equal(processed.history.items[0].capture_id, clip.capture.capture_id);
+});
+
+test("deleteCapture removes inbox entry, capture record, and source snapshot", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-delete-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const deleted = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/delete",
+    sourceTitle: "Delete",
+    title: "Delete me",
+    contentMarkdown: "Delete body"
+  }, { notesDir, configDir });
+  const kept = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/keep-delete-test",
+    sourceTitle: "Keep",
+    title: "Keep me",
+    contentMarkdown: "Keep body"
+  }, { notesDir, configDir });
+
+  const result = await deleteCapture(deleted.capture.capture_id, { notesDir, configDir });
+
+  assert.equal(result.lifecycle_status, "deleted");
+  assert.equal(result.remote_copies_affected, false);
+  assert.equal(await fileExists(deleted.capture.content_path), false);
+  assert.equal(await fileExists(kept.capture.content_path), true);
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
+  assert.doesNotMatch(inbox, new RegExp(deleted.capture.capture_id));
+  assert.match(inbox, new RegExp(kept.capture.capture_id));
+  assert.doesNotMatch(captures, new RegExp(deleted.capture.capture_id));
+  assert.match(captures, new RegExp(kept.capture.capture_id));
+});
+
+test("deleteCapture also permanently removes a processed capture", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-delete-processed-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/delete-processed",
+    sourceTitle: "Delete processed",
+    title: "Processed",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  await markCaptureProcessed(clip.capture.capture_id, { notesDir, configDir });
+
+  await deleteCapture(clip.capture.capture_id, { notesDir, configDir });
+
+  assert.equal(await fileExists(clip.capture.content_path), false);
+  const history = await listCaptureHistory({ notesDir, configDir, lifecycle: "all" });
+  assert.equal(history.history.items.length, 0);
+});
+
+test("lifecycle operations reject duplicate inbox IDs without deleting content", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-duplicate-inbox-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/duplicate-inbox",
+    sourceTitle: "Duplicate",
+    title: "Duplicate",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  const inboxPath = path.join(notesDir, "inbox.org");
+  await fs.appendFile(inboxPath, `\n* Duplicate copy\n:PROPERTIES:\n:CAPTURE_ID: ${clip.capture.capture_id}\n:END:\n`, "utf8");
+
+  await assert.rejects(
+    () => deleteCapture(clip.capture.capture_id, { notesDir, configDir }),
+    /Multiple inbox entries/
+  );
+
+  assert.equal(await fileExists(clip.capture.content_path), true);
+  const inbox = await fs.readFile(inboxPath, "utf8");
+  assert.equal(inbox.match(new RegExp(clip.capture.capture_id, "g")).length, 2);
+});
+
+test("history resumes a processing operation left by an interrupted host", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-recovery-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/recovery",
+    sourceTitle: "Recovery",
+    title: "Recovery",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  record.lifecycle_status = "processing";
+  record.lifecycle_started_at = new Date().toISOString();
+  await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
+
+  const active = await listCaptureHistory({ notesDir, configDir, lifecycle: "active" });
+  const processed = await listCaptureHistory({ notesDir, configDir, lifecycle: "processed" });
+
+  assert.equal(active.history.items.length, 0);
+  assert.equal(processed.history.items[0].capture_id, clip.capture.capture_id);
+  assert.doesNotMatch(await fs.readFile(path.join(notesDir, "inbox.org"), "utf8"), new RegExp(clip.capture.capture_id));
+});
+
+test("re-clipping processed content reactivates the existing capture", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-reactivate-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const payload = {
+    inputType: "selection",
+    sourceUrl: "https://example.com/reactivate",
+    sourceTitle: "Reactivate",
+    title: "Reactivate",
+    contentMarkdown: "Same body"
+  };
+  const first = await clipPayload(payload, { notesDir, configDir });
+  await markCaptureProcessed(first.capture.capture_id, { notesDir, configDir });
+
+  const second = await clipPayload(payload, { notesDir, configDir });
+  const active = await listCaptureHistory({ notesDir, configDir, lifecycle: "active" });
+  const processed = await listCaptureHistory({ notesDir, configDir, lifecycle: "processed" });
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+
+  assert.equal(second.duplicate, true);
+  assert.equal(second.reactivated, true);
+  assert.deepEqual(active.history.items.map((item) => item.capture_id), [first.capture.capture_id]);
+  assert.equal(processed.history.items.length, 0);
+  assert.equal(inbox.match(new RegExp(first.capture.capture_id, "g")).length, 1);
+});
+
+test("deleteCapture removes a Clipplane-managed local export", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-delete-export-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/delete-export",
+    sourceTitle: "Delete export",
+    title: "Delete export",
+    contentMarkdown: "Exported body"
+  }, { notesDir, configDir });
+  const sync = await syncCapture(clip.capture.capture_id, { notesDir, configDir, sinks: ["local-export"] });
+  const exportPath = sync.capture.sinks["local-export"].path;
+  assert.equal(await fileExists(exportPath), true);
+
+  await deleteCapture(clip.capture.capture_id, { notesDir, configDir });
+
+  assert.equal(await fileExists(exportPath), false);
+});
+
+test("deleteCapture rejects a capture directory that resolves outside the notes folder", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-symlink-notes-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-symlink-outside-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/symlink",
+    sourceTitle: "Symlink",
+    title: "Symlink",
+    contentMarkdown: "Protected body"
+  }, { notesDir, configDir });
+  const bodiesDir = path.join(notesDir, ".clipplane", "captures");
+  const outsideBody = path.join(outsideDir, path.basename(clip.capture.content_path));
+  await fs.writeFile(outsideBody, "outside body", "utf8");
+  await fs.rm(bodiesDir, { recursive: true });
+  await fs.symlink(outsideDir, bodiesDir, process.platform === "win32" ? "junction" : "dir");
+
+  await assert.rejects(
+    () => deleteCapture(clip.capture.capture_id, { notesDir, configDir }),
+    /resolves outside/
+  );
+
+  assert.equal(await fs.readFile(outsideBody, "utf8"), "outside body");
+});
+
+test("lifecycle rewrites preserve restrictive file modes", { skip: process.platform === "win32" }, async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-mode-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/mode",
+    sourceTitle: "Mode",
+    title: "Mode",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  const inboxPath = path.join(notesDir, "inbox.org");
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  await fs.chmod(inboxPath, 0o600);
+  await fs.chmod(capturesPath, 0o600);
+
+  await markCaptureProcessed(clip.capture.capture_id, { notesDir, configDir });
+
+  assert.equal((await fs.stat(inboxPath)).mode & 0o777, 0o600);
+  assert.equal((await fs.stat(capturesPath)).mode & 0o777, 0o600);
+});
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}

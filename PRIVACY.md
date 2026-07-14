@@ -38,7 +38,7 @@ Clipplane's use of information received from Google APIs complies with the Chrom
 
 ## Retention and Deletion
 
-Local clips remain until you edit or delete the files from your notes folder. You can remove extension preferences and consent records by clearing the extension's data or uninstalling it. You can remove stored Notion or flomo credentials through the operating system credential manager. Data already sent to Notion or flomo must be deleted through that service.
+Local clips remain until you process or delete them. In Capture History, **Mark processed** removes the matching entry from `inbox.org` while retaining Clipplane's local history record and source snapshot. **Delete local copy** removes the matching Org entry, history record, source snapshot, and Clipplane-managed local-export copy together. If you remove an Org entry manually, History reports that it is missing and lets you finish cleanup without guessing that the edit was a permanent deletion. You can remove extension preferences and consent records by clearing the extension's data or uninstalling it. You can remove stored Notion or flomo credentials through the operating system credential manager. Data already sent to Notion or flomo must be deleted through that service.
 
 ## Security
 

@@ -18,6 +18,7 @@ const syncStatusEl = document.querySelector("#sync-status");
 const historyStatusEl = document.querySelector("#history-status");
 const historyListEl = document.querySelector("#history-list");
 const historyWarningEl = document.querySelector("#history-warning");
+const historyFilterButtons = [...document.querySelectorAll("[data-history-filter]")];
 const hostPanelEl = document.querySelector("#host-panel");
 const setupCommandEl = document.querySelector("#setup-command");
 const tabButtons = [...document.querySelectorAll("[data-tab]")];
@@ -50,12 +51,14 @@ const hostDependentControls = [
   document.querySelector("#save-storage"),
   document.querySelector("#open-folder"),
   document.querySelector("#refresh-history"),
+  ...historyFilterButtons,
   document.querySelector("#save-sync")
 ];
 let hostAvailable = true;
 let historyItems = [];
 let activeTab = "history";
 let historyLoaded = false;
+let historyMode = "active";
 let syncConsent = { version: "", sinks: {} };
 
 for (const button of tabButtons) {
@@ -65,6 +68,9 @@ for (const button of tabButtons) {
 document.querySelector("#save-storage").addEventListener("click", saveStorage);
 document.querySelector("#open-folder").addEventListener("click", openFolder);
 document.querySelector("#refresh-history").addEventListener("click", loadHistory);
+for (const button of historyFilterButtons) {
+  button.addEventListener("click", () => setHistoryMode(button.dataset.historyFilter));
+}
 document.querySelector("#save-sync").addEventListener("click", saveSync);
 document.querySelector("#sync-form").addEventListener("submit", (event) => event.preventDefault());
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
@@ -249,7 +255,7 @@ async function loadHistory() {
   historyWarningEl.hidden = true;
   historyListEl.innerHTML = '<div class="history-empty">Loading capture history</div>';
   try {
-    const response = await sendNative({ type: "history", limit: 50 });
+    const response = await sendNative({ type: "history", limit: 50, lifecycle: historyMode });
     if (!response.ok) {
       if (isHostUnavailable(response)) {
         renderHostUnavailable();
@@ -302,6 +308,36 @@ async function handleHistoryAction(event) {
         throw new Error(response.error?.message || "Could not retry sync.");
       }
       showResult(syncResultMessage(response));
+      await loadHistory();
+      return;
+    }
+
+    if (button.dataset.action === "mark-processed") {
+      const item = historyItems.find((capture) => capture.capture_id === captureId);
+      const detail = item?.inbox_state === "missing"
+        ? "Finish cleanup for this capture? Its internal history and source snapshot will be kept."
+        : "Mark this capture as processed? It will be removed from inbox.org, while its internal history and source snapshot are kept.";
+      if (!window.confirm(detail)) {
+        return;
+      }
+      const response = await sendNative({ type: "process_capture", captureId });
+      if (!response.ok) {
+        throw new Error(response.error?.message || "Could not mark capture as processed.");
+      }
+      showResult("Capture marked as processed");
+      await loadHistory();
+      return;
+    }
+
+    if (button.dataset.action === "delete-capture") {
+      if (!window.confirm("Permanently delete this local capture from inbox.org, History, and its source snapshot? Copies already sent to Notion or flomo will not be deleted.")) {
+        return;
+      }
+      const response = await sendNative({ type: "delete_capture", captureId });
+      if (!response.ok) {
+        throw new Error(response.error?.message || "Could not delete local capture.");
+      }
+      showResult("Local capture permanently deleted. External copies were not changed.");
       await loadHistory();
     }
   } catch (error) {
@@ -361,7 +397,16 @@ function renderHistory(history) {
 
   if (warnings.length) {
     historyWarningEl.hidden = false;
-    historyWarningEl.textContent = `${warnings.length} unreadable capture record${warnings.length === 1 ? "" : "s"} skipped.`;
+    const unreadableCount = warnings.filter((warning) => ["invalid_json", "invalid_record"].includes(warning.code)).length;
+    const recoveryCount = warnings.filter((warning) => warning.code === "lifecycle_recovery_failed").length;
+    const messages = [];
+    if (unreadableCount) {
+      messages.push(`${unreadableCount} unreadable capture record${unreadableCount === 1 ? "" : "s"} skipped.`);
+    }
+    if (recoveryCount) {
+      messages.push(`${recoveryCount} interrupted lifecycle operation${recoveryCount === 1 ? "" : "s"} still need attention.`);
+    }
+    historyWarningEl.textContent = messages.join(" ") || "Capture history needs attention.";
   } else {
     historyWarningEl.hidden = true;
     historyWarningEl.textContent = "";
@@ -371,12 +416,14 @@ function renderHistory(history) {
     setStatus(historyStatusEl, "Empty", "neutral");
     const empty = document.createElement("div");
     empty.className = "history-empty";
-    empty.textContent = "No local clips yet. Save a page or selection to start a trail.";
+    empty.textContent = historyMode === "processed"
+      ? "No processed captures. Items marked as processed will remain available here."
+      : "No active local clips. Save a page or selection to start a trail.";
     historyListEl.append(empty);
     return;
   }
 
-  setStatus(historyStatusEl, `${items.length} recent`, "ready");
+  setStatus(historyStatusEl, `${items.length} ${historyMode}`, "ready");
   for (const item of items) {
     historyListEl.append(renderHistoryItem(item));
   }
@@ -437,6 +484,17 @@ function renderHistoryItem(item) {
   open.disabled = !item.content_exists || !hostAvailable;
   actions.append(open);
 
+  if (item.lifecycle_status === "active") {
+    const process = document.createElement("button");
+    process.className = "secondary history-action";
+    process.type = "button";
+    process.dataset.action = "mark-processed";
+    process.dataset.captureId = item.capture_id;
+    process.textContent = item.inbox_state === "missing" ? "Finish cleanup" : "Mark processed";
+    process.disabled = item.inbox_state === "duplicate" || !hostAvailable;
+    actions.append(process);
+  }
+
   if (item.sync_status === "sync_failed") {
     const retry = document.createElement("button");
     retry.className = "primary history-action";
@@ -447,6 +505,15 @@ function renderHistoryItem(item) {
     retry.disabled = !hostAvailable;
     actions.append(retry);
   }
+
+  const remove = document.createElement("button");
+  remove.className = "secondary history-action danger";
+  remove.type = "button";
+  remove.dataset.action = "delete-capture";
+  remove.dataset.captureId = item.capture_id;
+  remove.textContent = "Delete local copy";
+  remove.disabled = item.inbox_state === "duplicate" || !hostAvailable;
+  actions.append(remove);
 
   row.append(main, actions);
   return row;
@@ -601,7 +668,9 @@ function setHistoryButtons(isBusy) {
   for (const button of historyListEl.querySelectorAll("button")) {
     const item = historyItems.find((capture) => capture.capture_id === button.dataset.captureId);
     const missingBody = button.dataset.action === "open-body" && item && !item.content_exists;
-    button.disabled = isBusy || !hostAvailable || missingBody;
+    const ambiguousInbox = ["mark-processed", "delete-capture"].includes(button.dataset.action)
+      && item?.inbox_state === "duplicate";
+    button.disabled = isBusy || !hostAvailable || missingBody || ambiguousInbox;
   }
 }
 
@@ -616,6 +685,15 @@ function historyStateClass(status) {
 }
 
 function historyStatusLabel(item) {
+  if (item.lifecycle_status === "processed") {
+    return "Processed";
+  }
+  if (item.inbox_state === "duplicate") {
+    return "Duplicate inbox entries";
+  }
+  if (item.inbox_state === "missing") {
+    return "Missing from inbox";
+  }
   if (!item.content_exists) {
     if (item.input_type === "selection") {
       return "Text unavailable";
@@ -633,6 +711,19 @@ function historyStatusLabel(item) {
     return "Sync skipped";
   }
     return "Saved locally";
+}
+
+async function setHistoryMode(mode) {
+  if (!["active", "processed"].includes(mode) || mode === historyMode) {
+    return;
+  }
+  historyMode = mode;
+  for (const button of historyFilterButtons) {
+    const active = button.dataset.historyFilter === mode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  await loadHistory();
 }
 
 function historyOpenLabel(item) {

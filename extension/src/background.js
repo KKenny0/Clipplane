@@ -6,9 +6,9 @@ import {
 } from "./element-capture-state.js";
 import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
 import { capturablePage } from "./capture-policy.js";
+import { supportsHostProtocol } from "./host-protocol.js";
 
 const HOST_NAME = "com.clipplane.host";
-const MIN_HOST_PROTOCOL = 1;
 const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
 const ELEMENT_CAPTURE_STATE_TTL_MS = 70_000;
 
@@ -50,7 +50,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (["get_config", "set_config", "open_notes_dir", "history", "open_capture_body"].includes(message?.type)) {
+  if ([
+    "get_config",
+    "set_config",
+    "open_notes_dir",
+    "history",
+    "open_capture_body",
+    "process_capture",
+    "delete_capture"
+  ].includes(message?.type)) {
     sendNative(message).then(sendResponse);
     return true;
   }
@@ -233,7 +241,7 @@ async function getStatusWithConsent() {
     return status;
   }
 
-  if (!Number.isInteger(status.protocol_version) || status.protocol_version < MIN_HOST_PROTOCOL) {
+  if (!supportsHostProtocol(status.protocol_version)) {
     return {
       ok: false,
       host_version: status.host_version || null,

@@ -46,6 +46,11 @@ test("settings follows tab and keyboard accessibility structure", async () => {
     assert.ok(panel);
     assert.equal(panel.getAttribute("role"), "tabpanel");
   }
+
+  const historyFilters = [...document.querySelectorAll("[data-history-filter]")];
+  assert.deepEqual(historyFilters.map((button) => button.dataset.historyFilter), ["active", "processed"]);
+  assert.equal(historyFilters[0].getAttribute("aria-pressed"), "true");
+  assert.equal(historyFilters[1].getAttribute("aria-pressed"), "false");
 });
 
 test("extension styles avoid broad transitions and honor reduced motion", async () => {

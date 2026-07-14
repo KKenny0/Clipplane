@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { withCaptureMutationLock } from "./capture-lock.mjs";
 import { ClipplaneError } from "./clip-core.mjs";
 import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
@@ -58,6 +59,10 @@ export async function syncClipResult(clipResult, options = {}) {
 
 export async function syncCapture(captureId, options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
+  return withCaptureMutationLock(paths, () => syncCaptureLocked(captureId, options, paths, config));
+}
+
+async function syncCaptureLocked(captureId, options, paths, config) {
   const records = await readCaptureRecords(paths.capturesPath);
   const index = records.findIndex((record) => record.capture_id === captureId);
 

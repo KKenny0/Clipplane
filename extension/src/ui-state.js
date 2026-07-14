@@ -4,6 +4,7 @@ const UI_STATES = Object.freeze({
   working: state("Saving", "working", "Saving locally", "Keep this popup open while Clipplane confirms the local write."),
   "saved-local": state("Saved local", "ready", "Saved locally", "Your local copy is safe.", "Open local copy"),
   duplicate: state("Already saved", "neutral", "Already in your trail", "Clipplane kept the existing local copy.", "Open existing clip"),
+  reactivated: state("Back in inbox", "ready", "Returned to your inbox", "This processed clip is active again.", "Open local copy"),
   "saved-local-sync-failed": state("Sync failed", "warning", "Saved locally. Sync failed.", "Your local copy is safe. You can retry the external sync.", "Retry sync"),
   "saved-local-sync-skipped": state("Sync skipped", "warning", "Saved locally. Sync skipped.", "Your local copy is safe. Check the destination before retrying."),
   "consent-required": state("Approval needed", "warning", "Saved locally. Sync needs approval.", "Confirm what Clipplane may send in Sync settings.", "Open Sync settings"),
@@ -65,6 +66,9 @@ export function resolveClipUiState(response) {
       return getUiState("consent-required");
     }
     return getUiState("saved-local-sync-skipped");
+  }
+  if (response.reactivated) {
+    return getUiState("reactivated");
   }
   if (response.duplicate) {
     return getUiState("duplicate");
