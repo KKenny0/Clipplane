@@ -110,9 +110,29 @@ test("openFolder reports opener launch failures", async () => {
   );
 });
 
+test("Windows opener resolves after launch when Explorer hands off with exit code 1", async () => {
+  await openFolder("D:\\Notes\\Clipplane", {
+    platform: "win32",
+    spawnImpl: () => closingChild(1)
+  });
+});
+
+test("non-Windows openers still report nonzero exit codes", async () => {
+  await assert.rejects(
+    openFolder("/notes", {
+      platform: "linux",
+      spawnImpl: () => closingChild(1)
+    }),
+    /exit code 1/
+  );
+});
+
 function closingChild(code) {
   const child = new EventEmitter();
-  process.nextTick(() => child.emit("close", code));
+  process.nextTick(() => {
+    child.emit("spawn");
+    child.emit("close", code);
+  });
   return child;
 }
 

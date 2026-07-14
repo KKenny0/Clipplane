@@ -40,8 +40,12 @@ function settingsResponse(paths, config, secretStatus) {
 }
 
 export function openFolder(targetPath, options = {}) {
-  const { command, args } = getOpenFolderCommand(targetPath, options.platform || process.platform);
-  return runOpenCommand(command, args, options);
+  const platform = options.platform || process.platform;
+  const { command, args } = getOpenFolderCommand(targetPath, platform);
+  return runOpenCommand(command, args, {
+    ...options,
+    resolveOnSpawn: platform === "win32"
+  });
 }
 
 export function getOpenFolderCommand(targetPath, platform = process.platform) {
@@ -69,6 +73,11 @@ function runOpenCommand(command, args, options = {}) {
     });
 
     child.once("error", reject);
+    if (options.resolveOnSpawn) {
+      child.once("spawn", resolve);
+      return;
+    }
+
     child.once("close", (code) => {
       if (code === 0 || code === null) {
         resolve();
