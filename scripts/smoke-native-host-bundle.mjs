@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodeNativeMessage } from "../native-host/native-message.mjs";
+import { PROTOCOL_VERSION } from "../native-host/version.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(await readFile(path.join(rootDir, "package.json"), "utf8"));
@@ -63,7 +64,7 @@ if (responseBuffer.length < 4) {
 const length = responseBuffer.readUInt32LE(0);
 const response = JSON.parse(responseBuffer.subarray(4, 4 + length).toString("utf8"));
 
-if (!response.ok || response.host_version !== packageJson.version || response.protocol_version !== 1) {
+if (!response.ok || response.host_version !== packageJson.version || response.protocol_version !== PROTOCOL_VERSION) {
   throw new Error(`Unexpected Native Host status: ${JSON.stringify(response)}`);
 }
 if (/secret_|flomoapp\.com\/iwh\//i.test(JSON.stringify(response))) {

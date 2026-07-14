@@ -138,9 +138,9 @@ By default Clipplane writes:
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.org` is the human-readable source of truth. `captures.jsonl` and `captures/` are machine-readable audit, retry, and sync records. Clipplane skips duplicate clips by content hash.
+`inbox.org` is the workspace where you process clips. `captures.jsonl` and `captures/` under `.clipplane` are Clipplane-managed history, deduplication, retry, and sync state; you do not need to maintain them separately. All three representations refer to one capture through its `CAPTURE_ID`.
 
-The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder, `History` to review recent clips, local body files, capture methods, and sync status, and `Sync` to configure Notion or flomo. Normal users do not need environment variables or launcher edits.
+The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder. In `History`, review recent clips, local body files, capture methods, and sync status, or mark an item as processed or permanently delete its local copy. `Mark processed` removes the item from `inbox.org` while retaining its internal record and source snapshot under Processed; clipping the same content again returns that item to Active and `inbox.org`. `Delete local copy` removes the Org entry, history record, source snapshot, and Clipplane-managed local-export copy together, but does not delete content already sent to Notion or flomo. Use `Sync` to configure those optional destinations. Normal users do not need environment variables or launcher edits.
 
 ## External Sync
 

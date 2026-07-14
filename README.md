@@ -138,9 +138,9 @@ npm run doctor
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.org` 是人可读的主文件。`captures.jsonl` 和 `captures/` 是机器可读的审计、重试和同步记录。Clipplane 会用内容 hash 跳过重复剪藏。
+`inbox.org` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。三者通过 `CAPTURE_ID` 表示同一个剪藏项。
 
-扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态，在 `Sync` 配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
+扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态，也可以把条目标记为已处理或永久删除本地副本。`Mark processed` 会从 `inbox.org` 移除条目，但在 Processed 历史中保留内部记录和原始正文；再次剪藏相同内容时，这个条目会回到 Active 和 `inbox.org`。`Delete local copy` 会统一移除 Org 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本，但不会删除已经同步到 Notion 或 flomo 的内容。在 `Sync` 可以配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
 ## 外部同步
 
