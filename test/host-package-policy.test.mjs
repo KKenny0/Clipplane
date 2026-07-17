@@ -40,3 +40,12 @@ test("macOS distribution scripts keep credentials in a named keychain profile", 
   assert.match(notarizeScript, /notarytool wait/);
   assert.doesNotMatch(notarizeScript, /--password|--apple-id/);
 });
+
+test("macOS source setup installs the Host outside privacy-protected source folders", async () => {
+  const setupScript = await readFile(path.join(rootDir, "scripts", "setup-macos.sh"), "utf8");
+
+  assert.match(setupScript, /install_root="\$install_parent\/Clipplane Host"/);
+  assert.match(setupScript, /launcher_path="\$install_root\/clipplane-host"/);
+  assert.doesNotMatch(setupScript, /launcher_path="\$host_dir\/clipplane-host"/);
+  assert.doesNotMatch(setupScript, /cp -R "\$project_root\/native-host\/\."/);
+});

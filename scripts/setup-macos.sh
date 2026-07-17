@@ -68,9 +68,32 @@ if ! printf '%s' "$extension_id" | grep -Eq '^[a-p]{32}$'; then
   exit 2
 fi
 
-host_dir="$project_root/native-host"
-launcher_path="$host_dir/clipplane-host"
-manifest_path="$host_dir/com.clipplane.host.json"
+install_parent="$HOME/Library/Application Support"
+install_root="$install_parent/Clipplane Host"
+stage_root="$(mktemp -d "$install_parent/.clipplane-host.XXXXXX")"
+trap 'rm -rf "$stage_root"' EXIT
+
+mkdir -p "$stage_root/app/native-host" "$stage_root/app/node_modules"
+find "$project_root/native-host" -type f -name '*.mjs' | while IFS= read -r source_path; do
+  relative_path="${source_path#"$project_root/native-host"/}"
+  destination="$stage_root/app/native-host/$relative_path"
+  mkdir -p "$(dirname -- "$destination")"
+  cp "$source_path" "$destination"
+done
+cp "$project_root/package.json" "$stage_root/app/package.json"
+
+npm ls --prefix "$project_root" --omit=dev --all --parseable | while IFS= read -r dependency_path; do
+  if [ -z "$dependency_path" ] || [ "$dependency_path" = "$project_root" ]; then
+    continue
+  fi
+  relative_path="${dependency_path#"$project_root"/}"
+  destination="$stage_root/app/$relative_path"
+  mkdir -p "$(dirname -- "$destination")"
+  cp -R "$dependency_path" "$destination"
+done
+
+launcher_path="$stage_root/clipplane-host"
+manifest_path="$stage_root/com.clipplane.host.json"
 
 if [ "$browser" = "chrome" ]; then
   manifest_dir="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
@@ -93,10 +116,17 @@ shell_quote() {
     printf 'export CLIPPLANE_NOTES_DIR=%s\n' "$(shell_quote "$notes_dir")"
   fi
   printf 'SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\n'
-  printf 'exec %s "$SCRIPT_DIR/host.mjs"\n' "$(shell_quote "$node_path")"
+  printf 'exec %s "$SCRIPT_DIR/app/native-host/host.mjs"\n' "$(shell_quote "$node_path")"
 } > "$launcher_path"
 
 chmod +x "$launcher_path"
+
+rm -rf "$install_root"
+mv "$stage_root" "$install_root"
+trap - EXIT
+
+launcher_path="$install_root/clipplane-host"
+manifest_path="$install_root/com.clipplane.host.json"
 
 node - "$manifest_path" "$launcher_path" "$allowed_origins_json" <<'NODE'
 const fs = require("node:fs");
