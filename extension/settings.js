@@ -78,6 +78,8 @@ document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
 document.querySelector("#retry-host").addEventListener("click", loadSettings);
 document.querySelector("#install-host").addEventListener("click", openOnboarding);
 historyListEl.addEventListener("click", handleHistoryAction);
+document.addEventListener("click", closeHistoryMenusOnOutsideClick);
+document.addEventListener("keydown", closeHistoryMenuOnEscape);
 window.addEventListener("hashchange", () => {
   const tab = tabFromHash();
   if (tab) {
@@ -291,6 +293,8 @@ async function handleHistoryAction(event) {
     return;
   }
 
+  button.closest(".history-manage")?.removeAttribute("open");
+
   setHistoryButtons(true);
   try {
     if (button.dataset.action === "open-body") {
@@ -470,10 +474,13 @@ function renderHistoryItem(item) {
   const actions = document.createElement("div");
   actions.className = "history-actions";
 
+  const quickActions = document.createElement("div");
+  quickActions.className = "history-quick-actions";
+
   const status = document.createElement("span");
   status.className = `history-state ${historyStateClass(item.sync_status)}`;
   status.textContent = historyStatusLabel(item);
-  actions.append(status);
+  quickActions.append(status);
 
   const open = document.createElement("button");
   open.className = "secondary history-action";
@@ -482,18 +489,7 @@ function renderHistoryItem(item) {
   open.dataset.captureId = item.capture_id;
   open.textContent = historyOpenLabel(item);
   open.disabled = !item.content_exists || !hostAvailable;
-  actions.append(open);
-
-  if (item.lifecycle_status === "active") {
-    const process = document.createElement("button");
-    process.className = "secondary history-action";
-    process.type = "button";
-    process.dataset.action = "mark-processed";
-    process.dataset.captureId = item.capture_id;
-    process.textContent = item.inbox_state === "missing" ? "Finish cleanup" : "Mark processed";
-    process.disabled = item.inbox_state === "duplicate" || !hostAvailable;
-    actions.append(process);
-  }
+  quickActions.append(open);
 
   if (item.sync_status === "sync_failed") {
     const retry = document.createElement("button");
@@ -503,7 +499,38 @@ function renderHistoryItem(item) {
     retry.dataset.captureId = item.capture_id;
     retry.textContent = "Retry sync";
     retry.disabled = !hostAvailable;
-    actions.append(retry);
+    quickActions.append(retry);
+  }
+
+  const manage = document.createElement("details");
+  manage.className = "history-manage";
+  manage.addEventListener("toggle", () => {
+    if (!manage.open) {
+      return;
+    }
+    for (const other of historyListEl.querySelectorAll(".history-manage[open]")) {
+      if (other !== manage) {
+        other.removeAttribute("open");
+      }
+    }
+  });
+
+  const manageSummary = document.createElement("summary");
+  manageSummary.textContent = "Manage";
+  manageSummary.setAttribute("aria-label", `Manage ${item.title || "this capture"}`);
+
+  const manageActions = document.createElement("div");
+  manageActions.className = "history-manage-actions";
+
+  if (item.lifecycle_status === "active") {
+    const process = document.createElement("button");
+    process.className = "secondary history-action";
+    process.type = "button";
+    process.dataset.action = "mark-processed";
+    process.dataset.captureId = item.capture_id;
+    process.textContent = item.inbox_state === "missing" ? "Finish cleanup" : "Mark processed";
+    process.disabled = item.inbox_state === "duplicate" || !hostAvailable;
+    manageActions.append(process);
   }
 
   const remove = document.createElement("button");
@@ -513,10 +540,33 @@ function renderHistoryItem(item) {
   remove.dataset.captureId = item.capture_id;
   remove.textContent = "Delete local copy";
   remove.disabled = item.inbox_state === "duplicate" || !hostAvailable;
-  actions.append(remove);
+  manageActions.append(remove);
+
+  manage.append(manageSummary, manageActions);
+  actions.append(quickActions, manage);
 
   row.append(main, actions);
   return row;
+}
+
+function closeHistoryMenusOnOutsideClick(event) {
+  for (const menu of historyListEl.querySelectorAll(".history-manage[open]")) {
+    if (!menu.contains(event.target)) {
+      menu.removeAttribute("open");
+    }
+  }
+}
+
+function closeHistoryMenuOnEscape(event) {
+  if (event.key !== "Escape") {
+    return;
+  }
+  const menu = historyListEl.querySelector(".history-manage[open]");
+  if (!menu) {
+    return;
+  }
+  menu.removeAttribute("open");
+  menu.querySelector("summary")?.focus();
 }
 
 function flomoReady(flomo) {

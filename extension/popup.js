@@ -15,6 +15,7 @@ const resultEl = document.querySelector("#result");
 const resultLabelEl = document.querySelector("#result-label");
 const resultTitleEl = document.querySelector("#result-title");
 const resultDetailEl = document.querySelector("#result-detail");
+const resultDetailsEl = document.querySelector("#result-details");
 const resultPathEl = document.querySelector("#result-path");
 const resultPrimaryEl = document.querySelector("#result-primary");
 const syncStatusEl = document.querySelector("#sync-status");
@@ -144,7 +145,8 @@ function renderResult(response) {
     : uiState.detail;
 
   const localPath = response?.capture?.local_path || "";
-  resultPathEl.hidden = !localPath;
+  resultDetailsEl.hidden = !localPath;
+  resultDetailsEl.open = false;
   resultPathEl.textContent = localPath;
 
   resultPrimaryEl.hidden = !uiState.action;

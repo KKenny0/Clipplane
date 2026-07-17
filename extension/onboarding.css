@@ -34,7 +34,7 @@ a { touch-action: manipulation; }
   white-space: nowrap;
 }
 
-.onboarding-state.is-ready { color: var(--cp-moss); }
+.onboarding-state.is-ready { color: var(--cp-success); }
 .onboarding-state.is-warning,
 .onboarding-state.is-working { color: oklch(43% .1 55); }
 .onboarding-state.is-error { color: var(--cp-danger); }
@@ -42,7 +42,7 @@ a { touch-action: manipulation; }
 
 main {
   width: calc(100% - 44px);
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
 }
 
@@ -88,6 +88,23 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
   text-wrap: pretty;
 }
 
+.setup-band {
+  display: grid;
+  grid-template-columns: minmax(0, .88fr) minmax(0, 1.12fr);
+  column-gap: 64px;
+  align-items: start;
+}
+
+.setup-band .section-heading {
+  display: grid;
+  grid-column: 1;
+  gap: 18px;
+}
+
+.setup-band .status { justify-self: start; }
+.setup-band > .description { grid-column: 1; }
+.setup-band > .setup-steps { grid-column: 2; grid-row: 1 / span 2; }
+
 .section-heading,
 .next-band {
   display: flex;
@@ -109,7 +126,7 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
   text-align: center;
 }
 
-.status.is-ready { border-color: oklch(82% .05 160); background: var(--cp-moss-soft); color: var(--cp-moss); }
+.status.is-ready { border-color: oklch(82% .05 145); background: var(--cp-success-soft); color: var(--cp-success); }
 .status.is-warning { border-color: oklch(82% .06 60); background: var(--cp-signal-soft); color: oklch(40% .1 55); }
 .status.is-error { border-color: oklch(82% .055 28); background: var(--cp-danger-soft); color: var(--cp-danger); }
 
@@ -117,7 +134,7 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
   display: grid;
   gap: 0;
   max-width: 650px;
-  margin: 34px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -148,7 +165,7 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
 }
 
 .setup-step.is-current .step-number { border-color: var(--cp-signal); color: oklch(40% .1 55); }
-.setup-step.is-complete .step-number { border-color: var(--cp-moss); background: var(--cp-moss); color: var(--cp-paper); }
+.setup-step.is-complete .step-number { border-color: var(--cp-success); background: var(--cp-success); color: var(--cp-paper); }
 
 .setup-step strong { display: block; padding-top: 3px; font-size: 14px; }
 .setup-step > div { min-width: 0; }
@@ -170,11 +187,13 @@ button,
   min-height: 42px;
   padding: 9px 14px;
   border: 1px solid var(--cp-line);
-  border-radius: var(--cp-radius-sm);
+  border-radius: var(--cp-radius);
   background: var(--cp-surface);
   color: var(--cp-ink-strong);
   font: inherit;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  box-shadow: var(--cp-shadow-button);
   text-decoration: none;
   cursor: pointer;
   transition: transform var(--cp-duration-fast) var(--cp-ease-out), background-color var(--cp-duration-fast) ease, border-color var(--cp-duration-fast) ease, color var(--cp-duration-fast) ease, opacity var(--cp-duration-fast) ease;
@@ -182,18 +201,18 @@ button,
 
 .primary[hidden] { display: none; }
 
-.primary { border-color: var(--cp-ink); background: var(--cp-ink); color: var(--cp-paper); }
+.primary { border-color: var(--cp-moss); background: var(--cp-moss); color: var(--cp-paper); box-shadow: var(--cp-shadow-primary); }
 button:active,
-.primary:active { transform: scale(.97); }
+.primary:active { transform: translateY(1px) scale(.99); box-shadow: none; }
 button:disabled { cursor: default; opacity: .5; transform: none; }
 
 @media (hover: hover) and (pointer: fine) {
-  button:hover { border-color: var(--cp-moss); }
-  .primary:hover { background: var(--cp-moss); border-color: var(--cp-moss); }
+  button:hover { border-color: oklch(72% 0.045 150); background: var(--cp-surface-subtle); transform: translateY(-1px); }
+  .primary:hover { background: var(--cp-moss-hover); border-color: var(--cp-moss-hover); }
 }
 
 button:focus-visible,
-a:focus-visible { outline: 2px solid var(--cp-moss); outline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--cp-signal); outline-offset: 2px; }
 
 .text-link {
   display: inline-flex;
@@ -215,6 +234,9 @@ a:focus-visible { outline: 2px solid var(--cp-moss); outline-offset: 2px; }
   section { padding: 40px 0 44px; }
   .section-heading,
   .next-band { display: grid; gap: 18px; }
+  .setup-band { display: block; }
+  .setup-band .section-heading { display: grid; }
+  .setup-band > .setup-steps { margin-top: 30px; }
   h1 { font-size: 36px; }
   h2 { font-size: 32px; }
   .status { justify-self: start; }

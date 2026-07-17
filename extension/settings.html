@@ -101,55 +101,63 @@
 
           <form id="sync-form">
             <div class="sink">
-              <label class="toggle-row">
-                <input id="flomo-enabled" type="checkbox">
-                <span>flomo</span>
-              </label>
+              <div class="sink-heading">
+                <label class="toggle-row">
+                  <input id="flomo-enabled" type="checkbox">
+                  <span>flomo</span>
+                </label>
+                <p id="flomo-state" class="sink-state">Not configured</p>
+              </div>
               <p class="sink-help">
                 Requires flomo Pro API access.
                 <a href="https://help.flomoapp.com/advance/api.html" target="_blank" rel="noreferrer">API docs</a>
                 <span aria-hidden="true">·</span>
                 <a href="https://flomoapp.com/mine?source=incoming_webhook" target="_blank" rel="noreferrer">Get webhook URL</a>
               </p>
-              <label class="field">
-                <span>Webhook URL</span>
-                <input id="flomo-webhook" type="password" autocomplete="off" spellcheck="false">
-              </label>
-              <label class="field">
-                <span>Tags</span>
-                <input id="flomo-tags" type="text" autocomplete="off" spellcheck="false" placeholder="clipplane, read">
-              </label>
+              <div class="sink-fields">
+                <label class="field">
+                  <span>Webhook URL</span>
+                  <input id="flomo-webhook" type="password" autocomplete="off" spellcheck="false">
+                </label>
+                <label class="field">
+                  <span>Tags</span>
+                  <input id="flomo-tags" type="text" autocomplete="off" spellcheck="false" placeholder="clipplane, read">
+                </label>
+              </div>
               <label class="consent-row">
                 <input id="flomo-consent" type="checkbox">
                 <span>I understand that only <strong>Save + sync</strong> sends the clip body, title, and sanitized source URL to flomo.</span>
               </label>
-              <p id="flomo-state" class="note"></p>
             </div>
 
             <div class="sink">
-              <label class="toggle-row">
-                <input id="notion-enabled" type="checkbox">
-                <span>Notion</span>
-              </label>
+              <div class="sink-heading">
+                <label class="toggle-row">
+                  <input id="notion-enabled" type="checkbox">
+                  <span>Notion</span>
+                </label>
+                <p id="notion-state" class="sink-state">Not configured</p>
+              </div>
               <p class="sink-help">
                 Use a Notion API token and share the target page with the connection.
                 <a href="https://developers.notion.com/guides/get-started/quick-start" target="_blank" rel="noreferrer">API quickstart</a>
                 <span aria-hidden="true">·</span>
                 <a href="https://developers.notion.com/guides/get-started/authorization" target="_blank" rel="noreferrer">Permissions</a>
               </p>
-              <label class="field">
-                <span>Page ID</span>
-                <input id="notion-page" type="text" autocomplete="off" spellcheck="false">
-              </label>
-              <label class="field">
-                <span>Integration token</span>
-                <input id="notion-token" type="password" autocomplete="off" spellcheck="false">
-              </label>
+              <div class="sink-fields">
+                <label class="field">
+                  <span>Page ID</span>
+                  <input id="notion-page" type="text" autocomplete="off" spellcheck="false">
+                </label>
+                <label class="field">
+                  <span>Integration token</span>
+                  <input id="notion-token" type="password" autocomplete="off" spellcheck="false">
+                </label>
+              </div>
               <label class="consent-row">
                 <input id="notion-consent" type="checkbox">
                 <span>I understand that only <strong>Save + sync</strong> sends the clip body, title, and sanitized source URL to Notion.</span>
               </label>
-              <p id="notion-state" class="note"></p>
             </div>
 
             <div class="button-row">

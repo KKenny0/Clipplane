@@ -19,6 +19,7 @@ test("popup exposes one primary Host recovery action and a structured result", a
   assert.equal(result.getAttribute("aria-live"), "polite");
   assert.ok(result.querySelector("#result-title"));
   assert.ok(result.querySelector("#result-detail"));
+  assert.ok(result.querySelector("details#result-details #result-path"));
   assert.ok(result.querySelector("#result-primary"));
 });
 
@@ -51,6 +52,20 @@ test("settings follows tab and keyboard accessibility structure", async () => {
   assert.deepEqual(historyFilters.map((button) => button.dataset.historyFilter), ["active", "processed"]);
   assert.equal(historyFilters[0].getAttribute("aria-pressed"), "true");
   assert.equal(historyFilters[1].getAttribute("aria-pressed"), "false");
+
+  const sinkFields = [...document.querySelectorAll(".sink-fields")];
+  assert.equal(sinkFields.length, 2);
+  assert.ok(sinkFields.every((fields) => fields.querySelectorAll(".field").length === 2));
+});
+
+test("history keeps destructive actions inside a capture-scoped management disclosure", async () => {
+  const script = await readFile(path.join(rootDir, "extension", "settings.js"), "utf8");
+  assert.match(script, /manage\.className = "history-manage"/);
+  assert.match(script, /manageSummary\.setAttribute\("aria-label", `Manage /);
+  assert.match(script, /manageActions\.append\(remove\)/);
+  assert.match(script, /actions\.append\(quickActions, manage\)/);
+  assert.match(script, /closeHistoryMenusOnOutsideClick/);
+  assert.match(script, /closeHistoryMenuOnEscape/);
 });
 
 test("extension styles avoid broad transitions and honor reduced motion", async () => {
