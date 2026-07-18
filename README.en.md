@@ -140,6 +140,12 @@ By default Clipplane writes:
 
 `inbox.org` is the workspace where you process clips. `captures.jsonl` and `captures/` under `.clipplane` are Clipplane-managed history, deduplication, retry, and sync state; you do not need to maintain them separately. All three representations refer to one capture through its `CAPTURE_ID`.
 
+`captures.jsonl` does not persist device-specific absolute paths. On each device, Clipplane resolves `inbox.org`, capture bodies, and local exports from the current `Storage` folder plus `CAPTURE_ID`, so the complete notes folder can move through Git between Windows, macOS, and different home directories. Absolute paths written by older versions are ignored and migrate to the portable format the next time that record changes.
+
+After records migrate, do not downgrade to an older Host that does not support portable records; it cannot reliably retry sync for those records. If the current Host encounters a record written by a newer version, History remains readable, but mutations are refused until the Host is upgraded.
+
+This Git workflow assumes one writer at a time: commit and push on one device, then pull before continuing on another. Clipplane does not run Git automatically or resolve merge conflicts caused by two devices changing `captures.jsonl` or `inbox.org` concurrently.
+
 The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder. In `History`, review recent clips, local body files, capture methods, and sync status, or mark an item as processed or permanently delete its local copy. `Mark processed` removes the item from `inbox.org` while retaining its internal record and source snapshot under Processed; clipping the same content again returns that item to Active and `inbox.org`. `Delete local copy` removes the Org entry, history record, source snapshot, and Clipplane-managed local-export copy together, but does not delete content already sent to Notion or flomo. Use `Sync` to configure those optional destinations. Normal users do not need environment variables or launcher edits.
 
 ## External Sync

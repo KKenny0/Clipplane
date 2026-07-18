@@ -98,6 +98,12 @@ test("clipPayload writes inbox and skips duplicates", async () => {
 
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.equal(captures.trim().split(/\r?\n/).length, 1);
+  const record = JSON.parse(captures.trim());
+  assert.equal(record.schema_version, 2);
+  assert.equal("local_path" in record, false);
+  assert.equal("content_path" in record, false);
+  assert.equal("path" in record.sinks.local, false);
+  assert.equal(captures.includes(notesDir), false);
 });
 
 test("clipPayload records capture methods for selected areas", async () => {
@@ -169,7 +175,105 @@ test("clipPayload backfills capture body for legacy duplicates", async () => {
   assert.equal(second.duplicate, true);
   assert.equal(await fileExists(second.capture.content_path), true);
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
-  assert.match(captures, /"content_path":/);
+  const migrated = JSON.parse(captures.trim());
+  assert.equal(migrated.schema_version, 2);
+  assert.equal("local_path" in migrated, false);
+  assert.equal("content_path" in migrated, false);
+  assert.equal("path" in migrated.sinks.local, false);
+});
+
+test("clipPayload keeps a new record separate from an unterminated invalid line", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-invalid-eof-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const stateDir = path.join(notesDir, ".clipplane");
+  const capturesPath = path.join(stateDir, "captures.jsonl");
+  await fs.mkdir(stateDir, { recursive: true });
+  await fs.writeFile(capturesPath, "{not json}", "utf8");
+
+  const result = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/invalid-eof",
+    sourceTitle: "Invalid EOF",
+    title: "Invalid EOF",
+    contentMarkdown: "New capture body"
+  }, { notesDir, configDir });
+
+  const lines = (await fs.readFile(capturesPath, "utf8")).trim().split(/\r?\n/);
+  assert.equal(lines[0], "{not json}");
+  assert.equal(JSON.parse(lines[1]).capture_id, result.capture.capture_id);
+});
+
+test("re-clipping a future-schema duplicate cannot recreate its missing body", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-future-duplicate-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const payload = {
+    inputType: "selection",
+    sourceUrl: "https://example.com/future-duplicate",
+    sourceTitle: "Future duplicate",
+    title: "Future duplicate",
+    contentMarkdown: "Future body"
+  };
+  const first = await clipPayload(payload, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const inboxPath = path.join(notesDir, "inbox.org");
+  const futureRecord = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  futureRecord.schema_version = 3;
+  futureRecord.future_state = { preserved: true };
+  await fs.writeFile(capturesPath, `${JSON.stringify(futureRecord)}\n`, "utf8");
+  await fs.rm(first.capture.content_path);
+  const capturesBefore = await fs.readFile(capturesPath, "utf8");
+  const inboxBefore = await fs.readFile(inboxPath, "utf8");
+
+  await assert.rejects(
+    clipPayload(payload, { notesDir, configDir }),
+    (error) => error.code === "unsupported_capture_schema" && /newer Clipplane Host/.test(error.message)
+  );
+
+  assert.equal(await fileExists(first.capture.content_path), false);
+  assert.equal(await fs.readFile(capturesPath, "utf8"), capturesBefore);
+  assert.equal(await fs.readFile(inboxPath, "utf8"), inboxBefore);
+});
+
+test("a mixed-schema store is rejected before repairing a portable duplicate", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-mixed-schema-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const future = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/future-record",
+    sourceTitle: "Future record",
+    title: "Future record",
+    contentMarkdown: "Unrelated future body"
+  }, { notesDir, configDir });
+  const duplicatePayload = {
+    inputType: "selection",
+    sourceUrl: "https://example.com/portable-duplicate",
+    sourceTitle: "Portable duplicate",
+    title: "Portable duplicate",
+    contentMarkdown: "Portable duplicate body"
+  };
+  const duplicate = await clipPayload(duplicatePayload, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const inboxPath = path.join(notesDir, "inbox.org");
+  const records = (await fs.readFile(capturesPath, "utf8"))
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => JSON.parse(line));
+  records.find((record) => record.capture_id === future.capture.capture_id).schema_version = 3;
+  await fs.writeFile(capturesPath, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`, "utf8");
+  await fs.rm(duplicate.capture.content_path);
+  const capturesBefore = await fs.readFile(capturesPath, "utf8");
+  const inboxBefore = await fs.readFile(inboxPath, "utf8");
+  const futureBodyBefore = await fs.readFile(future.capture.content_path, "utf8");
+
+  await assert.rejects(
+    clipPayload(duplicatePayload, { notesDir, configDir }),
+    (error) => error.code === "unsupported_capture_schema"
+  );
+
+  assert.equal(await fileExists(duplicate.capture.content_path), false);
+  assert.equal(await fs.readFile(capturesPath, "utf8"), capturesBefore);
+  assert.equal(await fs.readFile(inboxPath, "utf8"), inboxBefore);
+  assert.equal(await fs.readFile(future.capture.content_path, "utf8"), futureBodyBefore);
 });
 
 async function fileExists(file) {

@@ -1,7 +1,19 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import path from "node:path";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
+import {
+  assertSupportedCaptureRecord,
+  ensureCaptureBody,
+  withRuntimeCapturePaths,
+  writeNewCaptureBody
+} from "./capture-record.mjs";
+import {
+  appendCaptureRecord,
+  assertCaptureStoreWritable,
+  captureRecords,
+  readCaptureStore,
+  replaceCaptureRecord
+} from "./capture-store.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
 import { getDefaultPaths } from "./paths.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
@@ -27,9 +39,12 @@ export async function clipPayload(payload, options = {}) {
 
 async function clipPayloadLocked(normalized, paths) {
   const contentHash = createContentHash(normalized);
-  const existing = await findExistingCapture(paths.capturesPath, contentHash);
+  const store = await readCaptureStore(paths.capturesPath);
+  assertCaptureStoreWritable(store.entries);
+  const existing = findExistingCapture(store, contentHash);
 
   if (existing) {
+    assertSupportedCaptureRecord(existing);
     let capture = await ensureDuplicateCaptureBody(paths, existing, normalized.contentMarkdown);
     const reactivated = capture.lifecycle_status === "processed";
     if (reactivated) {
@@ -39,25 +54,24 @@ async function clipPayloadLocked(normalized, paths) {
       ok: true,
       duplicate: true,
       reactivated,
-      capture
+      capture: withRuntimeCapturePaths(capture, paths)
     };
   }
 
   await fs.mkdir(paths.stateDir, { recursive: true });
   await ensureInbox(paths.inboxPath);
 
-  const capture = buildCapture(normalized, contentHash, paths);
+  const capture = buildCapture(normalized, contentHash);
   const orgEntry = buildOrgEntry(capture, normalized.contentMarkdown);
 
-  await fs.mkdir(paths.captureBodiesDir, { recursive: true });
-  await fs.writeFile(capture.content_path, normalized.contentMarkdown, "utf8");
+  await writeNewCaptureBody(paths, capture.capture_id, normalized.contentMarkdown);
   await fs.appendFile(paths.inboxPath, `\n${orgEntry}`, "utf8");
-  await fs.appendFile(paths.capturesPath, `${JSON.stringify(capture)}\n`, "utf8");
+  await appendCaptureRecord(paths.capturesPath, capture);
 
   return {
     ok: true,
     duplicate: false,
-    capture
+    capture: withRuntimeCapturePaths(capture, paths)
   };
 }
 
@@ -201,84 +215,22 @@ async function ensureInbox(inboxPath) {
   }
 }
 
-async function findExistingCapture(capturesPath, contentHash) {
-  let text;
-  try {
-    text = await fs.readFile(capturesPath, "utf8");
-  } catch {
-    return null;
-  }
-
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) {
-      continue;
-    }
-    try {
-      const record = JSON.parse(line);
-      if (record.content_hash === contentHash) {
-        return record;
-      }
-    } catch {
-      continue;
-    }
-  }
-  return null;
+function findExistingCapture(store, contentHash) {
+  return captureRecords(store).find((record) => record.content_hash === contentHash) || null;
 }
 
 async function ensureDuplicateCaptureBody(paths, existing, markdown) {
-  const contentPath = existing.content_path || path.join(paths.captureBodiesDir, `${existing.capture_id}.md`);
-  let needsUpdate = existing.content_path !== contentPath;
-
-  try {
-    await fs.access(contentPath);
-  } catch {
-    await fs.mkdir(paths.captureBodiesDir, { recursive: true });
-    await fs.writeFile(contentPath, markdown, "utf8");
-    needsUpdate = true;
-  }
-
-  if (!needsUpdate) {
-    return existing;
-  }
-
-  const updated = {
-    ...existing,
-    content_path: contentPath
-  };
+  await ensureCaptureBody(paths, existing.capture_id, markdown);
+  const updated = { ...existing };
   await replaceCaptureRecord(paths.capturesPath, updated);
   return updated;
 }
 
-async function replaceCaptureRecord(capturesPath, updated) {
-  const text = await fs.readFile(capturesPath, "utf8");
-  let replaced = false;
-  const lines = text.split(/\r?\n/).filter((line) => line.trim()).map((line) => {
-    try {
-      const record = JSON.parse(line);
-      if (record.capture_id === updated.capture_id) {
-        replaced = true;
-        return JSON.stringify(updated);
-      }
-    } catch {
-      return line;
-    }
-    return line;
-  });
-
-  if (!replaced) {
-    lines.push(JSON.stringify(updated));
-  }
-
-  await fs.writeFile(capturesPath, `${lines.join("\n")}\n`, "utf8");
-}
-
-function buildCapture(normalized, contentHash, paths) {
+function buildCapture(normalized, contentHash) {
   const clippedAt = new Date();
   const tags = classifyTags(`${normalized.title}\n${normalized.contentMarkdown}`);
   const captureId = `${formatCompactTimestamp(clippedAt)}-${contentHash.slice(0, 10)}`;
   const orgHeading = `* ${normalized.title} :${tags.join(":")}:`;
-  const contentPath = path.join(paths.captureBodiesDir, `${captureId}.md`);
-
   return {
     capture_id: captureId,
     source_url: normalized.sourceUrl,
@@ -290,12 +242,10 @@ function buildCapture(normalized, contentHash, paths) {
     org_timestamp: formatOrgTimestamp(clippedAt),
     content_hash: contentHash,
     tags,
-    local_path: paths.inboxPath,
-    content_path: contentPath,
     org_heading: orgHeading,
     sync_status: "local_saved",
     sinks: {
-      local: { status: "saved", path: paths.inboxPath }
+      local: { status: "saved" }
     },
     error: null
   };

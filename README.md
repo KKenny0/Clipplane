@@ -140,6 +140,12 @@ npm run doctor
 
 `inbox.org` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。三者通过 `CAPTURE_ID` 表示同一个剪藏项。
 
+`captures.jsonl` 不保存设备绝对路径。Clipplane 会在每台设备上根据当前 `Storage` 目录和 `CAPTURE_ID` 定位 `inbox.org`、正文快照与 local-export，因此整个 notes 目录可以放进 Git，并在 Windows、macOS 或不同用户目录之间移动。旧版本写入的绝对路径会被忽略，并在下一次记录变更时迁移为可移植格式。
+
+记录迁移后，不要降级到不支持可移植记录的旧 Host；旧 Host 无法可靠地对这些记录执行重试同步。若当前 Host 遇到由更新版本写入的记录，它仍会显示历史，但会拒绝修改该记录，直到 Host 完成升级。
+
+这里的 Git 用法假设同一时间只有一台设备写入：先提交并推送，再在另一台设备拉取后继续使用。Clipplane 不会自动运行 Git，也不解决两台设备同时修改 `captures.jsonl` 或 `inbox.org` 产生的合并冲突。
+
 扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态，也可以把条目标记为已处理或永久删除本地副本。`Mark processed` 会从 `inbox.org` 移除条目，但在 Processed 历史中保留内部记录和原始正文；再次剪藏相同内容时，这个条目会回到 Active 和 `inbox.org`。`Delete local copy` 会统一移除 Org 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本，但不会删除已经同步到 Notion 或 flomo 的内容。在 `Sync` 可以配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
 ## 外部同步
