@@ -48,6 +48,15 @@ export function openFolder(targetPath, options = {}) {
   });
 }
 
+export function openTextFile(targetPath, options = {}) {
+  const platform = options.platform || process.platform;
+  const { command, args } = getOpenTextFileCommand(targetPath, platform);
+  return runOpenCommand(command, args, {
+    ...options,
+    resolveOnSpawn: platform === "win32"
+  });
+}
+
 export function getOpenFolderCommand(targetPath, platform = process.platform) {
   if (platform === "win32") {
     return {
@@ -61,6 +70,13 @@ export function getOpenFolderCommand(targetPath, platform = process.platform) {
   }
 
   return { command: "xdg-open", args: [targetPath] };
+}
+
+export function getOpenTextFileCommand(targetPath, platform = process.platform) {
+  if (platform === "darwin") {
+    return { command: "open", args: ["-t", targetPath] };
+  }
+  return getOpenFolderCommand(targetPath, platform);
 }
 
 function runOpenCommand(command, args, options = {}) {

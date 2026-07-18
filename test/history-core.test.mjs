@@ -171,7 +171,7 @@ test("openCaptureBody opens only capture files inside notes dir", async () => {
   const response = await openCaptureBody(clip.capture.capture_id, {
     notesDir,
     configDir,
-    openFolderImpl: async (targetPath) => opened.push(targetPath)
+    openFileImpl: async (targetPath) => opened.push(targetPath)
   });
 
   assert.equal(response.ok, true);
@@ -204,7 +204,7 @@ test("openCaptureBody ignores stale records pointing outside the capture body di
   await openCaptureBody(clip.capture.capture_id, {
     notesDir,
     configDir,
-    openFolderImpl: async (targetPath) => opened.push(targetPath)
+    openFileImpl: async (targetPath) => opened.push(targetPath)
   });
   assert.deepEqual(opened, [clip.capture.content_path]);
 });
@@ -229,7 +229,7 @@ test("managed body symlinks cannot be previewed, opened, or synced", { skip: pro
   assert.equal(history.history.items[0].body_state, "unsafe");
   assert.equal(history.history.items[0].preview, "");
   await assert.rejects(
-    openCaptureBody(clip.capture.capture_id, { notesDir, configDir, openFolderImpl: async () => {} }),
+    openCaptureBody(clip.capture.capture_id, { notesDir, configDir, openFileImpl: async () => {} }),
     /symbolic link/
   );
   await assert.rejects(
@@ -282,7 +282,7 @@ test("legacy absolute paths remain portable across storage roots", async () => {
   await openCaptureBody(clip.capture.capture_id, {
     notesDir: destinationNotesDir,
     configDir: destinationConfigDir,
-    openFolderImpl: async (targetPath) => opened.push(targetPath)
+    openFileImpl: async (targetPath) => opened.push(targetPath)
   });
   const destinationSync = await syncCapture(clip.capture.capture_id, {
     notesDir: destinationNotesDir,
