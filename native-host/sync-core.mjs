@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
+import { resolveCaptureBodyForRead, withRuntimeCapturePaths } from "./capture-record.mjs";
+import { assertCaptureStoreWritable, captureRecords, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
 import { ClipplaneError } from "./clip-core.mjs";
 import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
@@ -63,7 +65,9 @@ export async function syncCapture(captureId, options = {}) {
 }
 
 async function syncCaptureLocked(captureId, options, paths, config) {
-  const records = await readCaptureRecords(paths.capturesPath);
+  const store = await readCaptureStore(paths.capturesPath);
+  assertCaptureStoreWritable(store.entries);
+  const records = captureRecords(store);
   const index = records.findIndex((record) => record.capture_id === captureId);
 
   if (index < 0) {
@@ -71,7 +75,7 @@ async function syncCaptureLocked(captureId, options, paths, config) {
   }
 
   const capture = records[index];
-  const markdown = await readCaptureMarkdown(capture);
+  const markdown = await readCaptureMarkdown(capture, paths);
   const sinkNames = chooseSinkNames(options.sinks, config);
   const secrets = sinkNames.some((name) => name === "notion-api" || name === "flomo-api")
     ? await resolveSyncSecrets(config, options)
@@ -84,7 +88,7 @@ async function syncCaptureLocked(captureId, options, paths, config) {
       status: "no_sinks",
       requested: [],
       results,
-      capture
+      capture: withRuntimeCapturePaths(capture, paths)
     };
   }
 
@@ -119,15 +123,16 @@ async function syncCaptureLocked(captureId, options, paths, config) {
   }
 
   const updatedCapture = updateCaptureSinks(capture, results);
-  records[index] = updatedCapture;
-  await writeCaptureRecords(paths.capturesPath, records);
+  const entry = store.entries.find((candidate) => candidate.record === capture);
+  entry.record = updatedCapture;
+  await writeCaptureStore(paths.capturesPath, store.entries);
 
   return {
     ok: true,
     status: updatedCapture.sync_status,
     requested: sinkNames,
     results,
-    capture: updatedCapture
+    capture: withRuntimeCapturePaths(updatedCapture, paths)
   };
 }
 
@@ -143,33 +148,8 @@ export function chooseSinkNames(requested, config) {
   return configuredExternalSinks(config);
 }
 
-async function readCaptureMarkdown(capture) {
-  if (!capture.content_path) {
-    throw new ClipplaneError("missing_capture_body", "Capture body is missing for this record.");
-  }
-  return fs.readFile(capture.content_path, "utf8");
-}
-
-async function readCaptureRecords(capturesPath) {
-  let text;
-  try {
-    text = await fs.readFile(capturesPath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
-
-  return text
-    .split(/\r?\n/)
-    .filter((line) => line.trim())
-    .map((line) => JSON.parse(line));
-}
-
-async function writeCaptureRecords(capturesPath, records) {
-  const body = records.map((record) => JSON.stringify(record)).join("\n");
-  await fs.writeFile(capturesPath, `${body}\n`, "utf8");
+async function readCaptureMarkdown(capture, paths) {
+  return fs.readFile(await resolveCaptureBodyForRead(paths, capture.capture_id), "utf8");
 }
 
 function updateCaptureSinks(capture, results) {
@@ -181,8 +161,7 @@ function updateCaptureSinks(capture, results) {
       external_url: result.external_url || null,
       synced_at: result.status === "synced" ? new Date().toISOString() : null,
       error_code: result.error_code || null,
-      last_error: result.last_error || null,
-      path: result.path || null
+      last_error: result.last_error || null
     };
   }
 

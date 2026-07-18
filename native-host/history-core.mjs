@@ -1,6 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
+import { captureBodyPath, inspectCaptureBody, localExportPath, resolveCaptureBodyForRead } from "./capture-record.mjs";
+import {
+  assertCaptureStoreWritable,
+  captureRecords,
+  readCaptureStore,
+  writeCaptureStore
+} from "./capture-store.mjs";
 import { ClipplaneError } from "./clip-core.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
 import { openFolder } from "./settings-core.mjs";
@@ -14,9 +21,21 @@ export async function listCaptureHistory(options = {}) {
   const { paths } = await resolveConfiguredPaths(options);
   let captureData = await readCaptureRecords(paths.capturesPath);
   let recoveryWarnings = [];
-  if (captureData.records.some((record) => ["processing", "deleting"].includes(cleanString(record.lifecycle_status)))) {
-    recoveryWarnings = await withCaptureMutationLock(paths, () => recoverPendingLifecycleOperations(paths));
-    captureData = await readCaptureRecords(paths.capturesPath);
+  const pendingRecords = captureData.records
+    .filter((record) => ["processing", "deleting"].includes(cleanString(record.lifecycle_status)));
+  if (pendingRecords.length) {
+    try {
+      recoveryWarnings = await withCaptureMutationLock(paths, () => recoverPendingLifecycleOperations(paths));
+      captureData = await readCaptureRecords(paths.capturesPath);
+    } catch (error) {
+      if (error.code !== "unsupported_capture_schema") {
+        throw error;
+      }
+      recoveryWarnings = pendingRecords.map((record) => ({
+        capture_id: cleanString(record.capture_id),
+        code: "lifecycle_recovery_failed"
+      }));
+    }
   }
   const { records, warnings } = captureData;
   const inboxIds = await readInboxCaptureIds(paths.inboxPath);
@@ -47,8 +66,7 @@ export async function openCaptureBody(captureId, options = {}) {
   const { paths } = await resolveConfiguredPaths(options);
   const { records } = await readCaptureRecords(paths.capturesPath);
   const capture = findUniqueRecord(records, id);
-  const contentPath = safeCaptureBodyPath(capture, paths);
-  await fs.access(contentPath);
+  const contentPath = await resolveCaptureBodyForRead(paths, capture.capture_id);
   await (options.openFolderImpl || openFolder)(contentPath, options);
 
   return {
@@ -112,8 +130,9 @@ async function deleteCaptureLocked(id, paths) {
 }
 
 async function summarizeCapture(record, paths, inboxIds) {
-  const contentPath = safeCaptureBodyPath(record, paths, { allowMissing: true });
-  const contentExists = contentPath ? await fileExists(contentPath) : false;
+  const inspectedBody = await inspectCaptureBody(paths, record.capture_id);
+  const contentPath = inspectedBody.path;
+  const contentExists = inspectedBody.state === "available";
   const inputType = ["selection", "element"].includes(record.input_type) ? record.input_type : "page";
   const extractionMethod = publicExtractionMethod(record.extraction_method, inputType);
   const preview = ["selection", "element"].includes(inputType) && contentExists ? await readCapturePreview(contentPath) : "";
@@ -135,14 +154,16 @@ async function summarizeCapture(record, paths, inboxIds) {
     sync_status: cleanString(record.sync_status) || "local_saved",
     content_path: contentPath || "",
     content_exists: contentExists,
-    body_state: contentExists ? "available" : contentPath ? "missing" : "unsafe",
+    body_state: inspectedBody.state,
     preview,
     sinks: publicSinks(record.sinks)
   };
 }
 
 async function recoverPendingLifecycleOperations(paths) {
-  const { records } = await readCaptureRecords(paths.capturesPath);
+  const store = await readCaptureStore(paths.capturesPath);
+  assertCaptureStoreWritable(store.entries);
+  const records = captureRecords(store);
   const pending = records
     .filter((record) => ["processing", "deleting"].includes(cleanString(record.lifecycle_status)))
     .map((record) => ({ id: cleanString(record.capture_id), operation: cleanString(record.lifecycle_status) }));
@@ -180,7 +201,7 @@ async function finishProcessingCapture(paths, captureId) {
 async function finishDeletingCapture(paths, captureId) {
   const store = await readCaptureStore(paths.capturesPath);
   const entry = findUniqueStoreEntry(store.entries, captureId);
-  const contentCandidate = safeCaptureBodyPath(entry.record, paths);
+  const contentCandidate = captureBodyPath(paths, entry.record.capture_id);
   const contentPath = await safeManagedFileForDeletion(
     contentCandidate,
     paths.captureBodiesDir,
@@ -203,11 +224,7 @@ async function finishDeletingCapture(paths, captureId) {
 
 async function localExportForDeletion(record, paths) {
   const exportRoot = path.join(paths.stateDir, "sinks", "local-export");
-  const expected = path.join(exportRoot, `${cleanString(record.capture_id)}.json`);
-  const recorded = cleanString(record.sinks?.["local-export"]?.path);
-  if (recorded && path.resolve(recorded) !== path.resolve(expected)) {
-    throw new ClipplaneError("unsafe_local_export_path", "Local export path is outside the Clipplane export folder.");
-  }
+  const expected = localExportPath(paths, record.capture_id);
   return safeManagedFileForDeletion(expected, exportRoot, paths.notesDir, "unsafe_local_export_path");
 }
 
@@ -360,49 +377,9 @@ function cleanPreview(value) {
 async function readCaptureRecords(capturesPath) {
   const store = await readCaptureStore(capturesPath);
   return {
-    records: store.entries.filter((entry) => entry.record).map((entry) => entry.record),
+    records: captureRecords(store),
     warnings: store.warnings
   };
-}
-
-async function readCaptureStore(capturesPath) {
-  let text;
-  try {
-    text = await fs.readFile(capturesPath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return { entries: [], warnings: [] };
-    }
-    throw error;
-  }
-
-  const entries = [];
-  const warnings = [];
-  const lines = text.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
-    if (!line.trim()) {
-      continue;
-    }
-    try {
-      const record = JSON.parse(line);
-      if (record && typeof record === "object" && cleanString(record.capture_id)) {
-        entries.push({ raw: line, record });
-      } else {
-        entries.push({ raw: line, record: null });
-        warnings.push({ line: index + 1, code: "invalid_record" });
-      }
-    } catch {
-      entries.push({ raw: line, record: null });
-      warnings.push({ line: index + 1, code: "invalid_json" });
-    }
-  }
-
-  return { entries, warnings };
-}
-
-async function writeCaptureStore(capturesPath, entries) {
-  const body = entries.map((entry) => entry.record ? JSON.stringify(entry.record) : entry.raw).join("\n");
-  await atomicWrite(capturesPath, body ? `${body}\n` : "");
 }
 
 async function atomicWrite(filePath, body, options = {}) {
@@ -474,23 +451,6 @@ function publicLifecycleStatus(record) {
 function normalizeLifecycleFilter(value) {
   const filter = cleanString(value);
   return LIFECYCLE_FILTERS.has(filter) ? filter : "active";
-}
-
-function safeCaptureBodyPath(record, paths, options = {}) {
-  const candidate = cleanString(record.content_path)
-    || path.join(paths.captureBodiesDir, `${cleanString(record.capture_id)}.md`);
-  const resolved = path.resolve(candidate);
-  const notesRoot = path.resolve(paths.notesDir);
-  const bodiesRoot = path.resolve(paths.captureBodiesDir);
-
-  if (!isPathInside(resolved, notesRoot) || !isPathInside(resolved, bodiesRoot)) {
-    if (options.allowMissing) {
-      return "";
-    }
-    throw new ClipplaneError("unsafe_capture_path", "Capture body path is outside the Clipplane notes folder.");
-  }
-
-  return resolved;
 }
 
 function publicSinks(sinks) {

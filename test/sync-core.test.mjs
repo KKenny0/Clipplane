@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { clipPayload } from "../native-host/clip-core.mjs";
 import { getSecretStatus, normalizeConfig, publicConfig, resolveConfiguredPaths, saveConfig } from "../native-host/config.mjs";
+import { listCaptureHistory } from "../native-host/history-core.mjs";
 import { formatFlomoContent, syncFlomoApi } from "../native-host/sinks/flomo-api.mjs";
 import { buildBlocks, syncNotionApi } from "../native-host/sinks/notion-api.mjs";
 import { chooseSinkNames, getSyncStatus, syncCapture } from "../native-host/sync-core.mjs";
@@ -49,6 +50,66 @@ test("syncCapture writes local export and updates captures jsonl", async () => {
 
   const records = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.match(records, /"sync_status":"synced"/);
+  assert.equal(records.includes(notesDir), false);
+  assert.doesNotMatch(records, /"content_path"|"local_path"|"path"/);
+  const localExport = JSON.parse(exported);
+  assert.equal(localExport.capture.schema_version, 2);
+  assert.equal("content_path" in localExport.capture, false);
+  assert.equal(JSON.stringify(localExport.capture).includes(notesDir), false);
+});
+
+test("local export refuses a symlink target without overwriting it", { skip: process.platform === "win32" }, async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-sync-symlink-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-sync-outside-"));
+  const victimPath = path.join(outsideDir, "victim.json");
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/sync-symlink",
+    sourceTitle: "Sync symlink",
+    title: "Sync symlink",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  const exportDir = path.join(notesDir, ".clipplane", "sinks", "local-export");
+  const exportPath = path.join(exportDir, `${clip.capture.capture_id}.json`);
+  await fs.mkdir(exportDir, { recursive: true });
+  await fs.writeFile(victimPath, "DO NOT OVERWRITE", "utf8");
+  await fs.symlink(victimPath, exportPath);
+
+  const result = await syncCapture(clip.capture.capture_id, {
+    notesDir,
+    configDir,
+    sinks: ["local-export"]
+  });
+
+  assert.equal(result.status, "sync_failed");
+  assert.equal(result.results[0].error_code, "unsafe_managed_path");
+  assert.equal(await fs.readFile(victimPath, "utf8"), "DO NOT OVERWRITE");
+});
+
+test("future capture schemas remain readable but cannot be mutated", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-sync-future-schema-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/future-schema",
+    sourceTitle: "Future schema",
+    title: "Future schema",
+    contentMarkdown: "Future body"
+  }, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const future = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  future.schema_version = 3;
+  future.future_state = { preserved: true };
+  await fs.writeFile(capturesPath, `${JSON.stringify(future)}\n`, "utf8");
+
+  const history = await listCaptureHistory({ notesDir, configDir });
+  assert.equal(history.history.items[0].capture_id, clip.capture.capture_id);
+  await assert.rejects(
+    syncCapture(clip.capture.capture_id, { notesDir, configDir, sinks: ["local-export"] }),
+    /requires a newer Clipplane Host/
+  );
+  assert.deepEqual(JSON.parse((await fs.readFile(capturesPath, "utf8")).trim()), future);
 });
 
 test("getSyncStatus does not expose token values", async () => {

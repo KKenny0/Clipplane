@@ -126,7 +126,7 @@ test("listCaptureHistory exposes selected-area metadata and a bounded preview", 
   assert.equal(item.preview.length, 500);
 });
 
-test("listCaptureHistory marks unsafe body paths without exposing them", async () => {
+test("listCaptureHistory ignores a stale device path and resolves the managed body", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-unsafe-list-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const clip = await clipPayload({
@@ -150,10 +150,10 @@ test("listCaptureHistory marks unsafe body paths without exposing them", async (
   const response = await listCaptureHistory({ notesDir, configDir });
   const item = response.history.items[0];
 
-  assert.equal(item.content_exists, false);
-  assert.equal(item.body_state, "unsafe");
-  assert.equal(item.content_path, "");
-  assert.equal(item.preview, "");
+  assert.equal(item.content_exists, true);
+  assert.equal(item.body_state, "available");
+  assert.equal(item.content_path, clip.capture.content_path);
+  assert.equal(item.preview, "Body");
 });
 
 test("openCaptureBody opens only capture files inside notes dir", async () => {
@@ -179,7 +179,7 @@ test("openCaptureBody opens only capture files inside notes dir", async () => {
   assert.deepEqual(opened, [clip.capture.content_path]);
 });
 
-test("openCaptureBody rejects stale records pointing outside the capture body directory", async () => {
+test("openCaptureBody ignores stale records pointing outside the capture body directory", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-unsafe-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const clip = await clipPayload({
@@ -200,10 +200,109 @@ test("openCaptureBody rejects stale records pointing outside the capture body di
     "utf8"
   );
 
+  const opened = [];
+  await openCaptureBody(clip.capture.capture_id, {
+    notesDir,
+    configDir,
+    openFolderImpl: async (targetPath) => opened.push(targetPath)
+  });
+  assert.deepEqual(opened, [clip.capture.content_path]);
+});
+
+test("managed body symlinks cannot be previewed, opened, or synced", { skip: process.platform === "win32" }, async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-body-symlink-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-body-outside-"));
+  const outsideBody = path.join(outsideDir, "private.md");
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/body-symlink",
+    sourceTitle: "Body symlink",
+    title: "Body symlink",
+    contentMarkdown: "Original body"
+  }, { notesDir, configDir });
+  await fs.writeFile(outsideBody, "PRIVATE OUTSIDE CONTENT", "utf8");
+  await fs.rm(clip.capture.content_path);
+  await fs.symlink(outsideBody, clip.capture.content_path);
+
+  const history = await listCaptureHistory({ notesDir, configDir });
+  assert.equal(history.history.items[0].body_state, "unsafe");
+  assert.equal(history.history.items[0].preview, "");
   await assert.rejects(
-    () => openCaptureBody(clip.capture.capture_id, { notesDir, configDir, openFolderImpl: async () => {} }),
-    /outside the Clipplane notes folder/
+    openCaptureBody(clip.capture.capture_id, { notesDir, configDir, openFolderImpl: async () => {} }),
+    /symbolic link/
   );
+  await assert.rejects(
+    syncCapture(clip.capture.capture_id, { notesDir, configDir, sinks: ["local-export"] }),
+    /symbolic link/
+  );
+  assert.equal(await fs.readFile(outsideBody, "utf8"), "PRIVATE OUTSIDE CONTENT");
+});
+
+test("legacy absolute paths remain portable across storage roots", async () => {
+  const sourceNotesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-portable-source-"));
+  const sourceConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const destinationParent = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-portable-destination-"));
+  const destinationNotesDir = path.join(destinationParent, "notes");
+  const destinationConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const opened = [];
+
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/portable",
+    sourceTitle: "Portable",
+    title: "Portable capture",
+    contentMarkdown: "Portable body"
+  }, { notesDir: sourceNotesDir, configDir: sourceConfigDir });
+  const sourceSync = await syncCapture(clip.capture.capture_id, {
+    notesDir: sourceNotesDir,
+    configDir: sourceConfigDir,
+    sinks: ["local-export"]
+  });
+  const capturesPath = path.join(sourceNotesDir, ".clipplane", "captures.jsonl");
+  const legacy = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  delete legacy.schema_version;
+  legacy.local_path = "C:\\Users\\Alice\\Documents\\notes\\inbox.org";
+  legacy.content_path = `C:\\Users\\Alice\\Documents\\notes\\.clipplane\\captures\\${clip.capture.capture_id}.md`;
+  legacy.sinks.local.path = legacy.local_path;
+  legacy.sinks["local-export"].path = `C:\\Users\\Alice\\Documents\\notes\\.clipplane\\sinks\\local-export\\${clip.capture.capture_id}.json`;
+  await fs.writeFile(capturesPath, `${JSON.stringify(legacy)}\n{not json}\n`, "utf8");
+  await fs.cp(sourceNotesDir, destinationNotesDir, { recursive: true });
+
+  const history = await listCaptureHistory({ notesDir: destinationNotesDir, configDir: destinationConfigDir });
+  const destinationBody = path.join(
+    destinationNotesDir,
+    ".clipplane",
+    "captures",
+    `${clip.capture.capture_id}.md`
+  );
+  assert.equal(history.history.items[0].body_state, "available");
+  assert.equal(history.history.items[0].content_path, destinationBody);
+
+  await openCaptureBody(clip.capture.capture_id, {
+    notesDir: destinationNotesDir,
+    configDir: destinationConfigDir,
+    openFolderImpl: async (targetPath) => opened.push(targetPath)
+  });
+  const destinationSync = await syncCapture(clip.capture.capture_id, {
+    notesDir: destinationNotesDir,
+    configDir: destinationConfigDir,
+    sinks: ["local-export"]
+  });
+  assert.deepEqual(opened, [destinationBody]);
+  assert.equal(destinationSync.capture.sinks["local-export"].path.startsWith(destinationNotesDir), true);
+
+  const migrated = await fs.readFile(path.join(destinationNotesDir, ".clipplane", "captures.jsonl"), "utf8");
+  assert.equal(migrated.includes(sourceNotesDir), false);
+  assert.equal(migrated.includes(destinationNotesDir), false);
+  assert.equal(migrated.includes("C:\\Users\\Alice"), false);
+  assert.match(migrated, /"schema_version":2/);
+  assert.match(migrated, /\{not json\}/);
+
+  await deleteCapture(clip.capture.capture_id, { notesDir: destinationNotesDir, configDir: destinationConfigDir });
+  assert.equal(await fileExists(destinationBody), false);
+  assert.equal(await fileExists(clip.capture.content_path), true);
+  assert.equal(await fileExists(sourceSync.capture.sinks["local-export"].path), true);
 });
 
 test("markCaptureProcessed removes one complete org subtree and keeps internal history", async () => {
@@ -358,6 +457,55 @@ test("history resumes a processing operation left by an interrupted host", async
   assert.equal(active.history.items.length, 0);
   assert.equal(processed.history.items[0].capture_id, clip.capture.capture_id);
   assert.doesNotMatch(await fs.readFile(path.join(notesDir, "inbox.org"), "utf8"), new RegExp(clip.capture.capture_id));
+});
+
+test("history leaves future-schema lifecycle records and managed files unchanged", async () => {
+  for (const lifecycleStatus of ["processing", "deleting"]) {
+    const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), `clipplane-future-${lifecycleStatus}-`));
+    const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+    const clip = await clipPayload({
+      inputType: "selection",
+      sourceUrl: `https://example.com/future-${lifecycleStatus}`,
+      sourceTitle: `Future ${lifecycleStatus}`,
+      title: `Future ${lifecycleStatus}`,
+      contentMarkdown: `Future ${lifecycleStatus} body`
+    }, { notesDir, configDir });
+    const sync = await syncCapture(clip.capture.capture_id, {
+      notesDir,
+      configDir,
+      sinks: ["local-export"]
+    });
+    const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+    const inboxPath = path.join(notesDir, "inbox.org");
+    const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+    record.schema_version = 3;
+    record.lifecycle_status = lifecycleStatus;
+    record.lifecycle_started_at = new Date().toISOString();
+    record.future_state = { preserved: true };
+    await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
+
+    const before = {
+      captures: await fs.readFile(capturesPath, "utf8"),
+      inbox: await fs.readFile(inboxPath, "utf8"),
+      body: await fs.readFile(clip.capture.content_path, "utf8"),
+      localExport: await fs.readFile(sync.capture.sinks["local-export"].path, "utf8")
+    };
+
+    const history = await listCaptureHistory({ notesDir, configDir, lifecycle: "all" });
+
+    assert.equal(history.history.items[0].capture_id, clip.capture.capture_id);
+    assert.deepEqual(history.history.warnings, [{
+      capture_id: clip.capture.capture_id,
+      code: "lifecycle_recovery_failed"
+    }]);
+    assert.equal(await fs.readFile(capturesPath, "utf8"), before.captures);
+    assert.equal(await fs.readFile(inboxPath, "utf8"), before.inbox);
+    assert.equal(await fs.readFile(clip.capture.content_path, "utf8"), before.body);
+    assert.equal(
+      await fs.readFile(sync.capture.sinks["local-export"].path, "utf8"),
+      before.localExport
+    );
+  }
 });
 
 test("re-clipping processed content reactivates the existing capture", async () => {
