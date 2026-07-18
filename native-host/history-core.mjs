@@ -10,7 +10,7 @@ import {
 } from "./capture-store.mjs";
 import { ClipplaneError } from "./clip-core.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
-import { openFolder } from "./settings-core.mjs";
+import { openTextFile } from "./settings-core.mjs";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -67,7 +67,7 @@ export async function openCaptureBody(captureId, options = {}) {
   const { records } = await readCaptureRecords(paths.capturesPath);
   const capture = findUniqueRecord(records, id);
   const contentPath = await resolveCaptureBodyForRead(paths, capture.capture_id);
-  await (options.openFolderImpl || openFolder)(contentPath, options);
+  await (options.openFileImpl || openTextFile)(contentPath, options);
 
   return {
     ok: true,

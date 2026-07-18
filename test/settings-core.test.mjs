@@ -4,7 +4,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { getOpenFolderCommand, openFolder, openNotesDir } from "../native-host/settings-core.mjs";
+import {
+  getOpenFolderCommand,
+  getOpenTextFileCommand,
+  openFolder,
+  openNotesDir,
+  openTextFile
+} from "../native-host/settings-core.mjs";
 
 test("openNotesDir creates and opens the resolved notes directory", async () => {
   const notesDir = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-open-")), "notes");
@@ -42,6 +48,35 @@ test("getOpenFolderCommand selects platform-native folder openers", () => {
     getOpenFolderCommand("/home/me/notes", "linux"),
     { command: "xdg-open", args: ["/home/me/notes"] }
   );
+});
+
+test("getOpenTextFileCommand bypasses broken Markdown handlers on macOS", () => {
+  assert.deepEqual(
+    getOpenTextFileCommand("/Users/me/Notes/capture.md", "darwin"),
+    { command: "open", args: ["-t", "/Users/me/Notes/capture.md"] }
+  );
+  assert.deepEqual(
+    getOpenTextFileCommand("D:\\Notes\\capture.md", "win32"),
+    { command: "explorer.exe", args: ["D:\\Notes\\capture.md"] }
+  );
+  assert.deepEqual(
+    getOpenTextFileCommand("/home/me/notes/capture.md", "linux"),
+    { command: "xdg-open", args: ["/home/me/notes/capture.md"] }
+  );
+});
+
+test("openTextFile uses the macOS text-editor route", async () => {
+  const captured = [];
+
+  await openTextFile("/notes/capture.md", {
+    platform: "darwin",
+    spawnImpl: (command, args) => {
+      captured.push({ command, args });
+      return closingChild(0);
+    }
+  });
+
+  assert.deepEqual(captured, [{ command: "open", args: ["-t", "/notes/capture.md"] }]);
 });
 
 test("openFolder launches one OS open request per invocation", async () => {
