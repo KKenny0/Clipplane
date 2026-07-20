@@ -76,6 +76,19 @@ test("extension styles avoid broad transitions and honor reduced motion", async 
   }
 });
 
+test("shared brand tokens follow the system color scheme without per-surface color forks", async () => {
+  const brandCss = await readFile(path.join(rootDir, "extension", "brand.css"), "utf8");
+  assert.match(brandCss, /color-scheme:\s*light dark/);
+  assert.match(brandCss, /@media\s*\(prefers-color-scheme:\s*dark\)/);
+  assert.match(brandCss, /--cp-on-accent:/);
+  assert.match(brandCss, /--cp-warning-border:/);
+
+  for (const file of ["popup.css", "onboarding.css", "settings.css"]) {
+    const css = await readFile(path.join(rootDir, "extension", file), "utf8");
+    assert.doesNotMatch(css, /oklch\(/, `${file} must consume shared semantic color tokens`);
+  }
+});
+
 async function loadDocument(relativePath) {
   const html = await readFile(path.join(rootDir, relativePath), "utf8");
   return new JSDOM(html).window.document;
