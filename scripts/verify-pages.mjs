@@ -60,6 +60,14 @@ if (new Set(fixedUrls).size !== fixedUrls.length || fixedUrls.some((url) => !url
   errors.push("Canonical Pages URLs are invalid.");
 }
 
+const activePages = ["index.html", "privacy/index.html", "setup/index.html", "support/index.html"];
+for (const relative of activePages) {
+  const source = await readFile(path.join(docs, relative), "utf8");
+  if (source.includes("releases/0.6.0")) {
+    errors.push(`docs/${relative}: must not promote the archived 0.6.0 release page.`);
+  }
+}
+
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exitCode = 1;

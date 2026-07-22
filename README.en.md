@@ -115,21 +115,6 @@ You can also select text and clip it from the context menu.
   </tr>
 </table>
 
-### Notion Sync
-
-After the Notion sink is enabled, `Save + sync` saves the clip locally first, then creates a page under the target Notion page.
-
-<table>
-  <tr>
-    <th>Sync from Clipplane</th>
-    <th>Page created in Notion</th>
-  </tr>
-  <tr>
-    <td valign="top"><img src="assets/screenshots/sync-to-notion-1.png" alt="Clipplane sync result in the Notion page list" width="380"></td>
-    <td valign="top"><img src="assets/screenshots/sync-to-notion-2.png" alt="Clipplane sync result in the generated Notion page" width="380"></td>
-  </tr>
-</table>
-
 ## What Clipplane Saves
 
 By default Clipplane writes:

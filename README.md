@@ -115,21 +115,6 @@ npm run doctor
   </tr>
 </table>
 
-### Notion 同步
-
-启用 Notion sink 后，`Save + sync` 会先保存到本地，再在目标 Notion page 下创建页面。
-
-<table>
-  <tr>
-    <th>Clipplane 中触发同步</th>
-    <th>Notion 中生成页面</th>
-  </tr>
-  <tr>
-    <td valign="top"><img src="assets/screenshots/sync-to-notion-1.png" alt="Clipplane 同步到 Notion 列表页" width="380"></td>
-    <td valign="top"><img src="assets/screenshots/sync-to-notion-2.png" alt="Clipplane 同步到 Notion 页面详情" width="380"></td>
-  </tr>
-</table>
-
 ## Clipplane 保存什么
 
 默认保存到：
