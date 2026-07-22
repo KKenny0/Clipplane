@@ -5,16 +5,16 @@
 <h1 align="center">Clipplane</h1>
 
 <p align="center">
-  先把网页剪藏留在你的电脑上。
+  把网页上该留下的部分，剪成可复查的笔记。
   <br>
-  一键保存网页或选中文本到本地 <code>inbox.org</code>，之后可以检查完整剪藏轨迹，也可以在需要时手动同步到 Notion 或 flomo。
+  一键保存选区、正文或页面元素到本地 <code>inbox.org</code>；可检查完整剪藏轨迹，需要时再同步到 Notion 或 flomo。
 </p>
 
 <p align="center">
   <a href="README.en.md">English README</a> · <a href="https://kkenny0.github.io/Clipplane/">产品页</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">安装</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">隐私</a> · <a href="https://kkenny0.github.io/Clipplane/support/">帮助</a>
 </p>
 
-Clipplane 是本地优先的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展负责捕获页面或选中文本，本地 host 负责清理内容、转换为 org-mode，并写入本地 notes 目录。外部服务只是可选同步目标，不影响本地保存。
+Clipplane 是面向笔记工作流的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展按边界捕获选区、可读正文或页面元素；本地 host 清理内容、转换为 org-mode，并写入 notes 目录。先成为本地笔记，再由你决定要不要同步；外部服务只是可选目标，不影响本地保存。
 
 扩展首次安装页会检查 Host 版本，并指向与当前扩展版本一致的 GitHub Release asset。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
 
@@ -144,7 +144,7 @@ npm run doctor
 
 ## 参考工作流
 
-Clipplane 的剪藏链路参考了 [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip)：捕获 URL 或选中文本，清理为 Markdown，转换为 org-mode，打标签，追加到本地 `inbox.org`。Clipplane 把这条链路变成浏览器可触发的本地应用，同时保留本地优先的存储边界。
+Clipplane 的剪藏链路参考了 [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip)：捕获 URL 或选中文本，清理为 Markdown，转换为 org-mode，打标签，追加到本地 `inbox.org`。Clipplane 把这条链路变成浏览器可触发的应用：先写出可复查的本地笔记，外部同步只作为可选的第二步。
 
 ## 工作方式
 

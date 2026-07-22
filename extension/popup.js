@@ -105,7 +105,7 @@ function updateActionLabels() {
   setActionLabel(
     clipLocalButton,
     choosingElement ? "Choose area" : "Save local",
-    choosingElement ? "Pick a region" : "Inbox first"
+    choosingElement ? "Pick a region" : "Note first"
   );
   setActionLabel(
     clipSyncButton,
@@ -220,7 +220,7 @@ async function openSettings(tab) {
 
 async function handleResultAction() {
   const state = resolveClipUiState(currentResult);
-  if (["saved-local", "duplicate"].includes(state.key)) {
+  if (["saved-local", "duplicate", "reactivated"].includes(state.key)) {
     const captureId = currentResult?.capture?.capture_id;
     if (!captureId) {
       return;
@@ -229,7 +229,7 @@ async function handleResultAction() {
     if (!response?.ok) {
       renderResult(response);
     } else {
-      showTransientResult("Local copy opened", "Clipplane opened the saved body from your capture trail.");
+      showTransientResult("Note opened", "Clipplane opened the saved body from your capture trail.");
     }
     return;
   }

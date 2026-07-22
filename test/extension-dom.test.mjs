@@ -31,7 +31,7 @@ test("onboarding presents install, restart, and verification as ordered steps", 
     ["step-install", "step-restart", "step-check"]
   );
   assert.equal(document.querySelector("#host-state").getAttribute("aria-live"), "polite");
-  assert.match(document.querySelector("#first-capture").textContent, /Save locally first/);
+  assert.match(document.querySelector("#first-capture").textContent, /Capture the part that matters/);
   assert.equal(document.querySelector("#download-host").hidden, true);
   assert.match(css, /\.primary\[hidden\]\s*\{\s*display:\s*none;/);
 });

@@ -1,17 +1,17 @@
 const UI_STATES = Object.freeze({
   checking: state("Checking", "neutral", "Checking Clipplane", "Confirming the local Host and saved destinations."),
-  ready: state("Ready", "ready", "Ready to clip", "Clips are saved locally before anything else."),
-  working: state("Saving", "working", "Saving locally", "Keep this popup open while Clipplane confirms the local write."),
-  "saved-local": state("Saved local", "ready", "Saved locally", "Your local copy is safe.", "Open local copy"),
-  duplicate: state("Already saved", "neutral", "Already in your trail", "Clipplane kept the existing local copy.", "Open existing clip"),
-  reactivated: state("Back in inbox", "ready", "Returned to your inbox", "This processed clip is active again.", "Open local copy"),
-  "saved-local-sync-failed": state("Sync failed", "warning", "Saved locally. Sync failed.", "Your local copy is safe. You can retry the external sync.", "Retry sync"),
-  "saved-local-sync-skipped": state("Sync skipped", "warning", "Saved locally. Sync skipped.", "Your local copy is safe. Check the destination before retrying."),
-  "consent-required": state("Approval needed", "warning", "Saved locally. Sync needs approval.", "Confirm what Clipplane may send in Sync settings.", "Open Sync settings"),
-  "host-missing": state("Host missing", "warning", "Install the local Host", "Clipplane needs the local Host to write clips to your notes folder.", "Install host"),
+  ready: state("Ready", "ready", "Ready to clip", "Clips become notes first. Sync is optional."),
+  working: state("Saving", "working", "Saving note", "Keep this popup open while Clipplane confirms the write."),
+  "saved-local": state("Saved", "ready", "Note saved", "Your note is ready to inspect.", "Open note"),
+  duplicate: state("Already saved", "neutral", "Already in your trail", "Clipplane kept the existing note.", "Open existing clip"),
+  reactivated: state("Back in inbox", "ready", "Returned to your inbox", "This processed clip is active again.", "Open note"),
+  "saved-local-sync-failed": state("Sync failed", "warning", "Note saved. Sync failed.", "Your note is safe. You can retry the external sync.", "Retry sync"),
+  "saved-local-sync-skipped": state("Sync skipped", "warning", "Note saved. Sync skipped.", "Your note is safe. Check the destination before retrying."),
+  "consent-required": state("Approval needed", "warning", "Note saved. Sync needs approval.", "Confirm what Clipplane may send in Sync settings.", "Open Sync settings"),
+  "host-missing": state("Host missing", "warning", "Install the local Host", "Clipplane needs the local Host to write notes to your folder.", "Install host"),
   "host-outdated": state("Update required", "warning", "Update the local Host", "This extension needs a newer Host protocol before it can save safely.", "Update host"),
   unsupported: state("Unavailable", "warning", "This page cannot be clipped", "Try a normal webpage or select text on a supported page."),
-  error: state("Failed", "error", "Clip not saved", "No local write was confirmed. Review the error and try again.")
+  error: state("Failed", "error", "Clip not saved", "No note was written. Review the error and try again.")
 });
 
 export function getUiState(key, overrides = {}) {

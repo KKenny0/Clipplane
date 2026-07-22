@@ -5,16 +5,16 @@
 <h1 align="center">Clipplane</h1>
 
 <p align="center">
-  Keep web clips on your machine first.
+  Keep the part that matters as an inspectable note.
   <br>
-  Save pages or selected text to a local <code>inbox.org</code>, inspect the capture trail later, and sync to Notion or flomo only when you choose.
+  Save a selection, readable page, or page element to a local <code>inbox.org</code>, inspect the capture trail later, and sync to Notion or flomo only when you choose.
 </p>
 
 <p align="center">
   <a href="README.md">中文 README</a> · <a href="https://kkenny0.github.io/Clipplane/">Product</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">Setup</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">Privacy</a> · <a href="https://kkenny0.github.io/Clipplane/support/">Help</a>
 </p>
 
-Clipplane is a local-first web clipper with two parts: a browser extension and a local Native Messaging host. The extension captures the page or selection. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. External services are optional sinks, not a requirement for saving.
+Clipplane is a web clipper built for note workflows, with two parts: a browser extension and a local Native Messaging host. The extension captures a selection, readable page, or chosen element by an explicit boundary. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. Clips become local notes first; external services are optional sinks, not a requirement for saving.
 
 The extension's first-install page checks the Host version and links to a version-matched GitHub Release asset. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
 
@@ -144,7 +144,7 @@ External sinks are opt-in. Enabling one requires an explicit acknowledgement in 
 
 ## Reference Workflow
 
-Clipplane follows the clipping workflow from [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip): capture a URL or text selection, clean it into Markdown, convert it into org-mode, tag it, and append it to a local `inbox.org`. Clipplane turns that workflow into a browser-triggered local app while keeping the same local-first storage boundary.
+Clipplane follows the clipping workflow from [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip): capture a URL or text selection, clean it into Markdown, convert it into org-mode, tag it, and append it to a local `inbox.org`. Clipplane turns that workflow into a browser-triggered app that writes inspectable local notes first, with external sync only as an optional second step.
 
 ## How It Works
 

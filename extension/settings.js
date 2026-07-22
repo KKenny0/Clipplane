@@ -341,7 +341,7 @@ async function handleHistoryAction(event) {
       if (!response.ok) {
         throw new Error(response.error?.message || "Could not delete local capture.");
       }
-      showResult("Local capture permanently deleted. External copies were not changed.");
+      showResult("Local note permanently deleted. External copies were not changed.");
       await loadHistory();
     }
   } catch (error) {
@@ -422,7 +422,7 @@ function renderHistory(history) {
     empty.className = "history-empty";
     empty.textContent = historyMode === "processed"
       ? "No processed captures. Items marked as processed will remain available here."
-      : "No active local clips. Save a page or selection to start a trail.";
+      : "No active clips. Save a selection, page, or element to start a trail.";
     historyListEl.append(empty);
     return;
   }
@@ -760,7 +760,7 @@ function historyStatusLabel(item) {
   if (status === "sync_skipped") {
     return "Sync skipped";
   }
-    return "Saved locally";
+  return "Note saved";
 }
 
 async function setHistoryMode(mode) {
@@ -802,7 +802,7 @@ function syncResultMessage(response) {
     return "Sync retried successfully";
   }
   if (response.status === "sync_failed") {
-    return "Saved locally. Sync still failed.";
+    return "Note saved. Sync still failed.";
   }
   if (response.status === "sync_skipped") {
     return "Sync skipped";
