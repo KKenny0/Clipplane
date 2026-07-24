@@ -5,7 +5,7 @@ import { sanitizeSourceUrl } from "../native-host/url-sanitizer.mjs";
 
 test("sanitizeSourceUrl removes credentials, fragments, tracking, and sensitive query values", () => {
   const sanitized = new URL(sanitizeSourceUrl(
-    "https://user:pass@example.com/article?id=42&utm_source=news&access_token=secret#private"
+    "https://user:pass@example.com/article?id=42&utm_source=news&access_token=secret&password=hunter2&jwt=eySecret#private"
   ));
 
   assert.equal(sanitized.username, "");
@@ -14,6 +14,8 @@ test("sanitizeSourceUrl removes credentials, fragments, tracking, and sensitive 
   assert.equal(sanitized.searchParams.get("id"), "42");
   assert.equal(sanitized.searchParams.has("utm_source"), false);
   assert.equal(sanitized.searchParams.get("access_token"), "[redacted]");
+  assert.equal(sanitized.searchParams.get("password"), "[redacted]");
+  assert.equal(sanitized.searchParams.get("jwt"), "[redacted]");
 });
 test("sanitizeSourceUrl preserves manual and non-web sources", () => {
   assert.equal(sanitizeSourceUrl("manual"), "manual");

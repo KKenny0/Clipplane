@@ -8,9 +8,10 @@ import {
   readCaptureStore,
   writeCaptureStore
 } from "./capture-store.mjs";
-import { ClipplaneError } from "./clip-core.mjs";
+import { ClipplaneError, MAX_CAPTURE_CONTENT_BYTES } from "./clip-core.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
-import { openTextFile } from "./settings-core.mjs";
+import { openTextFile, writeClipboardText } from "./settings-core.mjs";
+import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -77,10 +78,59 @@ export async function openCaptureBody(captureId, options = {}) {
   };
 }
 
+export async function copyCapture(captureId, mode, options = {}) {
+  const id = requireCaptureId(captureId);
+  if (!["agent-reference", "content"].includes(mode)) {
+    throw new ClipplaneError("invalid_copy_mode", "Choose a supported capture copy format.");
+  }
+
+  const { paths } = await resolveConfiguredPaths(options);
+  const { records } = await readCaptureRecords(paths.capturesPath);
+  const capture = findUniqueRecord(records, id);
+  const contentPath = await resolveCaptureBodyForRead(paths, capture.capture_id);
+  const text = mode === "content"
+    ? await readCaptureBodyForClipboard(contentPath)
+    : buildAgentReference(capture, contentPath);
+  await (options.writeClipboardImpl || writeClipboardText)(text, options);
+
+  return {
+    ok: true,
+    capture_id: id,
+    copy_mode: mode,
+    byte_length: Buffer.byteLength(text, "utf8"),
+    copied_at: new Date().toISOString()
+  };
+}
+
 export async function markCaptureProcessed(captureId, options = {}) {
   const id = requireCaptureId(captureId);
   const { paths } = await resolveConfiguredPaths(options);
   return withCaptureMutationLock(paths, () => markCaptureProcessedLocked(id, paths));
+}
+
+async function readCaptureBodyForClipboard(contentPath) {
+  const stat = await fs.stat(contentPath);
+  if (stat.size > MAX_CAPTURE_CONTENT_BYTES) {
+    throw new ClipplaneError(
+      "capture_too_large",
+      "This capture body is too large to copy safely."
+    );
+  }
+  return fs.readFile(contentPath, "utf8");
+}
+
+function buildAgentReference(capture, contentPath) {
+  const lines = [
+    "Use this Clipplane capture as source material.",
+    "",
+    `Title: ${cleanString(capture.title) || "Untitled"}`
+  ];
+  const sourceUrl = sanitizeSourceUrl(cleanString(capture.source_url));
+  if (sourceUrl) {
+    lines.push(`Source: ${sourceUrl}`);
+  }
+  lines.push(`Local Markdown file: ${contentPath}`);
+  return lines.join("\n");
 }
 
 async function markCaptureProcessedLocked(id, paths) {

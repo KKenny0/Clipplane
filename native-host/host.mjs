@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import { clipPayload, ClipplaneError } from "./clip-core.mjs";
-import { deleteCapture, listCaptureHistory, markCaptureProcessed, openCaptureBody } from "./history-core.mjs";
+import {
+  copyCapture,
+  deleteCapture,
+  listCaptureHistory,
+  markCaptureProcessed,
+  openCaptureBody
+} from "./history-core.mjs";
 import { createNativeMessageParser, writeNativeMessage } from "./native-message.mjs";
 import { getSettings, openNotesDir, setSettings } from "./settings-core.mjs";
 import { getSyncStatus, syncCapture, syncClipResult } from "./sync-core.mjs";
@@ -44,6 +50,10 @@ async function handleMessage(message) {
 
     if (message?.type === "open_capture_body") {
       return await openCaptureBody(message.captureId);
+    }
+
+    if (message?.type === "copy_capture") {
+      return await copyCapture(message.captureId, message.mode);
     }
 
     if (message?.type === "process_capture") {

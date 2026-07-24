@@ -3,8 +3,9 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { clipPayload } from "../native-host/clip-core.mjs";
+import { clipPayload, MAX_CAPTURE_CONTENT_BYTES } from "../native-host/clip-core.mjs";
 import {
+  copyCapture,
   deleteCapture,
   listCaptureHistory,
   markCaptureProcessed,
@@ -179,6 +180,131 @@ test("openCaptureBody opens only capture files inside notes dir", async () => {
   assert.deepEqual(opened, [clip.capture.content_path]);
 });
 
+test("copyCapture writes a paste-ready Agent reference with the current managed path", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-copy-agent-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const copied = [];
+  const clip = await clipPayload({
+    inputType: "page",
+    sourceUrl: "https://example.com/agent-source",
+    sourceTitle: "Agent source",
+    title: "Agent-ready capture",
+    contentMarkdown: "Agent body"
+  }, { notesDir, configDir });
+
+  const response = await copyCapture(clip.capture.capture_id, "agent-reference", {
+    notesDir,
+    configDir,
+    writeClipboardImpl: async (text) => copied.push(text)
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal(response.capture_id, clip.capture.capture_id);
+  assert.equal(response.copy_mode, "agent-reference");
+  assert.equal(response.byte_length, Buffer.byteLength(copied[0], "utf8"));
+  assert.match(response.copied_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal("path" in response, false);
+  assert.equal("text" in response, false);
+  assert.equal(copied[0], [
+    "Use this Clipplane capture as source material.",
+    "",
+    "Title: Agent-ready capture",
+    "Source: https://example.com/agent-source",
+    `Local Markdown file: ${clip.capture.content_path}`
+  ].join("\n"));
+});
+
+test("copyCapture re-sanitizes legacy source URLs before Agent export", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-copy-secret-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const copied = [];
+  const clip = await clipPayload({
+    inputType: "page",
+    sourceUrl: "https://example.com/reset?id=42",
+    sourceTitle: "Reset",
+    title: "Legacy secret",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const legacy = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  legacy.source_url = "https://example.com/reset?id=42&password=hunter2&jwt=eySecret";
+  await fs.writeFile(capturesPath, `${JSON.stringify(legacy)}\n`, "utf8");
+
+  await copyCapture(clip.capture.capture_id, "agent-reference", {
+    notesDir,
+    configDir,
+    writeClipboardImpl: async (text) => copied.push(text)
+  });
+
+  assert.match(copied[0], /id=42/);
+  assert.match(copied[0], /password=%5Bredacted%5D/);
+  assert.match(copied[0], /jwt=%5Bredacted%5D/);
+  assert.doesNotMatch(copied[0], /hunter2|eySecret/);
+});
+
+test("copyCapture copies exact Markdown from processed captures", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-copy-content-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const body = "# 标题\n\nExact **Markdown** body.";
+  const copied = [];
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/content",
+    sourceTitle: "Content",
+    title: "Copy content",
+    contentMarkdown: body
+  }, { notesDir, configDir });
+  await markCaptureProcessed(clip.capture.capture_id, { notesDir, configDir });
+
+  const response = await copyCapture(clip.capture.capture_id, "content", {
+    notesDir,
+    configDir,
+    writeClipboardImpl: async (text) => copied.push(text)
+  });
+
+  assert.equal(response.copy_mode, "content");
+  assert.deepEqual(copied, [body]);
+});
+
+test("copyCapture rejects unsupported copy formats", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-copy-mode-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/mode",
+    sourceTitle: "Mode",
+    title: "Mode",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+
+  await assert.rejects(
+    copyCapture(clip.capture.capture_id, "html", { notesDir, configDir }),
+    (error) => error.code === "invalid_copy_mode"
+  );
+});
+
+test("copyCapture refuses a managed body that grew beyond the capture limit", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-copy-large-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/large",
+    sourceTitle: "Large",
+    title: "Large",
+    contentMarkdown: "Body"
+  }, { notesDir, configDir });
+  await fs.writeFile(clip.capture.content_path, "x".repeat(MAX_CAPTURE_CONTENT_BYTES + 1), "utf8");
+
+  await assert.rejects(
+    copyCapture(clip.capture.capture_id, "content", {
+      notesDir,
+      configDir,
+      writeClipboardImpl: async () => {}
+    }),
+    (error) => error.code === "capture_too_large"
+  );
+});
+
 test("openCaptureBody ignores stale records pointing outside the capture body directory", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-unsafe-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
@@ -233,6 +359,14 @@ test("managed body symlinks cannot be previewed, opened, or synced", { skip: pro
     /symbolic link/
   );
   await assert.rejects(
+    copyCapture(clip.capture.capture_id, "content", {
+      notesDir,
+      configDir,
+      writeClipboardImpl: async () => {}
+    }),
+    /symbolic link/
+  );
+  await assert.rejects(
     syncCapture(clip.capture.capture_id, { notesDir, configDir, sinks: ["local-export"] }),
     /symbolic link/
   );
@@ -246,6 +380,7 @@ test("legacy absolute paths remain portable across storage roots", async () => {
   const destinationNotesDir = path.join(destinationParent, "notes");
   const destinationConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const opened = [];
+  const copied = [];
 
   const clip = await clipPayload({
     inputType: "selection",
@@ -284,12 +419,19 @@ test("legacy absolute paths remain portable across storage roots", async () => {
     configDir: destinationConfigDir,
     openFileImpl: async (targetPath) => opened.push(targetPath)
   });
+  await copyCapture(clip.capture.capture_id, "agent-reference", {
+    notesDir: destinationNotesDir,
+    configDir: destinationConfigDir,
+    writeClipboardImpl: async (text) => copied.push(text)
+  });
   const destinationSync = await syncCapture(clip.capture.capture_id, {
     notesDir: destinationNotesDir,
     configDir: destinationConfigDir,
     sinks: ["local-export"]
   });
   assert.deepEqual(opened, [destinationBody]);
+  assert.match(copied[0], new RegExp(escapeRegExp(destinationBody)));
+  assert.equal(copied[0].includes(sourceNotesDir), false);
   assert.equal(destinationSync.capture.sinks["local-export"].path.startsWith(destinationNotesDir), true);
 
   const migrated = await fs.readFile(path.join(destinationNotesDir, ".clipplane", "captures.jsonl"), "utf8");
@@ -605,4 +747,8 @@ async function fileExists(filePath) {
   } catch {
     return false;
   }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -292,7 +292,7 @@ summary:focus-visible { outline: 2px solid var(--cp-signal); outline-offset: 2px
 .history-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .history-tags span { padding: 2px 6px; border: 1px solid var(--cp-tag-border); border-radius: var(--cp-radius-sm); color: var(--cp-moss); font-size: 11px; font-weight: 650; }
 
-.history-actions { display: grid; justify-items: end; gap: 6px; min-width: 250px; }
+.history-actions { display: grid; justify-items: end; gap: 6px; min-width: 330px; }
 .history-quick-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .history-state { display: inline-flex; align-items: center; min-height: 30px; padding: 0 9px; }
 .history-state.failed { background: var(--cp-danger-soft); color: var(--cp-danger); }
@@ -378,22 +378,24 @@ summary:focus-visible { outline: 2px solid var(--cp-signal); outline-offset: 2px
 .result.is-ready { border-color: var(--cp-success-border); color: var(--cp-success); }
 .result.is-error { border-color: var(--cp-danger-border); color: var(--cp-danger); }
 
+@media (max-width: 640px) {
+  .history-item { grid-template-columns: 1fr; }
+  .history-actions { min-width: 0; justify-content: flex-start; justify-items: start; }
+  .history-quick-actions,
+  .history-manage-actions { justify-content: flex-start; }
+  .history-manage summary { justify-content: flex-start; }
+  .history-manage-actions { right: auto; left: 0; }
+}
+
 @media (max-width: 520px) {
   main { padding: 24px 16px 40px; }
   .page-header { display: grid; align-items: flex-start; }
   .workspace-identity { align-items: flex-start; }
   .workspace-identity .brand-name { font-size: 24px; }
   .section { padding: 23px 0 25px; }
-  .section-heading,
-  .history-item { grid-template-columns: 1fr; }
+  .section-heading { grid-template-columns: 1fr; }
   .section-heading { display: grid; }
   .section-heading .status-pill { justify-self: start; }
-  .history-actions { justify-content: flex-start; min-width: 0; }
-  .history-actions { justify-items: start; }
-  .history-quick-actions,
-  .history-manage-actions { justify-content: flex-start; }
-  .history-manage summary { justify-content: flex-start; }
-  .history-manage-actions { right: auto; left: 0; }
   .history-toolbar { align-items: flex-start; }
   .history-title { font-size: 16px; }
   .sink-heading { align-items: flex-start; }

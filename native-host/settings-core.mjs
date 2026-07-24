@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import { getSecretStatus, publicConfig, resolveConfiguredPaths, saveConfig } from "./config.mjs";
 
+const CLIPBOARD_TIMEOUT_MS = 10_000;
+
 export async function getSettings(options = {}) {
   const { paths, config } = await resolveConfiguredPaths(options);
   return settingsResponse(paths, config, await getSecretStatus(config, options));
@@ -57,6 +59,23 @@ export function openTextFile(targetPath, options = {}) {
   });
 }
 
+export function writeClipboardText(text, options = {}) {
+  const platform = options.platform || process.platform;
+  const { command, args } = getClipboardCommand(platform);
+  const input = platform === "win32"
+    ? Buffer.from(String(text), "utf16le")
+    : String(text);
+  const env = platform === "darwin"
+    ? {
+        ...process.env,
+        ...options.env,
+        LANG: "en_US.UTF-8",
+        LC_ALL: "en_US.UTF-8"
+      }
+    : options.env;
+  return runClipboardCommand(command, args, input, { ...options, env });
+}
+
 export function getOpenFolderCommand(targetPath, platform = process.platform) {
   if (platform === "win32") {
     return {
@@ -77,6 +96,19 @@ export function getOpenTextFileCommand(targetPath, platform = process.platform) 
     return { command: "open", args: ["-t", targetPath] };
   }
   return getOpenFolderCommand(targetPath, platform);
+}
+
+export function getClipboardCommand(platform = process.platform) {
+  if (platform === "darwin") {
+    return { command: "/usr/bin/pbcopy", args: [] };
+  }
+  if (platform === "win32") {
+    return { command: "clip.exe", args: [] };
+  }
+
+  const error = new Error("Copying captures is supported on Windows and macOS.");
+  error.code = "clipboard_unsupported";
+  throw error;
 }
 
 function runOpenCommand(command, args, options = {}) {
@@ -101,5 +133,51 @@ function runOpenCommand(command, args, options = {}) {
       }
       reject(new Error(`Open folder command failed with exit code ${code}.`));
     });
+  });
+}
+
+function runClipboardCommand(command, args, input, options = {}) {
+  const spawnImpl = options.spawnImpl || spawn;
+  const timeoutMs = options.timeoutMs ?? CLIPBOARD_TIMEOUT_MS;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeout;
+    const finish = (callback, value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      callback(value);
+    };
+    const spawnOptions = {
+      stdio: ["pipe", "ignore", "ignore"],
+      windowsHide: true
+    };
+    if (options.env) {
+      spawnOptions.env = options.env;
+    }
+    const child = spawnImpl(command, args, spawnOptions);
+
+    child.once("error", (error) => finish(reject, error));
+    child.stdin.once("error", (error) => finish(reject, error));
+    child.once("close", (code) => {
+      if (code === 0) {
+        finish(resolve);
+        return;
+      }
+      const error = new Error(`Clipboard command failed with exit code ${code}.`);
+      error.code = "clipboard_failed";
+      finish(reject, error);
+    });
+    timeout = setTimeout(() => {
+      const error = new Error(`Clipboard command timed out after ${timeoutMs} ms.`);
+      error.code = "clipboard_timeout";
+      finish(reject, error);
+      child.stdin.destroy?.();
+      child.kill?.();
+    }, timeoutMs);
+    child.stdin.end(input);
   });
 }

@@ -131,7 +131,7 @@ npm run doctor
 
 这里的 Git 用法假设同一时间只有一台设备写入：先提交并推送，再在另一台设备拉取后继续使用。Clipplane 不会自动运行 Git，也不解决两台设备同时修改 `captures.jsonl` 或 `inbox.org` 产生的合并冲突。
 
-扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录，在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态，也可以把条目标记为已处理或永久删除本地副本。`Mark processed` 会从 `inbox.org` 移除条目，但在 Processed 历史中保留内部记录和原始正文；再次剪藏相同内容时，这个条目会回到 Active 和 `inbox.org`。`Delete local copy` 会统一移除 Org 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本，但不会删除已经同步到 Notion 或 flomo 的内容。在 `Sync` 可以配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
+扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录；在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态。`Copy for Agent` 会复制一段可直接粘贴到本地 Agent session 的标题、来源和当前设备正文路径；`Manage` 里的 `Copy content` 会复制完整 Markdown，供无法读取本机文件的 Agent 使用。History 也支持把条目标记为已处理或永久删除本地副本。`Mark processed` 会从 `inbox.org` 移除条目，但在 Processed 历史中保留内部记录和原始正文；再次剪藏相同内容时，这个条目会回到 Active 和 `inbox.org`。`Delete local copy` 会统一移除 Org 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本，但不会删除已经同步到 Notion 或 flomo 的内容。在 `Sync` 可以配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
 
 ## 外部同步
 

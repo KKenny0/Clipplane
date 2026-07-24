@@ -8,6 +8,7 @@ import {
   safeErrorMessage
 } from "./setup-guide.js";
 import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
+import { historyActionDisabled } from "./src/history-actions.js";
 import { getUiState, nextTabIndex, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 
 const stateEl = document.querySelector("#settings-state");
@@ -297,6 +298,21 @@ async function handleHistoryAction(event) {
 
   setHistoryButtons(true);
   try {
+    if (["copy-agent", "copy-content"].includes(button.dataset.action)) {
+      const mode = button.dataset.action === "copy-agent" ? "agent-reference" : "content";
+      const response = await sendNative({ type: "copy_capture", captureId, mode });
+      if (!response.ok) {
+        if (isUnsupportedMessage(response)) {
+          throw new Error("Update the local Host to copy captures.");
+        }
+        throw new Error(response.error?.message || "Could not copy capture.");
+      }
+      showResult(mode === "agent-reference"
+        ? "Agent reference copied. Paste it into your Agent session."
+        : "Capture content copied");
+      return;
+    }
+
     if (button.dataset.action === "open-body") {
       const response = await sendNative({ type: "open_capture_body", captureId });
       if (!response.ok) {
@@ -482,13 +498,22 @@ function renderHistoryItem(item) {
   status.textContent = historyStatusLabel(item);
   quickActions.append(status);
 
+  const copyAgent = document.createElement("button");
+  copyAgent.className = `${item.sync_status === "sync_failed" ? "secondary" : "primary"} history-action`;
+  copyAgent.type = "button";
+  copyAgent.dataset.action = "copy-agent";
+  copyAgent.dataset.captureId = item.capture_id;
+  copyAgent.textContent = "Copy for Agent";
+  copyAgent.disabled = historyActionDisabled("copy-agent", item, { hostAvailable });
+  quickActions.append(copyAgent);
+
   const open = document.createElement("button");
   open.className = "secondary history-action";
   open.type = "button";
   open.dataset.action = "open-body";
   open.dataset.captureId = item.capture_id;
   open.textContent = historyOpenLabel(item);
-  open.disabled = !item.content_exists || !hostAvailable;
+  open.disabled = historyActionDisabled("open-body", item, { hostAvailable });
   quickActions.append(open);
 
   if (item.sync_status === "sync_failed") {
@@ -498,7 +523,7 @@ function renderHistoryItem(item) {
     retry.dataset.action = "retry-sync";
     retry.dataset.captureId = item.capture_id;
     retry.textContent = "Retry sync";
-    retry.disabled = !hostAvailable;
+    retry.disabled = historyActionDisabled("retry-sync", item, { hostAvailable });
     quickActions.append(retry);
   }
 
@@ -522,6 +547,15 @@ function renderHistoryItem(item) {
   const manageActions = document.createElement("div");
   manageActions.className = "history-manage-actions";
 
+  const copyContent = document.createElement("button");
+  copyContent.className = "secondary history-action";
+  copyContent.type = "button";
+  copyContent.dataset.action = "copy-content";
+  copyContent.dataset.captureId = item.capture_id;
+  copyContent.textContent = "Copy content";
+  copyContent.disabled = historyActionDisabled("copy-content", item, { hostAvailable });
+  manageActions.append(copyContent);
+
   if (item.lifecycle_status === "active") {
     const process = document.createElement("button");
     process.className = "secondary history-action";
@@ -529,7 +563,7 @@ function renderHistoryItem(item) {
     process.dataset.action = "mark-processed";
     process.dataset.captureId = item.capture_id;
     process.textContent = item.inbox_state === "missing" ? "Finish cleanup" : "Mark processed";
-    process.disabled = item.inbox_state === "duplicate" || !hostAvailable;
+    process.disabled = historyActionDisabled("mark-processed", item, { hostAvailable });
     manageActions.append(process);
   }
 
@@ -539,7 +573,7 @@ function renderHistoryItem(item) {
   remove.dataset.action = "delete-capture";
   remove.dataset.captureId = item.capture_id;
   remove.textContent = "Delete local copy";
-  remove.disabled = item.inbox_state === "duplicate" || !hostAvailable;
+  remove.disabled = historyActionDisabled("delete-capture", item, { hostAvailable });
   manageActions.append(remove);
 
   manage.append(manageSummary, manageActions);
@@ -717,10 +751,7 @@ function renderHistoryUpgradeRequired() {
 function setHistoryButtons(isBusy) {
   for (const button of historyListEl.querySelectorAll("button")) {
     const item = historyItems.find((capture) => capture.capture_id === button.dataset.captureId);
-    const missingBody = button.dataset.action === "open-body" && item && !item.content_exists;
-    const ambiguousInbox = ["mark-processed", "delete-capture"].includes(button.dataset.action)
-      && item?.inbox_state === "duplicate";
-    button.disabled = isBusy || !hostAvailable || missingBody || ambiguousInbox;
+    button.disabled = historyActionDisabled(button.dataset.action, item, { isBusy, hostAvailable });
   }
 }
 
