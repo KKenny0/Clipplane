@@ -5,11 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  getClipboardCommand,
   getOpenFolderCommand,
   getOpenTextFileCommand,
   openFolder,
   openNotesDir,
-  openTextFile
+  openTextFile,
+  writeClipboardText
 } from "../native-host/settings-core.mjs";
 
 test("openNotesDir creates and opens the resolved notes directory", async () => {
@@ -63,6 +65,93 @@ test("getOpenTextFileCommand bypasses broken Markdown handlers on macOS", () => 
     getOpenTextFileCommand("/home/me/notes/capture.md", "linux"),
     { command: "xdg-open", args: ["/home/me/notes/capture.md"] }
   );
+});
+
+test("getClipboardCommand uses platform-native clipboard writers", () => {
+  assert.deepEqual(
+    getClipboardCommand("darwin"),
+    { command: "/usr/bin/pbcopy", args: [] }
+  );
+  assert.deepEqual(
+    getClipboardCommand("win32"),
+    { command: "clip.exe", args: [] }
+  );
+  assert.throws(
+    () => getClipboardCommand("linux"),
+    (error) => error.code === "clipboard_unsupported"
+  );
+});
+
+test("writeClipboardText sends exact Unicode text over stdin without a shell", async () => {
+  const calls = [];
+
+  await writeClipboardText("# 标题\n\nExact body", {
+    platform: "darwin",
+    env: {},
+    spawnImpl: (command, args, options) => clipboardChild(0, (input) => {
+      calls.push({ command, args, options, input });
+    })
+  });
+
+  assert.equal(calls[0].command, "/usr/bin/pbcopy");
+  assert.deepEqual(calls[0].args, []);
+  assert.deepEqual(calls[0].options.stdio, ["pipe", "ignore", "ignore"]);
+  assert.equal(calls[0].options.windowsHide, true);
+  assert.equal(calls[0].options.env.LANG, "en_US.UTF-8");
+  assert.equal(calls[0].options.env.LC_ALL, "en_US.UTF-8");
+  assert.equal(calls[0].input, "# 标题\n\nExact body");
+});
+
+test("writeClipboardText sends UTF-16LE to the Windows clipboard writer", async () => {
+  const calls = [];
+
+  await writeClipboardText("# 标题\n\nExact body", {
+    platform: "win32",
+    spawnImpl: (command, args, options) => clipboardChild(0, (input) => {
+      calls.push({ command, args, options, input });
+    })
+  });
+
+  assert.equal(calls[0].command, "clip.exe");
+  assert.deepEqual(calls[0].args, []);
+  assert.equal(Buffer.isBuffer(calls[0].input), true);
+  assert.equal(calls[0].input.toString("utf16le"), "# 标题\n\nExact body");
+});
+
+test("writeClipboardText reports clipboard command failures", async () => {
+  await assert.rejects(
+    writeClipboardText("Body", {
+      platform: "win32",
+      spawnImpl: () => clipboardChild(1, () => {})
+    }),
+    (error) => error.code === "clipboard_failed"
+  );
+});
+
+test("writeClipboardText stops a clipboard writer that does not finish", async () => {
+  const child = new EventEmitter();
+  let destroyed = false;
+  let killed = false;
+  child.stdin = new EventEmitter();
+  child.stdin.end = () => {};
+  child.stdin.destroy = () => {
+    destroyed = true;
+  };
+  child.kill = () => {
+    killed = true;
+  };
+
+  await assert.rejects(
+    writeClipboardText("Body", {
+      platform: "darwin",
+      timeoutMs: 5,
+      spawnImpl: () => child
+    }),
+    (error) => error.code === "clipboard_timeout"
+  );
+
+  assert.equal(destroyed, true);
+  assert.equal(killed, true);
 });
 
 test("openTextFile uses the macOS text-editor route", async () => {
@@ -174,5 +263,15 @@ function closingChild(code) {
 function failingChild(error) {
   const child = new EventEmitter();
   process.nextTick(() => child.emit("error", error));
+  return child;
+}
+
+function clipboardChild(code, onEnd) {
+  const child = new EventEmitter();
+  child.stdin = new EventEmitter();
+  child.stdin.end = (input) => {
+    onEnd(input);
+    process.nextTick(() => child.emit("close", code));
+  };
   return child;
 }

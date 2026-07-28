@@ -56,6 +56,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "open_notes_dir",
     "history",
     "open_capture_body",
+    "copy_capture",
     "process_capture",
     "delete_capture"
   ].includes(message?.type)) {

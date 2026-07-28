@@ -20,16 +20,16 @@ The extension's first-install page checks the Host version and links to a versio
 
 ## Current Status
 
-Clipplane's public release is still a GitHub dev preview; the current source is now the `0.7.4` Chrome Web Store candidate:
+Clipplane's public release is still a GitHub dev preview; the current source is now the `0.7.5` Chrome Web Store candidate:
 
 - GitHub Releases provide a packaged extension zip for manual `Load unpacked`, with the stable extension ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
-- The current `0.7.4` source and Chrome Web Store draft use canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
+- The current `0.7.5` source and Chrome Web Store draft use canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
 - The local host and setup scripts come from the source repo, or from the Release `Source code` package.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
 
-Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.7.4` candidate aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
+Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.7.5` candidate aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
 
 ## 5-Minute Start
 
@@ -55,7 +55,7 @@ If you are running directly from the Git repo, run the same commands from the re
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the unzipped `clipplane-extension-vX` folder, or the source repo's `extension` folder.
-5. Current source and `0.7.4` candidates should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
+5. Current source and `0.7.5` candidates should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
 
 ### 3. Register the local host
 
@@ -131,7 +131,7 @@ After records migrate, do not downgrade to an older Host that does not support p
 
 This Git workflow assumes one writer at a time: commit and push on one device, then pull before continuing on another. Clipplane does not run Git automatically or resolve merge conflicts caused by two devices changing `captures.jsonl` or `inbox.org` concurrently.
 
-The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder. In `History`, review recent clips, local body files, capture methods, and sync status, or mark an item as processed or permanently delete its local copy. `Mark processed` removes the item from `inbox.org` while retaining its internal record and source snapshot under Processed; clipping the same content again returns that item to Active and `inbox.org`. `Delete local copy` removes the Org entry, history record, source snapshot, and Clipplane-managed local-export copy together, but does not delete content already sent to Notion or flomo. Use `Sync` to configure those optional destinations. Normal users do not need environment variables or launcher edits.
+The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder. In `History`, review recent clips, local body files, capture methods, and sync status. `Copy for Agent` copies a paste-ready title, source, and current-device body path for a local Agent session; `Copy content` under `Manage` copies the complete Markdown for an Agent that cannot read local files. History also lets you mark an item as processed or permanently delete its local copy. `Mark processed` removes the item from `inbox.org` while retaining its internal record and source snapshot under Processed; clipping the same content again returns that item to Active and `inbox.org`. `Delete local copy` removes the Org entry, history record, source snapshot, and Clipplane-managed local-export copy together, but does not delete content already sent to Notion or flomo. Use `Sync` to configure those optional destinations. Normal users do not need environment variables or launcher edits.
 
 ## External Sync
 
@@ -191,7 +191,7 @@ npm run verify:store
 
 `npm run package:extension` writes `dist/clipplane-extension-vX.zip`, preserving the public identity key for local candidate testing. First and subsequent Chrome Web Store uploads use `npm run package:store`, which writes `dist/clipplane-store-vX.zip` after removing `key` from the staging manifest without changing the source manifest. `npm run verify:store` audits the Store ZIP and rejects `key`, private keys, `.env*`, Native Host files, executables, remote code, and permission expansion. Both ZIPs contain only the browser extension. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license.
 
-On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.4`.
+On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.5`.
 
 <details>
 <summary>Advanced configuration</summary>

@@ -1,5 +1,5 @@
 const TRACKING_PARAMS = new Set(["fbclid", "gclid", "dclid", "msclkid"]);
-const SENSITIVE_PARAM = /(^|[_-])(access[_-]?token|token|code|api[_-]?key|key|auth|signature|session|secret)($|[_-])/i;
+const SENSITIVE_PARAM = /(^|[_-])(access[_-]?token|token|code|api[_-]?key|key|auth|signature|session|secret|password|passwd|pwd|jwt|bearer|credential)($|[_-])/i;
 
 export function sanitizeSourceUrl(value) {
   const source = String(value || "").trim();
