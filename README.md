@@ -193,6 +193,17 @@ npm run verify:store
 
 在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.7.5` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
 
+Windows 的私有 unsigned candidate 必须按这个顺序构建和验证：
+
+```powershell
+npm run package:host:windows
+node scripts/smoke-native-host-bundle.mjs --target windows
+npm run package:host:windows:installer:candidate
+npm run smoke:host:windows:installer
+```
+
+Installer packaging 只消费已生成并 smoke 通过的 bundle，不会自动重建它。签名构建还需要 `CLIPPLANE_INNO_SETUP_COMPILER`、`CLIPPLANE_WINDOWS_SIGNTOOL`、`CLIPPLANE_WINDOWS_CERT_SUBJECT` 和 `CLIPPLANE_WINDOWS_TIMESTAMP_URL`。unsigned candidate 仅用于私有验证，不能作为公开下载资产。
+
 <details>
 <summary>高级配置</summary>
 

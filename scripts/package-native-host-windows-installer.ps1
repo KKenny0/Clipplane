@@ -56,20 +56,14 @@ if (-not $AllowUnsigned) {
   $isccArgs += "/DSignToolName=clipplane"
 }
 
-Push-Location $projectRoot
-try {
-  & npm run package:host:windows
-  if ($LASTEXITCODE -ne 0) {
-    throw "Windows Host bundle packaging failed."
-  }
-} finally {
-  Pop-Location
-}
-
 foreach ($required in @(
   (Join-Path $bundleDir "clipplane-host.cmd"),
   (Join-Path $bundleDir "install-host.ps1"),
-  (Join-Path $bundleDir "uninstall-host.ps1")
+  (Join-Path $bundleDir "uninstall-host.ps1"),
+  (Join-Path $bundleDir "allowed-origins.json"),
+  (Join-Path $bundleDir "runtime\node.exe"),
+  (Join-Path $bundleDir "app\native-host\host.mjs"),
+  (Join-Path $bundleDir "app\native-host\credential-maintenance.mjs")
 )) {
   if (-not (Test-Path -LiteralPath $required)) {
     throw "Windows Host bundle is incomplete: $required"
