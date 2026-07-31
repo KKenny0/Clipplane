@@ -49,3 +49,29 @@ test("macOS source setup installs the Host outside privacy-protected source fold
   assert.doesNotMatch(setupScript, /launcher_path="\$host_dir\/clipplane-host"/);
   assert.doesNotMatch(setupScript, /cp -R "\$project_root\/native-host\/\."/);
 });
+
+test("Windows installer remains per-user, x64-only, and refuses unsigned public output", async () => {
+  const installer = await readFile(path.join(rootDir, "installer", "windows", "clipplane-host.iss"), "utf8");
+  const packageScript = await readFile(path.join(rootDir, "scripts", "package-native-host-windows-installer.ps1"), "utf8");
+
+  assert.match(installer, /DefaultDirName=\{localappdata\}\\Clipplane Host/);
+  assert.match(installer, /PrivilegesRequired=lowest/);
+  assert.match(installer, /ArchitecturesAllowed=x64compatible and not arm64/);
+  assert.match(installer, /SignTool=\{#SignToolName\}/);
+  assert.match(installer, /SignedUninstaller=yes/);
+  assert.match(installer, /RunHostScript\('install-host\.ps1', '-Browser all'/);
+  assert.match(installer, /RunHostScript\('uninstall-host\.ps1', '-Browser all -HostRoot/);
+  assert.match(installer, /ResultCode <> 0/);
+  assert.match(installer, /RaiseException\('Clipplane Host registration failed/);
+  assert.match(installer, /Abort;/);
+  assert.match(packageScript, /\[switch\]\$AllowUnsigned/);
+  assert.match(packageScript, /CLIPPLANE_WINDOWS_SIGNTOOL/);
+  assert.match(packageScript, /signtool/i);
+  assert.match(packageScript, /\/Sclipplane=/);
+  assert.match(packageScript, /\/DSignToolName=clipplane/);
+  assert.match(packageScript, /verify \/pa \/v \/tw/);
+  assert.match(packageScript, /-candidate/);
+  assert.match(packageScript, /-unsigned/);
+  assert.match(packageScript, /Refusing to overwrite an existing public installer/);
+  assert.match(packageScript, /Move-Item -LiteralPath \$installerPath -Destination \$publicInstallerPath/);
+});

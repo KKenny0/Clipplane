@@ -51,12 +51,26 @@ jobs:
         run: |
           [scriptblock]::Create((Get-Content scripts/install-bundled-host.ps1 -Raw)) | Out-Null
           [scriptblock]::Create((Get-Content scripts/uninstall-native-host.ps1 -Raw)) | Out-Null
+          [scriptblock]::Create((Get-Content scripts/package-native-host-windows-installer.ps1 -Raw)) | Out-Null
       - run: ${{ matrix.command }}
       - name: Smoke packaged Host
         run: node scripts/smoke-native-host-bundle.mjs --target ${{ matrix.target }}
+      - name: Build unsigned Windows installer candidate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          npm run package:host:windows:installer:candidate
       - name: Upload unsigned Host bundle
         uses: actions/upload-artifact@v4
         with:
           name: clipplane-host-${{ matrix.target }}-${{ runner.arch }}
           path: dist/clipplane-host-v*-${{ matrix.target }}-*.zip
+          if-no-files-found: error
+      - name: Upload unsigned Windows installer candidate
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipplane-host-windows-installer-candidate-${{ runner.arch }}
+          path: dist/clipplane-host-v*-windows-x64-unsigned.exe
           if-no-files-found: error
