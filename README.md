@@ -204,6 +204,8 @@ npm run smoke:host:windows:installer
 
 Installer packaging 只消费已生成并 smoke 通过的 bundle，不会自动重建它。签名构建还需要 `CLIPPLANE_INNO_SETUP_COMPILER`、`CLIPPLANE_WINDOWS_SIGNTOOL`、`CLIPPLANE_WINDOWS_CERT_SUBJECT` 和 `CLIPPLANE_WINDOWS_TIMESTAMP_URL`。unsigned candidate 仅用于私有验证，不能作为公开下载资产。
 
+Installer smoke 会修改当前用户的安装目录与 Chrome/Edge HKCU 注册，只能在 GitHub Actions、一次性 Windows VM 或专用测试用户中运行；它通过 `/PRESERVECREDENTIALS` 保留既有 Notion/flomo 凭据，仍不是普通开发机上的无副作用检查。
+
 <details>
 <summary>高级配置</summary>
 

@@ -10,6 +10,7 @@ $version = [string]$package.version
 $bundleRoot = Join-Path $projectRoot "dist\clipplane-host-v$version-windows-x64"
 $installerPath = Join-Path $projectRoot "dist\clipplane-host-v$version-windows-x64-unsigned.exe"
 $installRoot = Join-Path $env:LOCALAPPDATA "Clipplane Host"
+$installedManifest = Join-Path $installRoot "com.clipplane.host.json"
 $powerShellPath = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
 $registryPaths = [ordered]@{
   chrome = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.clipplane.host"
@@ -65,6 +66,28 @@ function Invoke-PowerShellFile {
 
   & $powerShellPath -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Path @Arguments
   return $LASTEXITCODE
+}
+
+function Assert-InstalledHost {
+  foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
+    $installedPath = Join-Path $installRoot $relativePath
+    if (-not (Test-Path -LiteralPath $installedPath)) {
+      throw "Installer did not create required file: $installedPath"
+    }
+  }
+  $manifest = Get-Content -LiteralPath $installedManifest -Raw | ConvertFrom-Json
+  if ($manifest.name -ne "com.clipplane.host" -or $manifest.path -ne (Join-Path $installRoot "clipplane-host.cmd") -or $manifest.type -ne "stdio") {
+    throw "Installed Host manifest is invalid."
+  }
+  foreach ($name in $registryPaths.Keys) {
+    if ((Get-Item -LiteralPath $registryPaths[$name]).GetValue("") -ne $installedManifest) {
+      throw "$name registration does not point to the installed manifest."
+    }
+  }
+  & node (Join-Path $projectRoot "scripts\smoke-native-host-bundle.mjs") --target windows --bundle $installRoot
+  if ($LASTEXITCODE -ne 0) {
+    throw "Installed Host bundle smoke failed with $LASTEXITCODE."
+  }
 }
 
 foreach ($relativePath in $requiredBundleFiles) {
@@ -130,27 +153,13 @@ try {
   if ($LASTEXITCODE -ne 0) {
     throw "Unsigned Windows installer candidate exited with $LASTEXITCODE."
   }
-  foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
-    $installedPath = Join-Path $installRoot $relativePath
-    if (-not (Test-Path -LiteralPath $installedPath)) {
-      throw "Installer did not create required file: $installedPath"
-    }
-  }
-  $installedManifest = Join-Path $installRoot "com.clipplane.host.json"
-  $manifest = Get-Content -LiteralPath $installedManifest -Raw | ConvertFrom-Json
-  if ($manifest.name -ne "com.clipplane.host" -or $manifest.path -ne (Join-Path $installRoot "clipplane-host.cmd") -or $manifest.type -ne "stdio") {
-    throw "Installed Host manifest is invalid."
-  }
-  foreach ($name in $registryPaths.Keys) {
-    if ((Get-Item -LiteralPath $registryPaths[$name]).GetValue("") -ne $installedManifest) {
-      throw "$name registration does not point to the installed manifest."
-    }
-  }
+  Assert-InstalledHost
 
-  & node (Join-Path $projectRoot "scripts\smoke-native-host-bundle.mjs") --target windows --bundle $installRoot
+  & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
   if ($LASTEXITCODE -ne 0) {
-    throw "Installed Host bundle smoke failed with $LASTEXITCODE."
+    throw "Unsigned Windows installer candidate repair exited with $LASTEXITCODE."
   }
+  Assert-InstalledHost
 
   $maintenance = Join-Path $installRoot "app\native-host\credential-maintenance.mjs"
   $maintenanceBackup = "$maintenance.smoke-$PID"
@@ -172,11 +181,35 @@ try {
     $maintenanceBackup = $null
   }
 
+  $edgeAcl = Get-Acl -LiteralPath $registryPaths.edge
+  $edgeAclWithDeny = Get-Acl -LiteralPath $registryPaths.edge
+  $denyDelete = [System.Security.AccessControl.RegistryAccessRule]::new(
+    $currentUser,
+    [System.Security.AccessControl.RegistryRights]::Delete,
+    [System.Security.AccessControl.AccessControlType]::Deny
+  )
+  $edgeAclWithDeny.AddAccessRule($denyDelete)
+  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAclWithDeny
+  $edgeAclChanged = $true
+
+  $uninstallTransactionExitCode = Invoke-PowerShellFile (Join-Path $installRoot "uninstall-host.ps1") @("-Browser", "all", "-PreserveCredentials", "-HostRoot", $installRoot)
+  if ($uninstallTransactionExitCode -eq 0) {
+    throw "Bundled uninstall unexpectedly succeeded while Edge registration deletion was denied."
+  }
+  foreach ($name in $registryPaths.Keys) {
+    if (-not (Test-Path -LiteralPath $registryPaths[$name]) -or (Get-Item -LiteralPath $registryPaths[$name]).GetValue("") -ne $installedManifest) {
+      throw "$name registration was not restored after the denied uninstall."
+    }
+  }
+
+  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl
+  $edgeAclChanged = $false
+
   $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File | Select-Object -First 1
   if (-not $uninstaller) {
     throw "Inno uninstaller was not found in $installRoot"
   }
-  & $uninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+  & $uninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PRESERVECREDENTIALS
   if ($LASTEXITCODE -ne 0) {
     throw "Inno uninstaller exited with $LASTEXITCODE."
   }
@@ -203,7 +236,7 @@ try {
   if (Test-Path -LiteralPath $installRoot) {
     $cleanupUninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($cleanupUninstaller) {
-      & $cleanupUninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+      & $cleanupUninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PRESERVECREDENTIALS
     }
   }
   foreach ($name in $registryPaths.Keys) {

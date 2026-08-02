@@ -56,6 +56,19 @@ begin
   end;
 end;
 
+function PreserveCredentialsRequested: Boolean;
+var
+  Index: Integer;
+begin
+  Result := False;
+  for Index := 1 to ParamCount do begin
+    if CompareText(ParamStr(Index), '/PRESERVECREDENTIALS') = 0 then begin
+      Result := True;
+      exit;
+    end;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if (CurStep = ssPostInstall) and
@@ -65,9 +78,16 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  UninstallArguments: String;
 begin
-  if (CurUninstallStep = usUninstall) and
-     (not RunHostScript('uninstall-host.ps1', '-Browser all -HostRoot "' + ExpandConstant('{app}') + '"', 'remove the local Host')) then begin
-    Abort;
+  if CurUninstallStep = usUninstall then begin
+    UninstallArguments := '-Browser all -HostRoot "' + ExpandConstant('{app}') + '"';
+    if PreserveCredentialsRequested then begin
+      UninstallArguments := UninstallArguments + ' -PreserveCredentials';
+    end;
+    if not RunHostScript('uninstall-host.ps1', UninstallArguments, 'remove the local Host') then begin
+      Abort;
+    end;
   end;
 end;

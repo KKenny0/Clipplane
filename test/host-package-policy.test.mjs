@@ -64,7 +64,11 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installer, /SignTool=\{#SignToolName\}/);
   assert.match(installer, /SignedUninstaller=yes/);
   assert.match(installer, /RunHostScript\('install-host\.ps1', '-Browser all'/);
-  assert.match(installer, /RunHostScript\('uninstall-host\.ps1', '-Browser all -HostRoot/);
+  assert.match(installer, /RunHostScript\('uninstall-host\.ps1', UninstallArguments/);
+  assert.match(installer, /ParamCount/);
+  assert.match(installer, /CompareText\(ParamStr\(Index\), '\/PRESERVECREDENTIALS'\)/);
+  assert.match(installer, /UninstallArguments := UninstallArguments \+ ' -PreserveCredentials'/);
+  assert.equal((installer.match(/-PreserveCredentials/g) || []).length, 1);
   assert.match(installer, /ResultCode <> 0/);
   assert.match(installer, /RaiseException\('Clipplane Host registration failed/);
   assert.match(installer, /Abort;/);
@@ -77,6 +81,10 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
     "credential cleanup must run before browser registration removal"
   );
   assert.match(uninstallScript, /Browser registrations were left unchanged/);
+  assert.match(uninstallScript, /Get-RegistrationState/);
+  assert.match(uninstallScript, /Restore-RegistrationState/);
+  assert.match(uninstallScript, /Clipplane Host registration removal failed/);
+  assert.match(uninstallScript, /Rollback failures:/);
   assert.match(packageScript, /\[switch\]\$AllowUnsigned/);
   assert.match(packageScript, /CLIPPLANE_WINDOWS_SIGNTOOL/);
   assert.match(packageScript, /signtool/i);
@@ -101,6 +109,13 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installerSmoke, /Windows installer smoke tests can only run on Windows/);
   assert.match(installerSmoke, /Bundled install unexpectedly succeeded while Edge registration was denied/);
   assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded without credential maintenance/);
+  assert.match(installerSmoke, /RegistryRights\]::Delete/);
+  assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded while Edge registration deletion was denied/);
+  assert.match(installerSmoke, /registration was not restored after the denied uninstall/);
+  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 2);
+  assert.equal((installerSmoke.match(/^  Assert-InstalledHost$/gm) || []).length, 2);
+  assert.match(installerSmoke, /& \$uninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
+  assert.match(installerSmoke, /& \$cleanupUninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
   assert.match(installerSmoke, /PASS Windows Host installer candidate smoke/);
   assert.ok(
     ci.indexOf("npm run smoke:host:windows:installer") < ci.indexOf("Upload unsigned Windows installer candidate"),
