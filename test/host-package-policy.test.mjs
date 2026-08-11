@@ -87,6 +87,7 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installer, /ArchitecturesAllowed=x64compatible and not arm64/);
   assert.match(installer, /SignTool=\{#SignToolName\}/);
   assert.match(installer, /SignedUninstaller=yes/);
+  assert.match(installer, /\[UninstallDelete\][\s\S]*Type: files; Name: "\{app\}\\com\.clipplane\.host\.json"/);
   assert.match(installer, /RunHostScript\('install-host\.ps1', '-Browser all'/);
   assert.match(installer, /function PrepareToInstall\(var NeedsRestart: Boolean\): String;/);
   assert.match(installer, /CheckRegistrationWriteAccess\('Chrome', ChromeRegistrationKey\)/);

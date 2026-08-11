@@ -36,6 +36,10 @@ SignedUninstaller=yes
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[UninstallDelete]
+Type: files; Name: "{app}\com.clipplane.host.json"
+Type: dirifempty; Name: "{app}"
+
 [Code]
 const
   ChromeRegistrationKey = 'Software\Google\Chrome\NativeMessagingHosts\com.clipplane.host';
