@@ -141,7 +141,7 @@ try {
     [System.Security.AccessControl.AccessControlType]::Deny
   )
   $edgeAclWithDeny.AddAccessRule($denySetValue)
-  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAclWithDeny
+  Set-Acl -Path $registryPaths.edge -AclObject $edgeAclWithDeny
   $edgeAclChanged = $true
 
   $transactionExitCode = Invoke-PowerShellFile (Join-Path $bundleRoot "install-host.ps1") @("-Browser", "all")
@@ -169,7 +169,7 @@ try {
     throw "Installer registration preflight did not preserve prior registrations."
   }
 
-  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl
+  Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
   $edgeAclChanged = $false
 
   & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
@@ -212,7 +212,7 @@ try {
     [System.Security.AccessControl.AccessControlType]::Deny
   )
   $edgeAclWithDeny.AddAccessRule($denyDelete)
-  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAclWithDeny
+  Set-Acl -Path $registryPaths.edge -AclObject $edgeAclWithDeny
   $edgeAclChanged = $true
 
   $uninstallTransactionExitCode = Invoke-PowerShellFile (Join-Path $installRoot "uninstall-host.ps1") @("-Browser", "all", "-PreserveCredentials", "-HostRoot", $installRoot)
@@ -225,7 +225,7 @@ try {
     }
   }
 
-  Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl
+  Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
   $edgeAclChanged = $false
 
   $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File | Select-Object -First 1
@@ -254,7 +254,7 @@ try {
   Write-Host "PASS Windows Host installer smoke: $installerPath"
 } finally {
   if ($edgeAclChanged) {
-    Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl
+    Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
   }
   if ($maintenanceBackup -and (Test-Path -LiteralPath $maintenanceBackup)) {
     Move-Item -LiteralPath $maintenanceBackup -Destination (Join-Path $installRoot "app\native-host\credential-maintenance.mjs")
