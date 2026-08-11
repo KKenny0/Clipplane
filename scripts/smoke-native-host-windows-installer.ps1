@@ -86,6 +86,16 @@ function Invoke-Installer {
   return (Start-Process -FilePath $Path -ArgumentList $Arguments -Wait -PassThru).ExitCode
 }
 
+function Wait-PathRemoved {
+  param([string]$Path, [int]$TimeoutSeconds = 10)
+
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  while ((Test-Path -LiteralPath $Path) -and [DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Milliseconds 200
+  }
+  return -not (Test-Path -LiteralPath $Path)
+}
+
 function Assert-InstalledHost {
   foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
     $installedPath = Join-Path $installRoot $relativePath
@@ -181,7 +191,7 @@ try {
   if ($uninstallerExitCode -ne 0) {
     throw "Inno uninstaller exited with $uninstallerExitCode."
   }
-  if (Test-Path -LiteralPath $installRoot) {
+  if (-not (Wait-PathRemoved $installRoot)) {
     throw "Inno uninstaller left the Host install root behind: $installRoot"
   }
   if ((Get-Item -LiteralPath $registryPaths.chrome).GetValue("") -ne $newerChromeRegistration) {
