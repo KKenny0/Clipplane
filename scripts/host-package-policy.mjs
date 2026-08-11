@@ -19,6 +19,15 @@ export function validateNode20Version(version) {
   }
 }
 
+export function findNonSystemMacRuntimeDependencies(output) {
+  return output.split(/\r?\n/)
+    .slice(1)
+    .map((line) => line.trim().split(/\s+/, 1)[0])
+    .filter((dependency) => dependency
+      && !dependency.startsWith("/usr/lib/")
+      && !dependency.startsWith("/System/Library/"));
+}
+
 export function findForbiddenHostFiles(names) {
   return names
     .map((name) => name.replaceAll("\\", "/").replace(/^\.\//, ""))

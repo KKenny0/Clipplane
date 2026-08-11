@@ -3,7 +3,11 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findForbiddenHostFiles, validateNode20Version } from "../scripts/host-package-policy.mjs";
+import {
+  findForbiddenHostFiles,
+  findNonSystemMacRuntimeDependencies,
+  validateNode20Version
+} from "../scripts/host-package-policy.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -11,6 +15,14 @@ test("Host package runtime stays on supported Node 20", () => {
   assert.doesNotThrow(() => validateNode20Version("v20.19.0"));
   assert.throws(() => validateNode20Version("v24.0.0"), /require Node 20/);
   assert.throws(() => validateNode20Version("v20.18.3"), /require Node 20/);
+});
+
+test("macOS Host runtime rejects non-system dynamic libraries", () => {
+  assert.deepEqual(findNonSystemMacRuntimeDependencies(`node:
+\t/usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)
+\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 4424.1.255)
+\t/opt/homebrew/opt/libuv/lib/libuv.1.dylib (compatibility version 1.0.0, current version 1.0.0)
+`), ["/opt/homebrew/opt/libuv/lib/libuv.1.dylib"]);
 });
 
 test("Host package policy rejects secrets, config, and test fixtures", () => {

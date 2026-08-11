@@ -3,7 +3,11 @@ import { chmod, cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/prom
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findForbiddenHostFiles, validateNode20Version } from "./host-package-policy.mjs";
+import {
+  findForbiddenHostFiles,
+  findNonSystemMacRuntimeDependencies,
+  validateNode20Version
+} from "./host-package-policy.mjs";
 import { getNativeHostOrigins } from "./native-host-origins.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -15,8 +19,21 @@ if (process.platform !== expectedPlatform) {
   throw new Error(`${target} Host bundles must be built on ${expectedPlatform} so native credential modules match the target.`);
 }
 
-const runtimeVersion = run(process.execPath, ["--version"], { capture: true }).stdout;
+const runtimePath = process.env.CLIPPLANE_NODE_RUNTIME
+  ? path.resolve(process.env.CLIPPLANE_NODE_RUNTIME)
+  : process.execPath;
+const runtimeVersion = run(runtimePath, ["--version"], { capture: true }).stdout;
 validateNode20Version(runtimeVersion);
+const runtimeArch = run(runtimePath, ["-p", "process.arch"], { capture: true }).stdout.trim();
+if (runtimeArch !== process.arch) {
+  throw new Error(`Native Host runtime architecture ${runtimeArch} does not match build architecture ${process.arch}.`);
+}
+if (target === "macos") {
+  const dependencies = findNonSystemMacRuntimeDependencies(run("otool", ["-L", runtimePath], { capture: true }).stdout);
+  if (dependencies.length) {
+    throw new Error(`macOS Host runtime is not self-contained; use an official Node 20 binary via CLIPPLANE_NODE_RUNTIME:\n${dependencies.join("\n")}`);
+  }
+}
 
 const arch = process.arch === "x64" ? "x64" : process.arch === "arm64" ? "arm64" : null;
 if (!arch) {
@@ -55,7 +72,7 @@ for (const dependencyPath of productionDependencyPaths()) {
 }
 
 if (target === "windows") {
-  await cp(process.execPath, path.join(stageDir, "runtime", "node.exe"));
+  await cp(runtimePath, path.join(stageDir, "runtime", "node.exe"));
   await writeFile(path.join(stageDir, "clipplane-host.cmd"), [
     "@echo off",
     "setlocal",
@@ -68,7 +85,7 @@ if (target === "windows") {
   await cp(path.join(rootDir, "scripts", "stage-native-host-uninstall.ps1"), path.join(stageDir, "stage-uninstall-cleanup.ps1"));
 } else {
   await mkdir(path.join(stageDir, "runtime", "bin"), { recursive: true });
-  await cp(process.execPath, path.join(stageDir, "runtime", "bin", "node"));
+  await cp(runtimePath, path.join(stageDir, "runtime", "bin", "node"));
   await writeFile(path.join(stageDir, "clipplane-host"), [
     "#!/usr/bin/env sh",
     "set -eu",
