@@ -154,7 +154,7 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installerSmoke, /Invoke-Installer \$uninstaller\.FullName/);
   assert.match(installerSmoke, /Invoke-Installer \$cleanupUninstaller\.FullName/);
   assert.match(installerSmoke, /PASS Windows Host installer smoke/);
-  assert.match(bundleSmoke, /`""\$\{launcher\}""`/);
+  assert.match(bundleSmoke, /\["\/d", "\/s", "\/c", "call", launcher\]/);
   assert.ok(
     ci.indexOf("npm run smoke:host:windows:installer") < ci.indexOf("Upload unsigned Windows installer candidate"),
     "CI must smoke the installer before uploading it"
