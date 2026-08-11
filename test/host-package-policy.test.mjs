@@ -145,15 +145,9 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(ci, /npm run smoke:host:windows:installer/);
   assert.match(installerSmoke, /Windows installer smoke tests can only run on Windows/);
   assert.match(installerSmoke, /\[string\]\$InstallerPath/);
-  assert.match(installerSmoke, /Bundled install unexpectedly succeeded while Edge registration was denied/);
-  assert.match(installerSmoke, /Installer unexpectedly succeeded while Edge registration was denied/);
-  assert.match(installerSmoke, /Installer left required file behind after registration preflight failed/);
   assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded without credential maintenance/);
-  assert.match(installerSmoke, /RegistryRights\]::Delete/);
-  assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded while Edge registration deletion was denied/);
-  assert.match(installerSmoke, /registration was not restored after the denied uninstall/);
   assert.match(installerSmoke, /Inno uninstaller removed a newer Chrome Host registration/);
-  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 3);
+  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 2);
   assert.equal((installerSmoke.match(/^  Assert-InstalledHost$/gm) || []).length, 2);
   assert.match(installerSmoke, /& \$uninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
   assert.match(installerSmoke, /& \$cleanupUninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);

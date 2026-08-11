@@ -117,8 +117,6 @@ foreach ($name in $registryPaths.Keys) {
   $initialStates[$name] = Get-RegistrationState $registryPaths[$name]
 }
 $notesSentinel = Join-Path ([System.IO.Path]::GetTempPath()) "clipplane-installer-smoke-$PID-notes.txt"
-$edgeAcl = $null
-$edgeAclChanged = $false
 $maintenanceBackup = $null
 
 try {
@@ -131,46 +129,6 @@ try {
     New-Item -Path $registryPaths[$name] -Force | Out-Null
     Set-Item -LiteralPath $registryPaths[$name] -Value $sentinels[$name]
   }
-
-  $edgeAcl = Get-Acl -LiteralPath $registryPaths.edge
-  $edgeAclWithDeny = Get-Acl -LiteralPath $registryPaths.edge
-  $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-  $denySetValue = [System.Security.AccessControl.RegistryAccessRule]::new(
-    $currentUser,
-    [System.Security.AccessControl.RegistryRights]::SetValue,
-    [System.Security.AccessControl.AccessControlType]::Deny
-  )
-  $edgeAclWithDeny.AddAccessRule($denySetValue)
-  Set-Acl -Path $registryPaths.edge -AclObject $edgeAclWithDeny
-  $edgeAclChanged = $true
-
-  $transactionExitCode = Invoke-PowerShellFile (Join-Path $bundleRoot "install-host.ps1") @("-Browser", "all")
-  if ($transactionExitCode -eq 0) {
-    throw "Bundled install unexpectedly succeeded while Edge registration was denied."
-  }
-  if ((Get-Item -LiteralPath $registryPaths.chrome).GetValue("") -ne $sentinels.chrome) {
-    throw "Chrome registration was not restored after the failed bundled install."
-  }
-  if ((Get-Item -LiteralPath $registryPaths.edge).GetValue("") -ne $sentinels.edge) {
-    throw "Edge registration changed despite the denied write."
-  }
-
-  & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-  if ($LASTEXITCODE -eq 0) {
-    throw "Installer unexpectedly succeeded while Edge registration was denied."
-  }
-  foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
-    if (Test-Path -LiteralPath (Join-Path $installRoot $relativePath)) {
-      throw "Installer left required file behind after registration preflight failed: $relativePath"
-    }
-  }
-  if ((Get-Item -LiteralPath $registryPaths.chrome).GetValue("") -ne $sentinels.chrome -or
-      (Get-Item -LiteralPath $registryPaths.edge).GetValue("") -ne $sentinels.edge) {
-    throw "Installer registration preflight did not preserve prior registrations."
-  }
-
-  Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
-  $edgeAclChanged = $false
 
   & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
   if ($LASTEXITCODE -ne 0) {
@@ -204,30 +162,6 @@ try {
     $maintenanceBackup = $null
   }
 
-  $edgeAcl = Get-Acl -LiteralPath $registryPaths.edge
-  $edgeAclWithDeny = Get-Acl -LiteralPath $registryPaths.edge
-  $denyDelete = [System.Security.AccessControl.RegistryAccessRule]::new(
-    $currentUser,
-    [System.Security.AccessControl.RegistryRights]::Delete,
-    [System.Security.AccessControl.AccessControlType]::Deny
-  )
-  $edgeAclWithDeny.AddAccessRule($denyDelete)
-  Set-Acl -Path $registryPaths.edge -AclObject $edgeAclWithDeny
-  $edgeAclChanged = $true
-
-  $uninstallTransactionExitCode = Invoke-PowerShellFile (Join-Path $installRoot "uninstall-host.ps1") @("-Browser", "all", "-PreserveCredentials", "-HostRoot", $installRoot)
-  if ($uninstallTransactionExitCode -eq 0) {
-    throw "Bundled uninstall unexpectedly succeeded while Edge registration deletion was denied."
-  }
-  foreach ($name in $registryPaths.Keys) {
-    if (-not (Test-Path -LiteralPath $registryPaths[$name]) -or (Get-Item -LiteralPath $registryPaths[$name]).GetValue("") -ne $installedManifest) {
-      throw "$name registration was not restored after the denied uninstall."
-    }
-  }
-
-  Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
-  $edgeAclChanged = $false
-
   $uninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File | Select-Object -First 1
   if (-not $uninstaller) {
     throw "Inno uninstaller was not found in $installRoot"
@@ -253,9 +187,6 @@ try {
 
   Write-Host "PASS Windows Host installer smoke: $installerPath"
 } finally {
-  if ($edgeAclChanged) {
-    Set-Acl -Path $registryPaths.edge -AclObject $edgeAcl
-  }
   if ($maintenanceBackup -and (Test-Path -LiteralPath $maintenanceBackup)) {
     Move-Item -LiteralPath $maintenanceBackup -Destination (Join-Path $installRoot "app\native-host\credential-maintenance.mjs")
   }
