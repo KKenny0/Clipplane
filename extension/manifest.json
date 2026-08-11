@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "102",
   "name": "Clipplane",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmsN88riq7BJzNgK6O1AvX23xz9dCoIY2K+Vj2KYKt7RumyBTcvkL4edusH/qZ+Y/z2szWSGxh3tqdPQUARpABeqRANfjdQJUc6Qpi3zsc9VfXFWPNH8w/7P0DG6d8rHpCj+/T7IVwhZAmcicWqGOMlXQXTCUM2+H7bzly1fSxSyAA40zGsRHLV26q0Wb1gFi7HZKe1+M5jMupxenwipilQ0tnb2m79eKUxu6aJ4mEEuDQzuusozohsXiauIayRNGl89vAXVznkgx6e2fdUR+4uBAj+WlpoW/qe8Ax99rdmYkUxMgxg3BFJnNnWejAGp3g1ffsaC49Q8qbDNf4/tUjQIDAQAB",
   "description": "Turn Selection, Page, or Element into a clean org-mode note with an inspectable trail.",
   "permissions": [
