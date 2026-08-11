@@ -79,6 +79,7 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   const uninstallScript = await readFile(path.join(rootDir, "scripts", "uninstall-native-host.ps1"), "utf8");
   const packageScript = await readFile(path.join(rootDir, "scripts", "package-native-host-windows-installer.ps1"), "utf8");
   const installerSmoke = await readFile(path.join(rootDir, "scripts", "smoke-native-host-windows-installer.ps1"), "utf8");
+  const bundleSmoke = await readFile(path.join(rootDir, "scripts", "smoke-native-host-bundle.mjs"), "utf8");
   const ci = await readFile(path.join(rootDir, ".github", "workflows", "ci.yml"), "utf8");
 
   assert.match(installer, /DefaultDirName=\{localappdata\}\\Clipplane Host/);
@@ -153,6 +154,7 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installerSmoke, /Invoke-Installer \$uninstaller\.FullName/);
   assert.match(installerSmoke, /Invoke-Installer \$cleanupUninstaller\.FullName/);
   assert.match(installerSmoke, /PASS Windows Host installer smoke/);
+  assert.match(bundleSmoke, /`""\$\{launcher\}""`/);
   assert.ok(
     ci.indexOf("npm run smoke:host:windows:installer") < ci.indexOf("Upload unsigned Windows installer candidate"),
     "CI must smoke the installer before uploading it"

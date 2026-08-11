@@ -32,7 +32,7 @@ if (!existsSync(path.join(bundleDir, "app", "native-host", "credential-maintenan
 }
 
 const child = process.platform === "win32"
-  ? spawn("cmd.exe", ["/d", "/s", "/c", launcher], { stdio: ["pipe", "pipe", "pipe"] })
+  ? spawn("cmd.exe", ["/d", "/s", "/c", `""${launcher}""`], { stdio: ["pipe", "pipe", "pipe"] })
   : spawn(launcher, [], { stdio: ["pipe", "pipe", "pipe"] });
 
 const stdout = [];
