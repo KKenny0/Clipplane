@@ -34,7 +34,7 @@ fs.writeFileSync(manifestPath, `${JSON.stringify({
 }, null, 2)}\n`);
 NODE
 
-install_for() {
+manifest_file_for() {
   name="$1"
   if [ "$(id -u)" -eq 0 ]; then
     if [ "$name" = "chrome" ]; then
@@ -49,10 +49,49 @@ install_for() {
       manifest_dir="$HOME/Library/Application Support/Microsoft Edge/NativeMessagingHosts"
     fi
   fi
-  mkdir -p "$manifest_dir"
-  cp "$manifest_path" "$manifest_dir/com.clipplane.host.json"
+  printf '%s\n' "$manifest_dir/com.clipplane.host.json"
+}
+
+state_dir="$(mktemp -d "${TMPDIR:-/tmp}/clipplane-install.XXXXXX")"
+committed="false"
+selected="$browser"
+if [ "$browser" = "all" ]; then selected="chrome edge"; fi
+
+for name in $selected; do
+  target="$(manifest_file_for "$name")"
+  if [ -f "$target" ]; then
+    cp "$target" "$state_dir/$name"
+  else
+    : > "$state_dir/$name.missing"
+  fi
+done
+
+rollback() {
+  set +e
+  if [ "$committed" != "true" ]; then
+    for name in $selected; do
+      target="$(manifest_file_for "$name")"
+      if [ -f "$state_dir/$name" ]; then
+        mkdir -p "$(dirname "$target")"
+        cp "$state_dir/$name" "$target"
+      else
+        rm -f "$target"
+      fi
+    done
+  fi
+  rm -rf "$state_dir"
+}
+trap rollback EXIT
+trap 'exit 1' HUP INT TERM
+
+install_for() {
+  name="$1"
+  target="$(manifest_file_for "$name")"
+  mkdir -p "$(dirname "$target")"
+  cp "$manifest_path" "$target"
   echo "Registered Clipplane Host for $name"
 }
 
-if [ "$browser" = "all" ]; then install_for chrome; install_for edge; else install_for "$browser"; fi
+for name in $selected; do install_for "$name"; done
+committed="true"
 echo "Restart every browser window, then use Check again in Clipplane."

@@ -1,3 +1,7 @@
+param(
+  [string]$InstallerPath
+)
+
 $ErrorActionPreference = "Stop"
 
 if ($env:OS -ne "Windows_NT") {
@@ -8,7 +12,11 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $package = Get-Content -LiteralPath (Join-Path $projectRoot "package.json") -Raw | ConvertFrom-Json
 $version = [string]$package.version
 $bundleRoot = Join-Path $projectRoot "dist\clipplane-host-v$version-windows-x64"
-$installerPath = Join-Path $projectRoot "dist\clipplane-host-v$version-windows-x64-unsigned.exe"
+$installerPath = if ($InstallerPath) {
+  (Resolve-Path -LiteralPath $InstallerPath).Path
+} else {
+  Join-Path $projectRoot "dist\clipplane-host-v$version-windows-x64-unsigned.exe"
+}
 $installRoot = Join-Path $env:LOCALAPPDATA "Clipplane Host"
 $installedManifest = Join-Path $installRoot "com.clipplane.host.json"
 $powerShellPath = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -20,6 +28,7 @@ $requiredBundleFiles = @(
   "clipplane-host.cmd",
   "install-host.ps1",
   "uninstall-host.ps1",
+  "stage-uninstall-cleanup.ps1",
   "allowed-origins.json",
   "runtime\node.exe",
   "app\native-host\host.mjs",
@@ -97,7 +106,7 @@ foreach ($relativePath in $requiredBundleFiles) {
   }
 }
 if (-not (Test-Path -LiteralPath $installerPath)) {
-  throw "Unsigned Windows installer candidate was not found: $installerPath"
+  throw "Windows installer was not found: $installerPath"
 }
 if (Test-Path -LiteralPath $installRoot) {
   throw "Installer smoke requires an empty per-user install root: $installRoot"
@@ -146,18 +155,32 @@ try {
     throw "Edge registration changed despite the denied write."
   }
 
+  & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+  if ($LASTEXITCODE -eq 0) {
+    throw "Installer unexpectedly succeeded while Edge registration was denied."
+  }
+  foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
+    if (Test-Path -LiteralPath (Join-Path $installRoot $relativePath)) {
+      throw "Installer left required file behind after registration preflight failed: $relativePath"
+    }
+  }
+  if ((Get-Item -LiteralPath $registryPaths.chrome).GetValue("") -ne $sentinels.chrome -or
+      (Get-Item -LiteralPath $registryPaths.edge).GetValue("") -ne $sentinels.edge) {
+    throw "Installer registration preflight did not preserve prior registrations."
+  }
+
   Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl
   $edgeAclChanged = $false
 
   & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
   if ($LASTEXITCODE -ne 0) {
-    throw "Unsigned Windows installer candidate exited with $LASTEXITCODE."
+    throw "Windows installer exited with $LASTEXITCODE."
   }
   Assert-InstalledHost
 
   & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
   if ($LASTEXITCODE -ne 0) {
-    throw "Unsigned Windows installer candidate repair exited with $LASTEXITCODE."
+    throw "Windows installer repair exited with $LASTEXITCODE."
   }
   Assert-InstalledHost
 
@@ -209,6 +232,8 @@ try {
   if (-not $uninstaller) {
     throw "Inno uninstaller was not found in $installRoot"
   }
+  $newerChromeRegistration = "C:\clipplane-smoke\newer-$PID.json"
+  Set-Item -LiteralPath $registryPaths.chrome -Value $newerChromeRegistration
   & $uninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PRESERVECREDENTIALS
   if ($LASTEXITCODE -ne 0) {
     throw "Inno uninstaller exited with $LASTEXITCODE."
@@ -216,16 +241,17 @@ try {
   if (Test-Path -LiteralPath $installRoot) {
     throw "Inno uninstaller left the Host install root behind: $installRoot"
   }
-  foreach ($name in $registryPaths.Keys) {
-    if (Test-Path -LiteralPath $registryPaths[$name]) {
-      throw "Inno uninstaller left the $name registration behind."
-    }
+  if ((Get-Item -LiteralPath $registryPaths.chrome).GetValue("") -ne $newerChromeRegistration) {
+    throw "Inno uninstaller removed a newer Chrome Host registration."
+  }
+  if (Test-Path -LiteralPath $registryPaths.edge) {
+    throw "Inno uninstaller left the owned Edge registration behind."
   }
   if (-not (Test-Path -LiteralPath $notesSentinel)) {
     throw "Installer smoke changed notes outside the Host install root."
   }
 
-  Write-Host "PASS Windows Host installer candidate smoke"
+  Write-Host "PASS Windows Host installer smoke: $installerPath"
 } finally {
   if ($edgeAclChanged) {
     Set-Acl -LiteralPath $registryPaths.edge -AclObject $edgeAcl

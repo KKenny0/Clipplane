@@ -65,6 +65,7 @@ if (target === "windows") {
   ].join("\r\n"), "ascii");
   await cp(path.join(rootDir, "scripts", "install-bundled-host.ps1"), path.join(stageDir, "install-host.ps1"));
   await cp(path.join(rootDir, "scripts", "uninstall-native-host.ps1"), path.join(stageDir, "uninstall-host.ps1"));
+  await cp(path.join(rootDir, "scripts", "stage-native-host-uninstall.ps1"), path.join(stageDir, "stage-uninstall-cleanup.ps1"));
 } else {
   await mkdir(path.join(stageDir, "runtime", "bin"), { recursive: true });
   await cp(process.execPath, path.join(stageDir, "runtime", "bin", "node"));

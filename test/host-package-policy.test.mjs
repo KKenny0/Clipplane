@@ -31,14 +31,37 @@ test("Host package policy rejects secrets, config, and test fixtures", () => {
 test("macOS distribution scripts keep credentials in a named keychain profile", async () => {
   const packageScript = await readFile(path.join(rootDir, "scripts", "package-native-host-macos-pkg.sh"), "utf8");
   const notarizeScript = await readFile(path.join(rootDir, "scripts", "notarize-native-host-macos-pkg.sh"), "utf8");
+  const installScript = await readFile(path.join(rootDir, "scripts", "install-bundled-host-macos.sh"), "utf8");
+  const uninstallScript = await readFile(path.join(rootDir, "scripts", "uninstall-native-host-macos.sh"), "utf8");
 
   assert.match(packageScript, /Developer ID Application/);
   assert.match(packageScript, /Developer ID Installer/);
   assert.match(packageScript, /--options runtime --timestamp/);
+  assert.match(packageScript, /com\.apple\.security\.cs\.allow-jit/);
+  assert.match(packageScript, /com\.apple\.security\.cs\.allow-unsigned-executable-memory/);
+  assert.doesNotMatch(packageScript, /com\.apple\.security\.get-task-allow/);
+  assert.match(packageScript, /smoke-native-host-bundle\.mjs --target macos --bundle "\$bundle_dir"/);
+  assert.match(packageScript, /git status --porcelain --untracked-files=all/);
+  assert.match(packageScript, /git ls-files --others --ignored --exclude-standard -- native-host/);
+  assert.match(packageScript, /npm ci/);
+  assert.match(packageScript, /sha256=/);
+  assert.match(packageScript, /state=built/);
   assert.match(notarizeScript, /--keychain-profile/);
-  assert.match(notarizeScript, /CLIPPLANE_NOTARY_SUBMISSION_ID/);
-  assert.match(notarizeScript, /notarytool wait/);
+  assert.match(notarizeScript, /package-native-host-macos-pkg\.sh/);
+  assert.match(notarizeScript, /notarytool submit/);
+  assert.match(notarizeScript, /submitted_sha256/);
+  assert.match(notarizeScript, /state=stapled/);
+  assert.doesNotMatch(notarizeScript, /CLIPPLANE_NOTARY_SUBMISSION_ID/);
   assert.doesNotMatch(notarizeScript, /--password|--apple-id/);
+  assert.match(installScript, /trap rollback EXIT/);
+  assert.match(uninstallScript, /trap rollback EXIT/);
+  assert.match(uninstallScript, /--remove-payload/);
+  assert.match(uninstallScript, /pkgutil --forget com\.clipplane\.host/);
+  assert.match(uninstallScript, /Left a non-Clipplane or newer Host registration unchanged/);
+  assert.match(uninstallScript, /Preserved shared credentials because this was not an owned full Host uninstall/);
+  assert.match(uninstallScript, /\/bin\/launchctl asuser/);
+  assert.match(uninstallScript, /\/usr\/bin\/sudo -H -u/);
+  assert.match(uninstallScript, /package payload or receipt cleanup failed/);
 });
 
 test("macOS source setup installs the Host outside privacy-protected source folders", async () => {
@@ -64,7 +87,12 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installer, /SignTool=\{#SignToolName\}/);
   assert.match(installer, /SignedUninstaller=yes/);
   assert.match(installer, /RunHostScript\('install-host\.ps1', '-Browser all'/);
+  assert.match(installer, /function PrepareToInstall\(var NeedsRestart: Boolean\): String;/);
+  assert.match(installer, /CheckRegistrationWriteAccess\('Chrome', ChromeRegistrationKey\)/);
+  assert.match(installer, /CheckRegistrationWriteAccess\('Edge', EdgeRegistrationKey\)/);
   assert.match(installer, /RunHostScript\('uninstall-host\.ps1', UninstallArguments/);
+  assert.match(installer, /stage-uninstall-cleanup\.ps1/);
+  assert.match(installer, /CurUninstallStep = usPostUninstall/);
   assert.match(installer, /ParamCount/);
   assert.match(installer, /CompareText\(ParamStr\(Index\), '\/PRESERVECREDENTIALS'\)/);
   assert.match(installer, /UninstallArguments := UninstallArguments \+ ' -PreserveCredentials'/);
@@ -77,14 +105,16 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installScript, /HasDefaultValue/);
   assert.match(installScript, /Rollback failures:/);
   assert.ok(
-    uninstallScript.indexOf("& $nodePath $maintenance") < uninstallScript.indexOf("Remove-Item -LiteralPath $registryPath"),
-    "credential cleanup must run before browser registration removal"
+    uninstallScript.indexOf("& $nodePath $maintenance") > uninstallScript.indexOf("Remove-Item -LiteralPath $registryPath"),
+    "credential cleanup must run only after browser registration removal succeeds"
   );
-  assert.match(uninstallScript, /Browser registrations were left unchanged/);
+  assert.match(uninstallScript, /Credential cleanup did not complete/);
   assert.match(uninstallScript, /Get-RegistrationState/);
   assert.match(uninstallScript, /Restore-RegistrationState/);
   assert.match(uninstallScript, /Clipplane Host registration removal failed/);
   assert.match(uninstallScript, /Rollback failures:/);
+  assert.match(uninstallScript, /Left a non-Clipplane or newer Host registration unchanged/);
+  assert.match(uninstallScript, /Preserved shared credentials because this was not an owned full Host uninstall/);
   assert.match(packageScript, /\[switch\]\$AllowUnsigned/);
   assert.match(packageScript, /CLIPPLANE_WINDOWS_SIGNTOOL/);
   assert.match(packageScript, /signtool/i);
@@ -95,9 +125,16 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(packageScript, /-unsigned/);
   assert.match(packageScript, /Refusing to overwrite an existing public installer/);
   assert.match(packageScript, /Move-Item -LiteralPath \$installerPath -Destination \$publicInstallerPath/);
-  assert.doesNotMatch(packageScript, /npm run package:host:windows/);
+  assert.match(packageScript, /status --porcelain --untracked-files=all/);
+  assert.match(packageScript, /ls-files --others --ignored --exclude-standard -- native-host/);
+  assert.match(packageScript, /npm\.cmd ci/);
+  assert.match(packageScript, /npm\.cmd run package:host:windows/);
+  assert.match(packageScript, /smoke-native-host-bundle\.mjs/);
+  assert.match(packageScript, /Get-BundleDigest/);
+  assert.match(packageScript, /Source changed while the signed Windows installer was being built/);
   for (const required of [
     "allowed-origins.json",
+    "stage-uninstall-cleanup.ps1",
     "runtime\\node.exe",
     "app\\native-host\\host.mjs",
     "app\\native-host\\credential-maintenance.mjs"
@@ -107,16 +144,20 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(ci, /choco install innosetup --version=6\.7\.1 --yes --no-progress/);
   assert.match(ci, /npm run smoke:host:windows:installer/);
   assert.match(installerSmoke, /Windows installer smoke tests can only run on Windows/);
+  assert.match(installerSmoke, /\[string\]\$InstallerPath/);
   assert.match(installerSmoke, /Bundled install unexpectedly succeeded while Edge registration was denied/);
+  assert.match(installerSmoke, /Installer unexpectedly succeeded while Edge registration was denied/);
+  assert.match(installerSmoke, /Installer left required file behind after registration preflight failed/);
   assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded without credential maintenance/);
   assert.match(installerSmoke, /RegistryRights\]::Delete/);
   assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded while Edge registration deletion was denied/);
   assert.match(installerSmoke, /registration was not restored after the denied uninstall/);
-  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 2);
+  assert.match(installerSmoke, /Inno uninstaller removed a newer Chrome Host registration/);
+  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 3);
   assert.equal((installerSmoke.match(/^  Assert-InstalledHost$/gm) || []).length, 2);
   assert.match(installerSmoke, /& \$uninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
   assert.match(installerSmoke, /& \$cleanupUninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
-  assert.match(installerSmoke, /PASS Windows Host installer candidate smoke/);
+  assert.match(installerSmoke, /PASS Windows Host installer smoke/);
   assert.ok(
     ci.indexOf("npm run smoke:host:windows:installer") < ci.indexOf("Upload unsigned Windows installer candidate"),
     "CI must smoke the installer before uploading it"

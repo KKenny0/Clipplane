@@ -36,6 +36,18 @@ if (-not (Test-Path -LiteralPath $IsccPath)) {
 }
 
 if (-not $AllowUnsigned) {
+  $sourceHead = (& git -C $projectRoot rev-parse HEAD).Trim()
+  if ($LASTEXITCODE -ne 0 -or -not $sourceHead) {
+    throw "The signed Windows installer must be built from a Git commit."
+  }
+  $sourceChanges = @(& git -C $projectRoot status --porcelain --untracked-files=all)
+  if ($LASTEXITCODE -ne 0 -or $sourceChanges.Count -ne 0) {
+    throw "The signed Windows installer must be built from clean, committed source."
+  }
+  $ignoredHostInputs = @(& git -C $projectRoot ls-files --others --ignored --exclude-standard -- native-host)
+  if ($LASTEXITCODE -ne 0 -or $ignoredHostInputs.Count -ne 0) {
+    throw "The signed Windows installer refuses ignored files under native-host."
+  }
   if (Test-Path -LiteralPath $publicInstallerPath) {
     throw "Refusing to overwrite an existing public installer: $publicInstallerPath"
   }
@@ -54,12 +66,26 @@ if (-not $AllowUnsigned) {
   $innoSignTool = '$q' + $SignToolPath + '$q sign /fd SHA256 /tr ' + $TimestampUrl + ' /td SHA256 /n $q' + $CertificateSubject + '$q $f'
   $isccArgs += "/Sclipplane=$innoSignTool"
   $isccArgs += "/DSignToolName=clipplane"
+
+  & npm.cmd ci
+  if ($LASTEXITCODE -ne 0) {
+    throw "npm ci failed before the signed Windows Host build."
+  }
+  & npm.cmd run package:host:windows
+  if ($LASTEXITCODE -ne 0) {
+    throw "Windows Host bundle packaging failed."
+  }
+  & node.exe (Join-Path $projectRoot "scripts\smoke-native-host-bundle.mjs") --target windows --bundle $bundleDir
+  if ($LASTEXITCODE -ne 0) {
+    throw "Windows Host bundle smoke failed."
+  }
 }
 
 foreach ($required in @(
   (Join-Path $bundleDir "clipplane-host.cmd"),
   (Join-Path $bundleDir "install-host.ps1"),
-  (Join-Path $bundleDir "uninstall-host.ps1"),
+    (Join-Path $bundleDir "uninstall-host.ps1"),
+    (Join-Path $bundleDir "stage-uninstall-cleanup.ps1"),
   (Join-Path $bundleDir "allowed-origins.json"),
   (Join-Path $bundleDir "runtime\node.exe"),
   (Join-Path $bundleDir "app\native-host\host.mjs"),
@@ -70,10 +96,24 @@ foreach ($required in @(
   }
 }
 
+function Get-BundleDigest {
+  $entries = Get-ChildItem -LiteralPath $bundleDir -Recurse -File | Sort-Object FullName | ForEach-Object {
+    $relativePath = [System.IO.Path]::GetRelativePath($bundleDir, $_.FullName).Replace('\', '/')
+    "$relativePath $((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+  }
+  return ($entries -join "`n")
+}
+
+$bundleDigest = Get-BundleDigest
+
 Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
 & $IsccPath @isccArgs $scriptPath
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installerPath)) {
   throw "Inno Setup did not produce $installerPath"
+}
+if ((Get-BundleDigest) -ne $bundleDigest) {
+  Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
+  throw "Windows Host bundle changed while the installer was being built."
 }
 
 if ($AllowUnsigned) {
@@ -84,6 +124,13 @@ if ($AllowUnsigned) {
 & $SignToolPath verify /pa /v /tw $installerPath
 if ($LASTEXITCODE -ne 0) {
   throw "Authenticode verification failed for the signed installer."
+}
+
+$finalHead = (& git -C $projectRoot rev-parse HEAD).Trim()
+$finalChanges = @(& git -C $projectRoot status --porcelain --untracked-files=all)
+if ($LASTEXITCODE -ne 0 -or $finalHead -ne $sourceHead -or $finalChanges.Count -ne 0) {
+  Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
+  throw "Source changed while the signed Windows installer was being built."
 }
 
 Move-Item -LiteralPath $installerPath -Destination $publicInstallerPath

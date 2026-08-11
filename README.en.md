@@ -193,6 +193,19 @@ npm run verify:store
 
 On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.5`.
 
+Build and verify a private unsigned Windows candidate in this order:
+
+```powershell
+npm run package:host:windows
+node scripts/smoke-native-host-bundle.mjs --target windows
+npm run package:host:windows:installer:candidate
+npm run smoke:host:windows:installer
+```
+
+Unsigned candidate packaging consumes that prebuilt, smoke-tested bundle. The public signing command, `npm run package:host:windows:installer`, refuses dirty source and reruns `npm ci`, the bundle build, and the bundle smoke before it signs and verifies the same content. It also requires `CLIPPLANE_INNO_SETUP_COMPILER`, `CLIPPLANE_WINDOWS_SIGNTOOL`, `CLIPPLANE_WINDOWS_CERT_SUBJECT`, and `CLIPPLANE_WINDOWS_TIMESTAMP_URL`. Verify the final signed asset itself with `pwsh -File scripts/smoke-native-host-windows-installer.ps1 -InstallerPath <signed.exe>`. An unsigned candidate is private test input, never a public download.
+
+The installer smoke changes the current user's install directory and Chrome/Edge HKCU registrations. Run it only in GitHub Actions, a disposable Windows VM, or a dedicated test account. It preserves existing Notion/flomo credentials with `/PRESERVECREDENTIALS`, but it is not a side-effect-free developer-machine check.
+
 <details>
 <summary>Advanced configuration</summary>
 

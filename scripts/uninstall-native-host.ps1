@@ -21,23 +21,10 @@ $root = if ($HostRoot) {
 } else {
   (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
-
-if (-not $PreserveCredentials) {
-  $bundledNode = Join-Path $root "runtime\node.exe"
-  $nodePath = if (Test-Path -LiteralPath $bundledNode) {
-    $bundledNode
-  } else {
-    (Get-Command node -ErrorAction Stop).Source
-  }
-  $maintenance = if (Test-Path -LiteralPath (Join-Path $root "app\native-host\credential-maintenance.mjs")) {
-    Join-Path $root "app\native-host\credential-maintenance.mjs"
-  } else {
-    Join-Path $root "native-host\credential-maintenance.mjs"
-  }
-  & $nodePath $maintenance
-  if ($LASTEXITCODE -ne 0) {
-    throw "Clipplane Host credentials could not be deleted. Browser registrations were left unchanged. Local notes were not changed."
-  }
+$expectedManifest = if (Test-Path -LiteralPath (Join-Path $root "app\native-host\credential-maintenance.mjs")) {
+  Join-Path $root "com.clipplane.host.json"
+} else {
+  Join-Path $root "native-host\com.clipplane.host.json"
 }
 
 $browsers = if ($Browser -eq "all") { @("chrome", "edge") } else { @($Browser) }
@@ -79,12 +66,23 @@ function Restore-RegistrationState {
 }
 
 $previousStates = @{}
+$ownedBrowsers = @()
+$foreignRegistrationFound = $false
 foreach ($name in $browsers) {
   $previousStates[$name] = Get-RegistrationState $registryPaths[$name]
+  $state = $previousStates[$name]
+  if ($state.HasDefaultValue -and $state.DefaultValue -is [string] -and $state.DefaultValue -eq $expectedManifest) {
+    $ownedBrowsers += $name
+  } elseif ($state.Exists) {
+    $foreignRegistrationFound = $true
+    Write-Host "Left a non-Clipplane or newer Host registration unchanged for $name"
+  } else {
+    Write-Host "Clipplane Host was not registered for $name"
+  }
 }
 
 try {
-  foreach ($name in $browsers) {
+  foreach ($name in $ownedBrowsers) {
     $registryPath = $registryPaths[$name]
     if (Test-Path -LiteralPath $registryPath) {
       Remove-Item -LiteralPath $registryPath -Recurse -Force
@@ -93,17 +91,37 @@ try {
       Write-Host "Clipplane Host was not registered for $name"
     }
   }
+  $deleteCredentials = -not $PreserveCredentials -and $Browser -eq "all" -and -not $foreignRegistrationFound
+  if ($deleteCredentials) {
+    $bundledNode = Join-Path $root "runtime\node.exe"
+    $nodePath = if (Test-Path -LiteralPath $bundledNode) {
+      $bundledNode
+    } else {
+      (Get-Command node -ErrorAction Stop).Source
+    }
+    $maintenance = if (Test-Path -LiteralPath (Join-Path $root "app\native-host\credential-maintenance.mjs")) {
+      Join-Path $root "app\native-host\credential-maintenance.mjs"
+    } else {
+      Join-Path $root "native-host\credential-maintenance.mjs"
+    }
+    & $nodePath $maintenance
+    if ($LASTEXITCODE -ne 0) {
+      throw "Clipplane Host credentials could not be deleted."
+    }
+  } elseif (-not $PreserveCredentials) {
+    Write-Host "Preserved shared credentials because this was not an owned full Host uninstall."
+  }
 } catch {
   $registrationFailure = $_.Exception.Message
   $rollbackFailures = @()
-  foreach ($name in $browsers) {
+  foreach ($name in $ownedBrowsers) {
     try {
       Restore-RegistrationState $registryPaths[$name] $previousStates[$name]
     } catch {
       $rollbackFailures += "$($name): $($_.Exception.Message)"
     }
   }
-  $credentialDetail = if ($PreserveCredentials) { " Credentials were preserved." } else { " Credentials were already deleted." }
+  $credentialDetail = if ($PreserveCredentials) { " Credentials were preserved." } else { " Credential cleanup did not complete." }
   $rollbackDetail = if ($rollbackFailures.Count) { " Rollback failures: $($rollbackFailures -join '; ')" } else { "" }
   throw "Clipplane Host registration removal failed: $registrationFailure.$credentialDetail$rollbackDetail Local notes were not changed."
 }

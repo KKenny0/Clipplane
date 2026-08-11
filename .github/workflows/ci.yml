@@ -45,12 +45,16 @@ jobs:
       - name: Validate macOS install helpers
         if: runner.os == 'macOS'
         run: bash -n scripts/install-bundled-host-macos.sh scripts/uninstall-native-host-macos.sh
+      - name: Test macOS Host transactions
+        if: runner.os == 'macOS'
+        run: npm test
       - name: Validate Windows install helpers
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           [scriptblock]::Create((Get-Content scripts/install-bundled-host.ps1 -Raw)) | Out-Null
           [scriptblock]::Create((Get-Content scripts/uninstall-native-host.ps1 -Raw)) | Out-Null
+          [scriptblock]::Create((Get-Content scripts/stage-native-host-uninstall.ps1 -Raw)) | Out-Null
           [scriptblock]::Create((Get-Content scripts/package-native-host-windows-installer.ps1 -Raw)) | Out-Null
           [scriptblock]::Create((Get-Content scripts/smoke-native-host-windows-installer.ps1 -Raw)) | Out-Null
       - run: ${{ matrix.command }}
