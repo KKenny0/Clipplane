@@ -147,10 +147,11 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   assert.match(installerSmoke, /\[string\]\$InstallerPath/);
   assert.match(installerSmoke, /Bundled uninstall unexpectedly succeeded without credential maintenance/);
   assert.match(installerSmoke, /Inno uninstaller removed a newer Chrome Host registration/);
-  assert.equal((installerSmoke.match(/& \$installerPath \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART/g) || []).length, 2);
+  assert.match(installerSmoke, /Start-Process -FilePath \$Path -ArgumentList \$Arguments -Wait -PassThru/);
+  assert.equal((installerSmoke.match(/Invoke-Installer \$installerPath/g) || []).length, 2);
   assert.equal((installerSmoke.match(/^  Assert-InstalledHost$/gm) || []).length, 2);
-  assert.match(installerSmoke, /& \$uninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
-  assert.match(installerSmoke, /& \$cleanupUninstaller\.FullName \/VERYSILENT \/SUPPRESSMSGBOXES \/NORESTART \/PRESERVECREDENTIALS/);
+  assert.match(installerSmoke, /Invoke-Installer \$uninstaller\.FullName/);
+  assert.match(installerSmoke, /Invoke-Installer \$cleanupUninstaller\.FullName/);
   assert.match(installerSmoke, /PASS Windows Host installer smoke/);
   assert.ok(
     ci.indexOf("npm run smoke:host:windows:installer") < ci.indexOf("Upload unsigned Windows installer candidate"),

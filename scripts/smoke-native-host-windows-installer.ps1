@@ -77,6 +77,15 @@ function Invoke-PowerShellFile {
   return $LASTEXITCODE
 }
 
+function Invoke-Installer {
+  param(
+    [string]$Path,
+    [string[]]$Arguments
+  )
+
+  return (Start-Process -FilePath $Path -ArgumentList $Arguments -Wait -PassThru).ExitCode
+}
+
 function Assert-InstalledHost {
   foreach ($relativePath in $requiredBundleFiles + "com.clipplane.host.json") {
     $installedPath = Join-Path $installRoot $relativePath
@@ -130,15 +139,15 @@ try {
     Set-Item -LiteralPath $registryPaths[$name] -Value $sentinels[$name]
   }
 
-  & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-  if ($LASTEXITCODE -ne 0) {
-    throw "Windows installer exited with $LASTEXITCODE."
+  $installerExitCode = Invoke-Installer $installerPath @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
+  if ($installerExitCode -ne 0) {
+    throw "Windows installer exited with $installerExitCode."
   }
   Assert-InstalledHost
 
-  & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-  if ($LASTEXITCODE -ne 0) {
-    throw "Windows installer repair exited with $LASTEXITCODE."
+  $repairExitCode = Invoke-Installer $installerPath @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
+  if ($repairExitCode -ne 0) {
+    throw "Windows installer repair exited with $repairExitCode."
   }
   Assert-InstalledHost
 
@@ -168,9 +177,9 @@ try {
   }
   $newerChromeRegistration = "C:\clipplane-smoke\newer-$PID.json"
   Set-Item -LiteralPath $registryPaths.chrome -Value $newerChromeRegistration
-  & $uninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PRESERVECREDENTIALS
-  if ($LASTEXITCODE -ne 0) {
-    throw "Inno uninstaller exited with $LASTEXITCODE."
+  $uninstallerExitCode = Invoke-Installer $uninstaller.FullName @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/PRESERVECREDENTIALS")
+  if ($uninstallerExitCode -ne 0) {
+    throw "Inno uninstaller exited with $uninstallerExitCode."
   }
   if (Test-Path -LiteralPath $installRoot) {
     throw "Inno uninstaller left the Host install root behind: $installRoot"
@@ -193,7 +202,7 @@ try {
   if (Test-Path -LiteralPath $installRoot) {
     $cleanupUninstaller = Get-ChildItem -LiteralPath $installRoot -Filter "unins*.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($cleanupUninstaller) {
-      & $cleanupUninstaller.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PRESERVECREDENTIALS
+      Invoke-Installer $cleanupUninstaller.FullName @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/PRESERVECREDENTIALS") | Out-Null
     }
   }
   foreach ($name in $registryPaths.Keys) {
