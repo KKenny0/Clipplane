@@ -24,7 +24,7 @@ Current source is the breaking `0.8.0` storage candidate: the active Inbox is Ma
 
 - GitHub Releases provide `clipplane-extension-v0.7.7.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
 - macOS arm64 keeps the signed, notarized, and stapled Host `0.7.6` package; the immutable `v0.7.7` release pins SHA-256 `2d2c…fa4d6` and Apple Team ID `S7V7CK2G9T`.
-- Windows has no public binary installer. Users need Git and Node 20.19 or later in the Node 20 line, then run the PowerShell setup from the full commit SHA documented below.
+- Windows has no public binary installer. Users need Git and Node 24.13 or later in the Node 24 line, then run the PowerShell setup from the full commit SHA documented below.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
@@ -35,7 +35,7 @@ Chrome Native Messaging requires the local host to list the exact extension orig
 
 ### 1. Prepare the files
 
-For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git and Node 20.19 or later in the Node 20 line, then use the pinned source commit below; do not execute a tag's `Source code` archive.
+For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git and Node 24.13 or later in the Node 24 line, then use the pinned source commit below; do not execute a tag's `Source code` archive.
 
 Windows x64 uses the reviewed Host `0.7.6` source commit:
 
@@ -199,7 +199,7 @@ npm run verify:store
 
 Every public Host download record must pin its release tag, asset name, Host version, SHA-256 digest, and platform signing identity. `npm run verify:host:release` downloads the official release asset and verifies those claims. The Windows source path pins a full commit SHA instead of trusting a movable tag.
 
-On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.pkg` promised to end users in the immutable `v0.7.7` release.
+On Node 24.13 or later in the Node 24 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.pkg` promised to end users in the immutable `v0.7.7` release.
 
 Build and verify a private unsigned Windows candidate in this order:
 

@@ -6,15 +6,15 @@ import { fileURLToPath } from "node:url";
 import {
   findForbiddenHostFiles,
   findNonSystemMacRuntimeDependencies,
-  validateNode20Version
+  validateSupportedNodeVersion
 } from "../scripts/host-package-policy.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("Host package runtime stays on supported Node 20", () => {
-  assert.doesNotThrow(() => validateNode20Version("v20.19.0"));
-  assert.throws(() => validateNode20Version("v24.0.0"), /require Node 20/);
-  assert.throws(() => validateNode20Version("v20.18.3"), /require Node 20/);
+test("Host package runtime stays on supported Node 24", () => {
+  assert.doesNotThrow(() => validateSupportedNodeVersion("v24.13.0"));
+  assert.throws(() => validateSupportedNodeVersion("v24.12.0"), /require Node 24/);
+  assert.throws(() => validateSupportedNodeVersion("v20.19.0"), /require Node 24/);
 });
 
 test("macOS Host runtime rejects non-system dynamic libraries", () => {
@@ -174,11 +174,11 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
   );
 });
 
-test("Windows source setup rejects runtimes outside supported Node 20 before installation", async () => {
+test("Windows source setup rejects runtimes outside supported Node 24 before installation", async () => {
   const setupScript = await readFile(path.join(rootDir, "scripts", "setup-windows.ps1"), "utf8");
-  const validation = setupScript.indexOf("$nodeVersion.Major -ne 20");
+  const validation = setupScript.indexOf("$nodeVersion.Major -ne 24");
   const install = setupScript.indexOf("& $installScript @installArgs");
   assert.ok(validation >= 0 && install > validation);
-  assert.match(setupScript, /\$nodeVersion -lt \[version\]"20\.19\.0"/);
-  assert.match(setupScript, /requires Node\.js >=20\.19\.0 <21/);
+  assert.match(setupScript, /\$nodeVersion -lt \[version\]"24\.13\.0"/);
+  assert.match(setupScript, /requires Node\.js >=24\.13\.0 <25/);
 });

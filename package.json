@@ -35,7 +35,7 @@
     "accept:migration": "node scripts/accept-legacy-migration.mjs"
   },
   "engines": {
-    "node": ">=20.19.0 <21"
+    "node": ">=24.13.0 <25"
   },
   "devDependencies": {
     "@mozilla/readability": "0.6.0",

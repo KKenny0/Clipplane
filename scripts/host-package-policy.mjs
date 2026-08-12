@@ -8,14 +8,14 @@ const FORBIDDEN_EXTENSIONS = new Set([
   ".key", ".p12", ".pfx", ".pem"
 ]);
 
-export function validateNode20Version(version) {
+export function validateSupportedNodeVersion(version) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
   if (!match) {
     throw new Error(`Could not parse Node version: ${version}`);
   }
   const [, major, minor] = match.map(Number);
-  if (major !== 20 || minor < 19) {
-    throw new Error(`Native Host bundles require Node 20.19 or later in the Node 20 line; got ${version.trim()}`);
+  if (major !== 24 || minor < 13) {
+    throw new Error(`Native Host bundles require Node 24.13 or later in the Node 24 line; got ${version.trim()}`);
   }
 }
 

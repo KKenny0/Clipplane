@@ -17,8 +17,8 @@ $checkScript = Join-Path $PSScriptRoot "check-native-host.ps1"
 $node = Get-Command node -ErrorAction Stop
 $nodeVersionText = (& $node.Source --version).Trim().TrimStart("v")
 $nodeVersion = [version]$nodeVersionText
-if ($nodeVersion.Major -ne 20 -or $nodeVersion -lt [version]"20.19.0") {
-  throw "Clipplane source setup requires Node.js >=20.19.0 <21. Found $nodeVersionText at $($node.Source). Install Node 20 LTS or use the packaged Host."
+if ($nodeVersion.Major -ne 24 -or $nodeVersion -lt [version]"24.13.0") {
+  throw "Clipplane source setup requires Node.js >=24.13.0 <25. Found $nodeVersionText at $($node.Source). Install Node 24 or use the packaged Host."
 }
 Write-Host "PASS node ${nodeVersionText}: $($node.Source)"
 

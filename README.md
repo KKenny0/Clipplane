@@ -24,7 +24,7 @@ Clipplane 是面向人和 Agent 的本地网页剪藏 Inbox，由浏览器扩展
 
 - GitHub Release 提供 `clipplane-extension-v0.7.7.zip` 用于手动 `Load unpacked`，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
 - macOS arm64 继续使用签名、公证并 stapled 的 Host `0.7.6` 包；`v0.7.7` immutable release 固定其 SHA-256 `2d2c…fa4d6` 与 Apple Team ID `S7V7CK2G9T`。
-- Windows 不提供公开二进制安装器；用户需要 Git、Node 20.19 或更高的 Node 20，并从下方完整 commit SHA 固定的官方源码运行 PowerShell setup 脚本。
+- Windows 不提供公开二进制安装器；用户需要 Git、Node 24.13 或更高的 Node 24，并从下方完整 commit SHA 固定的官方源码运行 PowerShell setup 脚本。
 - Chrome Web Store 条目尚未提交审核或公开发布；Edge Add-ons 也尚未上架。
 - setup 默认同时允许 canonical Store ID 和旧 GitHub dev-preview ID，迁移用户不需要手动复制 ID。
 - Edge Add-ons 可以作为后续免费商店分发路径单独推进。
@@ -35,7 +35,7 @@ Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展�
 
 ### 1. 准备文件
 
-从 `v0.7.7` Release 试用时，先下载 `clipplane-extension-v0.7.7.zip`。macOS arm64 用户再下载同一 immutable Release 中的已签名 `.pkg`。Windows 用户安装 Git、Node 20.19 或更高的 Node 20，并使用下面固定的源码 commit；不要执行 tag 的 `Source code` 压缩包。
+从 `v0.7.7` Release 试用时，先下载 `clipplane-extension-v0.7.7.zip`。macOS arm64 用户再下载同一 immutable Release 中的已签名 `.pkg`。Windows 用户安装 Git、Node 24.13 或更高的 Node 24，并使用下面固定的源码 commit；不要执行 tag 的 `Source code` 压缩包。
 
 Windows x64 使用已审核的 Host `0.7.6` 源码 commit：
 
@@ -199,7 +199,7 @@ npm run verify:store
 
 公开 Host 下载记录必须固定 release tag、asset 名、Host 版本、SHA-256 和平台签名身份；`npm run verify:host:release` 会从官方 Release 下载并复核这些声明。Windows 源码路径固定完整 commit SHA，不依赖可移动 tag。
 
-在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `v0.7.7` immutable release 中面向用户承诺的签名 `.pkg`。
+在目标系统的 Node 24.13 或更高 Node 24 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `v0.7.7` immutable release 中面向用户承诺的签名 `.pkg`。
 
 Windows 的私有 unsigned candidate 必须按这个顺序构建和验证：
 

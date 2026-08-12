@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   findForbiddenHostFiles,
   findNonSystemMacRuntimeDependencies,
-  validateNode20Version
+  validateSupportedNodeVersion
 } from "./host-package-policy.mjs";
 import { getNativeHostOrigins } from "./native-host-origins.mjs";
 
@@ -23,7 +23,7 @@ const runtimePath = process.env.CLIPPLANE_NODE_RUNTIME
   ? path.resolve(process.env.CLIPPLANE_NODE_RUNTIME)
   : process.execPath;
 const runtimeVersion = run(runtimePath, ["--version"], { capture: true }).stdout;
-validateNode20Version(runtimeVersion);
+validateSupportedNodeVersion(runtimeVersion);
 const runtimeArch = run(runtimePath, ["-p", "process.arch"], { capture: true }).stdout.trim();
 if (runtimeArch !== process.arch) {
   throw new Error(`Native Host runtime architecture ${runtimeArch} does not match build architecture ${process.arch}.`);
@@ -31,7 +31,7 @@ if (runtimeArch !== process.arch) {
 if (target === "macos") {
   const dependencies = findNonSystemMacRuntimeDependencies(run("otool", ["-L", runtimePath], { capture: true }).stdout);
   if (dependencies.length) {
-    throw new Error(`macOS Host runtime is not self-contained; use an official Node 20 binary via CLIPPLANE_NODE_RUNTIME:\n${dependencies.join("\n")}`);
+    throw new Error(`macOS Host runtime is not self-contained; use an official Node 24 binary via CLIPPLANE_NODE_RUNTIME:\n${dependencies.join("\n")}`);
   }
 }
 
