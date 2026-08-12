@@ -56,6 +56,7 @@ test("settings follows tab and keyboard accessibility structure", async () => {
   const sinkFields = [...document.querySelectorAll(".sink-fields")];
   assert.equal(sinkFields.length, 2);
   assert.ok(sinkFields.every((fields) => fields.querySelectorAll(".field").length === 2));
+  assert.ok(document.querySelector("#copy-diagnostics"));
 });
 
 test("history keeps destructive actions inside a capture-scoped management disclosure", async () => {
@@ -72,6 +73,10 @@ test("history keeps destructive actions inside a capture-scoped management discl
 
   const background = await readFile(path.join(rootDir, "extension", "src", "background.js"), "utf8");
   assert.match(background, /"copy_capture"/);
+  assert.match(background, /async function sendNative\(message\)[\s\S]*requiresCurrentHostProtocol\(message\?\.type\)[\s\S]*sendNativeUnchecked/);
+
+  const popup = await readFile(path.join(rootDir, "extension", "popup.js"), "utf8");
+  assert.match(popup, /type: "copy_capture", captureId, mode: "agent-reference"/);
 });
 
 test("extension styles avoid broad transitions and honor reduced motion", async () => {

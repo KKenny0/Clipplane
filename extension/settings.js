@@ -10,6 +10,7 @@ import {
 import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
 import { historyActionDisabled } from "./src/history-actions.js";
 import { getUiState, nextTabIndex, resolveHostUiState, stateClassName } from "./src/ui-state.js";
+import { browserLabel, buildDiagnostics } from "./src/diagnostics.js";
 
 const stateEl = document.querySelector("#settings-state");
 const resultEl = document.querySelector("#result");
@@ -68,6 +69,7 @@ for (const button of tabButtons) {
 }
 document.querySelector("#save-storage").addEventListener("click", saveStorage);
 document.querySelector("#open-folder").addEventListener("click", openFolder);
+document.querySelector("#copy-diagnostics").addEventListener("click", copyDiagnostics);
 document.querySelector("#refresh-history").addEventListener("click", loadHistory);
 for (const button of historyFilterButtons) {
   button.addEventListener("click", () => setHistoryMode(button.dataset.historyFilter));
@@ -336,7 +338,7 @@ async function handleHistoryAction(event) {
       const item = historyItems.find((capture) => capture.capture_id === captureId);
       const detail = item?.inbox_state === "missing"
         ? "Finish cleanup for this capture? Its internal history and source snapshot will be kept."
-        : "Mark this capture as processed? It will be removed from inbox.org, while its internal history and source snapshot are kept.";
+        : "Mark this capture as processed? It will be removed from inbox.md, while its internal history and source snapshot are kept.";
       if (!window.confirm(detail)) {
         return;
       }
@@ -350,7 +352,7 @@ async function handleHistoryAction(event) {
     }
 
     if (button.dataset.action === "delete-capture") {
-      if (!window.confirm("Permanently delete this local capture from inbox.org, History, and its source snapshot? Copies already sent to Notion or flomo will not be deleted.")) {
+      if (!window.confirm("Permanently delete this local capture from inbox.md, History, and its source snapshot? Copies already sent to Notion or flomo will not be deleted.")) {
         return;
       }
       const response = await sendNative({ type: "delete_capture", captureId });
@@ -662,6 +664,52 @@ function formatDateTime(value) {
 
 function sendNative(message) {
   return chrome.runtime.sendMessage(message);
+}
+
+async function copyDiagnostics() {
+  setBusy(true, "Checking");
+  try {
+    const [platform, status] = await Promise.all([
+      chrome.runtime.getPlatformInfo(),
+      sendNative({ type: "status" })
+    ]);
+    const diagnostics = buildDiagnostics({
+      platform,
+      browser: browserLabel(navigator.userAgentData, navigator.userAgent),
+      extensionVersion: chrome.runtime.getManifest().version,
+      status
+    });
+    await copyText(diagnostics);
+    showResult("Diagnostics copied");
+  } catch {
+    showResult("Could not copy diagnostics.", true);
+  } finally {
+    setBusy(false, "Ready");
+  }
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // Fall through to the extension-page clipboard fallback.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) {
+    throw new Error("clipboard_unavailable");
+  }
 }
 
 function renderHostUnavailable(outdated = false) {

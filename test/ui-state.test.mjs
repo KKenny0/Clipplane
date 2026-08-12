@@ -34,7 +34,12 @@ test("re-clipping processed content reports that it returned to the inbox", () =
   const state = resolveClipUiState({ ok: true, duplicate: true, reactivated: true });
   assert.equal(state.key, "reactivated");
   assert.equal(state.title, "Returned to your inbox");
-  assert.equal(state.action, "Open note");
+  assert.equal(state.action, "Copy for Agent");
+});
+
+test("a local save continues directly into the Agent handoff", () => {
+  assert.equal(resolveClipUiState({ ok: true, capture: {} }).action, "Copy for Agent");
+  assert.equal(resolveClipUiState({ ok: true, duplicate: true, capture: {} }).action, "Copy for Agent");
 });
 
 test("missing and outdated Hosts have separate recovery states", () => {

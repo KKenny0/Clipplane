@@ -26,11 +26,11 @@ export function getHostDownloadUrl(os, arch, version, options = {}) {
 
 function hasPinnedIdentity(release) {
   return Boolean(
-    release &&
-    /^v\d+\.\d+\.\d+$/.test(release.releaseTag) &&
-    /^clipplane-host-v\d+\.\d+\.\d+-macos-arm64\.pkg$/.test(release.asset) &&
-    /^\d+\.\d+\.\d+$/.test(release.hostVersion) &&
-    /^[a-f0-9]{64}$/.test(release.sha256) &&
-    /^[A-Z0-9]{10}$/.test(release.appleTeamId)
+    release
+    && /^v\d+\.\d+\.\d+$/.test(release.releaseTag)
+    && /^clipplane-host-v\d+\.\d+\.\d+-macos-arm64\.pkg$/.test(release.asset)
+    && /^\d+\.\d+\.\d+$/.test(release.hostVersion)
+    && /^[a-f0-9]{64}$/.test(release.sha256)
+    && /^[A-Z0-9]{10}$/.test(release.appleTeamId)
   );
 }

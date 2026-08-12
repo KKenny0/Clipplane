@@ -30,6 +30,11 @@ test("0.7.7 points only to the immutable, identity-pinned macOS Host release", (
   assert.equal(getHostAsset("mac", "x86-64", "0.7.7"), null);
 });
 
+test("the 0.8.0 source candidate does not advertise an unpublished installer", () => {
+  assert.equal(getHostDownloadUrl("mac", "arm64", "0.8.0"), null);
+  assert.equal(getHostDownloadUrl("win", "x86-64", "0.8.0"), null);
+});
+
 test("published Host download URLs require exact immutable assets", () => {
   const options = {
     publishedReleases: new Map([

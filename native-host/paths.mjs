@@ -8,8 +8,10 @@ export function getDefaultPaths(notesDir = process.env.CLIPPLANE_NOTES_DIR || DE
 
   return {
     notesDir,
-    inboxPath: path.join(notesDir, "inbox.org"),
+    inboxPath: path.join(notesDir, "inbox.md"),
+    legacyInboxPath: path.join(notesDir, "inbox.org"),
     stateDir: path.join(notesDir, ".clipplane"),
+    legacyInboxBackupPath: path.join(notesDir, ".clipplane", "backups", "inbox-v2.org"),
     capturesPath: path.join(notesDir, ".clipplane", "captures.jsonl"),
     captureBodiesDir: path.join(notesDir, ".clipplane", "captures"),
     legacyConfigPath: path.join(notesDir, ".clipplane", "config.json"),

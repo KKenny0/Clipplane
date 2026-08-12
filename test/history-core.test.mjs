@@ -438,7 +438,7 @@ test("legacy absolute paths remain portable across storage roots", async () => {
   assert.equal(migrated.includes(sourceNotesDir), false);
   assert.equal(migrated.includes(destinationNotesDir), false);
   assert.equal(migrated.includes("C:\\Users\\Alice"), false);
-  assert.match(migrated, /"schema_version":2/);
+  assert.match(migrated, /"schema_version":3/);
   assert.match(migrated, /\{not json\}/);
 
   await deleteCapture(clip.capture.capture_id, { notesDir: destinationNotesDir, configDir: destinationConfigDir });
@@ -447,7 +447,7 @@ test("legacy absolute paths remain portable across storage roots", async () => {
   assert.equal(await fileExists(sourceSync.capture.sinks["local-export"].path), true);
 });
 
-test("markCaptureProcessed removes one complete org subtree and keeps internal history", async () => {
+test("markCaptureProcessed removes one complete Markdown capture and keeps internal history", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-history-process-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const first = await clipPayload({
@@ -469,7 +469,7 @@ test("markCaptureProcessed removes one complete org subtree and keeps internal h
 
   assert.equal(result.lifecycle_status, "processed");
   assert.equal(await fileExists(first.capture.content_path), true);
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
   assert.doesNotMatch(inbox, new RegExp(first.capture.capture_id));
   assert.doesNotMatch(inbox, /Processed body/);
   assert.match(inbox, new RegExp(second.capture.capture_id));
@@ -493,7 +493,7 @@ test("markCaptureProcessed finishes cleanup when the user already removed the in
     title: "Already removed",
     contentMarkdown: "Body"
   }, { notesDir, configDir });
-  await fs.writeFile(path.join(notesDir, "inbox.org"), "#+title: Inbox\n", "utf8");
+  await fs.writeFile(path.join(notesDir, "inbox.md"), "# Inbox\n", "utf8");
 
   const before = await listCaptureHistory({ notesDir, configDir });
   assert.equal(before.history.items[0].inbox_state, "missing");
@@ -527,7 +527,7 @@ test("deleteCapture removes inbox entry, capture record, and source snapshot", a
   assert.equal(result.remote_copies_affected, false);
   assert.equal(await fileExists(deleted.capture.content_path), false);
   assert.equal(await fileExists(kept.capture.content_path), true);
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.doesNotMatch(inbox, new RegExp(deleted.capture.capture_id));
   assert.match(inbox, new RegExp(kept.capture.capture_id));
@@ -564,8 +564,8 @@ test("lifecycle operations reject duplicate inbox IDs without deleting content",
     title: "Duplicate",
     contentMarkdown: "Body"
   }, { notesDir, configDir });
-  const inboxPath = path.join(notesDir, "inbox.org");
-  await fs.appendFile(inboxPath, `\n* Duplicate copy\n:PROPERTIES:\n:CAPTURE_ID: ${clip.capture.capture_id}\n:END:\n`, "utf8");
+  const inboxPath = path.join(notesDir, "inbox.md");
+  await fs.appendFile(inboxPath, `\n<!-- clipplane:capture:start id="${clip.capture.capture_id}" -->\n## Duplicate copy\n\nBody\n<!-- clipplane:capture:end id="${clip.capture.capture_id}" -->\n`, "utf8");
 
   await assert.rejects(
     () => deleteCapture(clip.capture.capture_id, { notesDir, configDir }),
@@ -574,7 +574,7 @@ test("lifecycle operations reject duplicate inbox IDs without deleting content",
 
   assert.equal(await fileExists(clip.capture.content_path), true);
   const inbox = await fs.readFile(inboxPath, "utf8");
-  assert.equal(inbox.match(new RegExp(clip.capture.capture_id, "g")).length, 2);
+  assert.equal(inbox.match(new RegExp(clip.capture.capture_id, "g")).length, 4);
 });
 
 test("history resumes a processing operation left by an interrupted host", async () => {
@@ -598,7 +598,7 @@ test("history resumes a processing operation left by an interrupted host", async
 
   assert.equal(active.history.items.length, 0);
   assert.equal(processed.history.items[0].capture_id, clip.capture.capture_id);
-  assert.doesNotMatch(await fs.readFile(path.join(notesDir, "inbox.org"), "utf8"), new RegExp(clip.capture.capture_id));
+  assert.doesNotMatch(await fs.readFile(path.join(notesDir, "inbox.md"), "utf8"), new RegExp(clip.capture.capture_id));
 });
 
 test("history leaves future-schema lifecycle records and managed files unchanged", async () => {
@@ -618,9 +618,9 @@ test("history leaves future-schema lifecycle records and managed files unchanged
       sinks: ["local-export"]
     });
     const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
-    const inboxPath = path.join(notesDir, "inbox.org");
+    const inboxPath = path.join(notesDir, "inbox.md");
     const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
-    record.schema_version = 3;
+    record.schema_version = 4;
     record.lifecycle_status = lifecycleStatus;
     record.lifecycle_started_at = new Date().toISOString();
     record.future_state = { preserved: true };
@@ -666,13 +666,38 @@ test("re-clipping processed content reactivates the existing capture", async () 
   const second = await clipPayload(payload, { notesDir, configDir });
   const active = await listCaptureHistory({ notesDir, configDir, lifecycle: "active" });
   const processed = await listCaptureHistory({ notesDir, configDir, lifecycle: "processed" });
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
 
   assert.equal(second.duplicate, true);
   assert.equal(second.reactivated, true);
   assert.deepEqual(active.history.items.map((item) => item.capture_id), [first.capture.capture_id]);
   assert.equal(processed.history.items.length, 0);
-  assert.equal(inbox.match(new RegExp(first.capture.capture_id, "g")).length, 1);
+  assert.equal(inbox.match(new RegExp(first.capture.capture_id, "g")).length, 2);
+});
+
+test("history finishes a reactivation interrupted after its journal record", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-reactivation-recovery-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/reactivation-recovery",
+    sourceTitle: "Reactivation recovery",
+    title: "Reactivation recovery",
+    contentMarkdown: "Recovered reactivation body"
+  }, { notesDir, configDir });
+  await markCaptureProcessed(clip.capture.capture_id, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  record.lifecycle_status = "reactivating";
+  record.lifecycle_started_at = new Date().toISOString();
+  await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
+
+  const active = await listCaptureHistory({ notesDir, configDir, lifecycle: "active" });
+  const recovered = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+
+  assert.deepEqual(active.history.items.map((item) => item.capture_id), [clip.capture.capture_id]);
+  assert.equal("lifecycle_status" in recovered, false);
+  assert.match(await fs.readFile(path.join(notesDir, "inbox.md"), "utf8"), /Recovered reactivation body/);
 });
 
 test("deleteCapture removes a Clipplane-managed local export", async () => {
@@ -729,7 +754,7 @@ test("lifecycle rewrites preserve restrictive file modes", { skip: process.platf
     title: "Mode",
     contentMarkdown: "Body"
   }, { notesDir, configDir });
-  const inboxPath = path.join(notesDir, "inbox.org");
+  const inboxPath = path.join(notesDir, "inbox.md");
   const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
   await fs.chmod(inboxPath, 0o600);
   await fs.chmod(capturesPath, 0o600);

@@ -225,11 +225,11 @@ async function handleResultAction() {
     if (!captureId) {
       return;
     }
-    const response = await chrome.runtime.sendMessage({ type: "open_capture_body", captureId });
+    const response = await chrome.runtime.sendMessage({ type: "copy_capture", captureId, mode: "agent-reference" });
     if (!response?.ok) {
       renderResult(response);
     } else {
-      showTransientResult("Note opened", "Clipplane opened the saved body from your capture trail.");
+      showTransientResult("Copied for Agent", "Paste the capture reference into your local Agent session.");
     }
     return;
   }

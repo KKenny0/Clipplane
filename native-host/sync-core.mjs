@@ -4,6 +4,7 @@ import { resolveCaptureBodyForRead, withRuntimeCapturePaths } from "./capture-re
 import { assertCaptureStoreWritable, captureRecords, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
 import { ClipplaneError } from "./clip-core.mjs";
 import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
+import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
 import { syncLocalExport } from "./sinks/local-export.mjs";
 import { syncNotionApi } from "./sinks/notion-api.mjs";
@@ -65,6 +66,7 @@ export async function syncCapture(captureId, options = {}) {
 }
 
 async function syncCaptureLocked(captureId, options, paths, config) {
+  await prepareCaptureStorage(paths);
   const store = await readCaptureStore(paths.capturesPath);
   assertCaptureStoreWritable(store.entries);
   const records = captureRecords(store);

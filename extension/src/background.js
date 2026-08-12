@@ -6,7 +6,7 @@ import {
 } from "./element-capture-state.js";
 import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
 import { capturablePage } from "./capture-policy.js";
-import { supportsHostProtocol } from "./host-protocol.js";
+import { requiresCurrentHostProtocol, supportsHostProtocol } from "./host-protocol.js";
 
 const HOST_NAME = "com.clipplane.host";
 const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
@@ -291,6 +291,24 @@ async function storeCaptureFailure(error) {
 }
 
 async function sendNative(message) {
+  if (requiresCurrentHostProtocol(message?.type)) {
+    const status = await sendNativeUnchecked({ type: "status" });
+    if (!status.ok) {
+      return status;
+    }
+    if (!supportsHostProtocol(status.protocol_version)) {
+      return {
+        ok: false,
+        host_version: status.host_version || null,
+        protocol_version: status.protocol_version || null,
+        error: { code: "host_outdated", message: "Clipplane Host must be updated." }
+      };
+    }
+  }
+  return sendNativeUnchecked(message);
+}
+
+async function sendNativeUnchecked(message) {
   try {
     return await chrome.runtime.sendNativeMessage(HOST_NAME, message);
   } catch (error) {

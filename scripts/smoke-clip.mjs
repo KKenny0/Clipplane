@@ -15,4 +15,4 @@ const result = await clipPayload({
 }, { notesDir, configDir });
 
 console.log(JSON.stringify(result, null, 2));
-console.log(await fs.readFile(path.join(notesDir, "inbox.org"), "utf8"));
+console.log(await fs.readFile(path.join(notesDir, "inbox.md"), "utf8"));

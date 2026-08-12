@@ -1,6 +1,6 @@
 # Clipplane Privacy Policy
 
-Last updated: July 10, 2026
+Last updated: August 12, 2026
 
 Clipplane is a local-first browser clipper. This policy describes what the Clipplane browser extension and its Native Messaging host handle, where that data goes, and what choices you have.
 
@@ -17,7 +17,9 @@ Clipplane does not capture pages in the background. Page access begins only afte
 
 ## Local Storage
 
-Clips are saved first to files on your computer through the Clipplane Native Messaging host. By default these files are under `~/Documents/notes`, including `inbox.org` and the `.clipplane` capture history. Extension preferences and external-sync consent records are stored in Chrome extension storage.
+Clips are saved first to files on your computer through the Clipplane Native Messaging host. By default these files are under `~/Documents/notes`, including `inbox.md` and the `.clipplane` capture history. Extension preferences and external-sync consent records are stored in Chrome extension storage.
+
+The **Copy for Agent** action puts a title, sanitized source URL, and local Markdown snapshot path on your clipboard. **Copy diagnostics** puts only operating system, architecture, browser, extension version, Host version, protocol version, and a machine-readable error code on your clipboard. It does not include captured content, note paths, or external-sync credentials.
 
 Notion tokens and flomo webhooks are stored in the operating system credential store on supported Windows and macOS installations. Clipplane refuses to silently fall back to plaintext credential files. Older development versions may have stored these values in the local Clipplane config file; saving Sync settings migrates them only after the operating system credential store passes a write-and-read verification.
 
@@ -38,7 +40,7 @@ Clipplane's use of information received from Google APIs complies with the Chrom
 
 ## Retention and Deletion
 
-Local clips remain until you process or delete them. In Capture History, **Mark processed** removes the matching entry from `inbox.org` while retaining Clipplane's local history record and source snapshot. **Delete local copy** removes the matching Org entry, history record, source snapshot, and Clipplane-managed local-export copy together. If you remove an Org entry manually, History reports that it is missing and lets you finish cleanup without guessing that the edit was a permanent deletion. You can remove extension preferences and consent records by clearing the extension's data or uninstalling it. You can remove stored Notion or flomo credentials through the operating system credential manager. Data already sent to Notion or flomo must be deleted through that service.
+Local clips remain until you process or delete them. In Capture History, **Mark processed** removes the matching bounded entry from `inbox.md` while retaining Clipplane's local history record and Markdown source snapshot. **Delete local copy** removes the matching Inbox entry, history record, source snapshot, and Clipplane-managed local-export copy together. If you remove an Inbox entry manually, History reports that it is missing and lets you finish cleanup without guessing that the edit was a permanent deletion. During a 0.7.x upgrade, the previous `inbox.org` is retained both at its original location as read-only migration evidence and at `.clipplane/backups/inbox-v2.org`; Clipplane does not delete these migration copies automatically. You can remove extension preferences and consent records by clearing the extension's data or uninstalling it. You can remove stored Notion or flomo credentials through the operating system credential manager. Data already sent to Notion or flomo must be deleted through that service.
 
 ## Security
 

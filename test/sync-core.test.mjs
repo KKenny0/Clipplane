@@ -53,7 +53,7 @@ test("syncCapture writes local export and updates captures jsonl", async () => {
   assert.equal(records.includes(notesDir), false);
   assert.doesNotMatch(records, /"content_path"|"local_path"|"path"/);
   const localExport = JSON.parse(exported);
-  assert.equal(localExport.capture.schema_version, 2);
+  assert.equal(localExport.capture.schema_version, 3);
   assert.equal("content_path" in localExport.capture, false);
   assert.equal(JSON.stringify(localExport.capture).includes(notesDir), false);
 });
@@ -99,7 +99,7 @@ test("future capture schemas remain readable but cannot be mutated", async () =>
   }, { notesDir, configDir });
   const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
   const future = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
-  future.schema_version = 3;
+  future.schema_version = 4;
   future.future_state = { preserved: true };
   await fs.writeFile(capturesPath, `${JSON.stringify(future)}\n`, "utf8");
 

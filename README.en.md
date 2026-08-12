@@ -7,24 +7,24 @@
 <p align="center">
   Keep the part that matters as an inspectable note.
   <br>
-  Save a selection, readable page, or page element to a local <code>inbox.org</code>, inspect the capture trail later, and sync to Notion or flomo only when you choose.
+  Save a selection, readable page, or page element to a local <code>inbox.md</code>, then hand it directly to an Agent or sync only when you choose.
 </p>
 
 <p align="center">
   <a href="README.md">中文 README</a> · <a href="https://kkenny0.github.io/Clipplane/">Product</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">Setup</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">Privacy</a> · <a href="https://kkenny0.github.io/Clipplane/support/">Help</a>
 </p>
 
-Clipplane is a web clipper built for note workflows, with two parts: a browser extension and a local Native Messaging host. The extension captures a selection, readable page, or chosen element by an explicit boundary. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. Clips become local notes first; external services are optional sinks, not a requirement for saving.
+Clipplane is a local capture inbox for people and Agents, with two parts: a browser extension and a Native Messaging host. The extension captures a selection, readable page, or chosen element by an explicit boundary. The local host cleans it into Markdown and writes it into your notes folder. Each clip becomes a traceable local capture before you process it, hand it to an Agent, or optionally sync it elsewhere.
 
 The extension's first-install page checks the Host version. On macOS arm64 it links only to an asset in an immutable GitHub Release with a pinned digest and Apple Team ID; on Windows it points to a commit-pinned source setup guide. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
 
 ## Current Status
 
-Clipplane `0.7.7` uses a macOS-first public distribution boundary while retaining source setup on Windows:
+Current source is the breaking `0.8.0` storage candidate: the active Inbox is Markdown and Host protocol is 3. The published stable extension is `0.7.7`, with a macOS-first distribution boundary:
 
 - GitHub Releases provide `clipplane-extension-v0.7.7.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
-- macOS arm64 continues to use the signed, notarized, and stapled Host `0.7.6` package. The immutable `v0.7.7` release pins SHA-256 `2d2c…fa4d6` and Apple Team ID `S7V7CK2G9T`.
-- Windows has no public binary installer. Users need Node 20.19 or later in the Node 20 line and run the PowerShell setup from the full commit SHA below.
+- macOS arm64 keeps the signed, notarized, and stapled Host `0.7.6` package; the immutable `v0.7.7` release pins SHA-256 `2d2c…fa4d6` and Apple Team ID `S7V7CK2G9T`.
+- Windows has no public binary installer. Users need Git and Node 20.19 or later in the Node 20 line, then run the PowerShell setup from the full commit SHA documented below.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
@@ -35,7 +35,7 @@ Chrome Native Messaging requires the local host to list the exact extension orig
 
 ### 1. Prepare the files
 
-For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git plus Node 20.19 or later in the Node 20 line and use the pinned source commit below; do not execute a tag's `Source code` archive.
+For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git and Node 20.19 or later in the Node 20 line, then use the pinned source commit below; do not execute a tag's `Source code` archive.
 
 Windows x64 uses the reviewed Host `0.7.6` source commit:
 
@@ -49,7 +49,7 @@ npm ci --omit=dev --ignore-scripts
 npm run smoke
 ```
 
-If you are running directly from the Git repo, run the same commands from the repo root. `smoke` writes a temporary `inbox.org` under the system temp directory so you can confirm the local clip core works.
+If you are running directly from the Git repo, run the same commands from the repo root. `smoke` writes a temporary `inbox.md` under the system temp directory so you can confirm the local clip core works.
 
 ### 2. Load the browser extension
 
@@ -57,7 +57,7 @@ If you are running directly from the Git repo, run the same commands from the re
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the unzipped `clipplane-extension-vX` folder, or the source repo's `extension` folder.
-5. Current source and `0.7.7` candidates should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
+5. Current source and the `0.7.7` package should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
 
 ### 3. Register the local host
 
@@ -123,19 +123,19 @@ You can also select text and clip it from the context menu.
 
 By default Clipplane writes:
 
-- `~/Documents/notes/inbox.org`
+- `~/Documents/notes/inbox.md`
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.org` is the workspace where you process clips. `captures.jsonl` and `captures/` under `.clipplane` are Clipplane-managed history, deduplication, retry, and sync state; you do not need to maintain them separately. All three representations refer to one capture through its `CAPTURE_ID`.
+`inbox.md` is the workspace where you process clips. `captures.jsonl` and `captures/` under `.clipplane` are Clipplane-managed history, deduplication, retry, and sync state. All three representations refer to one capture through its `CAPTURE_ID`. On the first upgrade from 0.7.x, the Host backs up `inbox.org` to `.clipplane/backups/inbox-v2.org` and retains the original Org file as read-only migration evidence. After an exclusive, verified publish, runtime writes go only to Markdown. Migration stops without overwriting or deleting files if the Org source changes, a Markdown destination appears, or unmanaged preamble content is found.
 
-`captures.jsonl` does not persist device-specific absolute paths. On each device, Clipplane resolves `inbox.org`, capture bodies, and local exports from the current `Storage` folder plus `CAPTURE_ID`, so the complete notes folder can move through Git between Windows, macOS, and different home directories. Absolute paths written by older versions are ignored and migrate to the portable format the next time that record changes.
+`captures.jsonl` does not persist device-specific absolute paths. On each device, Clipplane resolves `inbox.md`, capture bodies, and local exports from the current `Storage` folder plus `CAPTURE_ID`, so the complete notes folder can move through Git between Windows, macOS, and different home directories. Absolute paths written by older versions are ignored and migrate to the portable format the next time that record changes.
 
 After records migrate, do not downgrade to an older Host that does not support portable records; it cannot reliably retry sync for those records. If the current Host encounters a record written by a newer version, History remains readable, but mutations are refused until the Host is upgraded.
 
-This Git workflow assumes one writer at a time: commit and push on one device, then pull before continuing on another. Clipplane does not run Git automatically or resolve merge conflicts caused by two devices changing `captures.jsonl` or `inbox.org` concurrently.
+This Git workflow assumes one writer at a time: commit and push on one device, then pull before continuing on another. Clipplane does not run Git automatically or resolve merge conflicts caused by two devices changing `captures.jsonl` or `inbox.md` concurrently.
 
-The extension `Settings` page has `Storage`, `History`, and `Sync` tabs. Use `Storage` to inspect or change the local folder. In `History`, review recent clips, local body files, capture methods, and sync status. `Copy for Agent` copies a paste-ready title, source, and current-device body path for a local Agent session; `Copy content` under `Manage` copies the complete Markdown for an Agent that cannot read local files. History also lets you mark an item as processed or permanently delete its local copy. `Mark processed` removes the item from `inbox.org` while retaining its internal record and source snapshot under Processed; clipping the same content again returns that item to Active and `inbox.org`. `Delete local copy` removes the Org entry, history record, source snapshot, and Clipplane-managed local-export copy together, but does not delete content already sent to Notion or flomo. Use `Sync` to configure those optional destinations. Normal users do not need environment variables or launcher edits.
+After a successful save, duplicate, or reactivation, the result card's primary action is `Copy for Agent`. It copies a paste-ready title, source, and current-device Markdown body path for a local Agent session. `History` still exposes capture method and sync state; `Copy content` under `Manage` supports an Agent that cannot read local files. `Mark processed` removes the item from `inbox.md` while retaining its internal record and source snapshot; clipping it again returns it to the active Inbox. `Delete local copy` removes the Markdown Inbox entry, history record, snapshot, and managed local export. `Copy diagnostics` in Storage includes only OS, architecture, browser, extension, Host, protocol, and error code—never note paths, page content, or sync credentials.
 
 ## External Sync
 
@@ -148,7 +148,7 @@ External sinks are opt-in. Enabling one requires an explicit acknowledgement in 
 
 ## Reference Workflow
 
-Clipplane follows the clipping workflow from [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip): capture a URL or text selection, clean it into Markdown, convert it into org-mode, tag it, and append it to a local `inbox.org`. Clipplane turns that workflow into a browser-triggered app that writes inspectable local notes first, with external sync only as an optional second step.
+Clipplane originally took inspiration from the local-first workflow in [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip). Version `0.8.0` keeps the capture, cleanup, tagging, and Inbox structure, but no longer converts Markdown to Org. The same Markdown is readable by a person and directly usable by an Agent.
 
 ## How It Works
 
@@ -158,10 +158,10 @@ flowchart LR
   B --> C[Chrome Native Messaging]
   C --> D[Local Node host]
   D --> E[Clean Markdown]
-  E --> F[Convert to org-mode]
-  F --> G[Append inbox.org]
-  F --> H[Write capture body]
-  F --> I[Append captures.jsonl]
+  E --> G[Append inbox.md]
+  E --> H[Write capture body]
+  E --> I[Append captures.jsonl]
+  G --> N[Copy for Agent]
   I --> J{Explicit Save + sync}
   J --> K[Notion API]
   J --> L[flomo webhook API]
@@ -195,9 +195,9 @@ npm run verify:store
 
 `npm run package:extension` writes `dist/clipplane-extension-vX.zip`, preserving the public identity key for local candidate testing. First and subsequent Chrome Web Store uploads use `npm run package:store`, which writes `dist/clipplane-store-vX.zip` after removing `key` from the staging manifest without changing the source manifest. `npm run verify:store` audits the Store ZIP and rejects `key`, private keys, `.env*`, Native Host files, executables, remote code, and permission expansion. Both ZIPs contain only the browser extension. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license.
 
-On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.7`.
+Every public Host download record must pin its release tag, asset name, Host version, SHA-256 digest, and platform signing identity. `npm run verify:host:release` downloads the official release asset and verifies those claims. The Windows source path pins a full commit SHA instead of trusting a movable tag.
 
-A public Host download may be added to `extension/src/host-distribution.js` only as a complete release record: immutable release tag, asset name, SHA-256, Host version, and platform signing identity are all required. Before upload, run `node scripts/verify-published-host-release.mjs --version <extension-version> --asset <package-path>` against the local package. After publication, run `npm run verify:host:release -- --version <extension-version>` to read back GitHub's immutable state, asset digest, actual bytes, and Apple Team ID.
+On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.pkg` promised to end users in the immutable `v0.7.7` release.
 
 Build and verify a private unsigned Windows candidate in this order:
 

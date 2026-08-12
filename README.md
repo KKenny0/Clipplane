@@ -7,24 +7,24 @@
 <p align="center">
   把网页上该留下的部分，剪成可复查的笔记。
   <br>
-  一键保存选区、正文或页面元素到本地 <code>inbox.org</code>；可检查完整剪藏轨迹，需要时再同步到 Notion 或 flomo。
+  一键保存选区、正文或页面元素到本地 <code>inbox.md</code>，保存后可直接交给 Agent；需要时再同步到 Notion 或 flomo。
 </p>
 
 <p align="center">
   <a href="README.en.md">English README</a> · <a href="https://kkenny0.github.io/Clipplane/">产品页</a> · <a href="https://kkenny0.github.io/Clipplane/setup/">安装</a> · <a href="https://kkenny0.github.io/Clipplane/privacy/">隐私</a> · <a href="https://kkenny0.github.io/Clipplane/support/">帮助</a>
 </p>
 
-Clipplane 是面向笔记工作流的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展按边界捕获选区、可读正文或页面元素；本地 host 清理内容、转换为 org-mode，并写入 notes 目录。先成为本地笔记，再由你决定要不要同步；外部服务只是可选目标，不影响本地保存。
+Clipplane 是面向人和 Agent 的本地网页剪藏 Inbox，由浏览器扩展和 Native Messaging host 组成。扩展按边界捕获选区、可读正文或页面元素；本地 host 清理为 Markdown 并写入 notes 目录。内容先成为可追溯的本地 capture，再由你决定交给 Agent、自己处理或同步；外部服务只是可选目标。
 
 扩展首次安装页会检查 Host 版本。macOS arm64 只会指向不可变 GitHub Release 中、已固定摘要与 Apple Team ID 的 asset；Windows 会指向固定 commit 的源码安装指南。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
 
 ## 当前状态
 
-Clipplane `0.7.7` 采用 macOS-first 的公开分发边界，同时保留 Windows 源码安装：
+当前源码是破坏性存储升级候选 `0.8.0`：活动 Inbox 改为 Markdown，Host 协议升级到 3。已公开的稳定扩展版本为 `0.7.7`，并采用 macOS-first 的分发边界：
 
 - GitHub Release 提供 `clipplane-extension-v0.7.7.zip` 用于手动 `Load unpacked`，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
 - macOS arm64 继续使用签名、公证并 stapled 的 Host `0.7.6` 包；`v0.7.7` immutable release 固定其 SHA-256 `2d2c…fa4d6` 与 Apple Team ID `S7V7CK2G9T`。
-- Windows 不提供公开二进制安装器；用户需要 Node 20.19 或更高的 Node 20，并从下方完整 commit SHA 固定的官方源码运行 PowerShell setup 脚本。
+- Windows 不提供公开二进制安装器；用户需要 Git、Node 20.19 或更高的 Node 20，并从下方完整 commit SHA 固定的官方源码运行 PowerShell setup 脚本。
 - Chrome Web Store 条目尚未提交审核或公开发布；Edge Add-ons 也尚未上架。
 - setup 默认同时允许 canonical Store ID 和旧 GitHub dev-preview ID，迁移用户不需要手动复制 ID。
 - Edge Add-ons 可以作为后续免费商店分发路径单独推进。
@@ -49,7 +49,7 @@ npm ci --omit=dev --ignore-scripts
 npm run smoke
 ```
 
-如果你直接从 Git 仓库运行，也是在仓库根目录执行同样命令。`smoke` 会在系统临时目录写入一份测试用 `inbox.org`，用来确认本地剪藏核心可以工作。
+如果你直接从 Git 仓库运行，也是在仓库根目录执行同样命令。`smoke` 会在系统临时目录写入一份测试用 `inbox.md`，用来确认本地剪藏核心可以工作。
 
 ### 2. 加载浏览器扩展
 
@@ -57,7 +57,7 @@ npm run smoke
 2. 开启 `Developer mode`。
 3. 点击 `Load unpacked`。
 4. 选择解压后的 `clipplane-extension-vX` 目录，或源码仓库里的 `extension` 目录。
-5. 当前源码或 `0.7.7` 候选应显示 `emacefnmbogjdcblglmipolnickjnmbl`；已发布的 `v0.5.0` dev-preview 包仍显示 legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`。
+5. 当前源码或 `0.7.7` 包应显示 `emacefnmbogjdcblglmipolnickjnmbl`；已发布的 `v0.5.0` dev-preview 包仍显示 legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`。
 
 ### 3. 注册本地 host
 
@@ -123,19 +123,19 @@ npm run doctor
 
 默认保存到：
 
-- `~/Documents/notes/inbox.org`
+- `~/Documents/notes/inbox.md`
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.org` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。三者通过 `CAPTURE_ID` 表示同一个剪藏项。
+`inbox.md` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。三者通过 `CAPTURE_ID` 表示同一个剪藏项。首次由 0.7.x 升级时，Host 会把原 `inbox.org` 备份为 `.clipplane/backups/inbox-v2.org`，并保留原 Org 文件作为只读迁移证据；验证且排他发布 `inbox.md` 后，运行时只写 Markdown。若迁移期间 Org 被编辑、目标 Markdown 已出现或旧 Inbox 含非 Clipplane 管理的前置内容，迁移会停止而不会覆盖或删除文件。
 
-`captures.jsonl` 不保存设备绝对路径。Clipplane 会在每台设备上根据当前 `Storage` 目录和 `CAPTURE_ID` 定位 `inbox.org`、正文快照与 local-export，因此整个 notes 目录可以放进 Git，并在 Windows、macOS 或不同用户目录之间移动。旧版本写入的绝对路径会被忽略，并在下一次记录变更时迁移为可移植格式。
+`captures.jsonl` 不保存设备绝对路径。Clipplane 会在每台设备上根据当前 `Storage` 目录和 `CAPTURE_ID` 定位 `inbox.md`、正文快照与 local-export，因此整个 notes 目录可以放进 Git，并在 Windows、macOS 或不同用户目录之间移动。旧版本写入的绝对路径会被忽略，并在下一次记录变更时迁移为可移植格式。
 
 记录迁移后，不要降级到不支持可移植记录的旧 Host；旧 Host 无法可靠地对这些记录执行重试同步。若当前 Host 遇到由更新版本写入的记录，它仍会显示历史，但会拒绝修改该记录，直到 Host 完成升级。
 
-这里的 Git 用法假设同一时间只有一台设备写入：先提交并推送，再在另一台设备拉取后继续使用。Clipplane 不会自动运行 Git，也不解决两台设备同时修改 `captures.jsonl` 或 `inbox.org` 产生的合并冲突。
+这里的 Git 用法假设同一时间只有一台设备写入：先提交并推送，再在另一台设备拉取后继续使用。Clipplane 不会自动运行 Git，也不解决两台设备同时修改 `captures.jsonl` 或 `inbox.md` 产生的合并冲突。
 
-扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。你可以在 `Storage` 查看或修改保存目录；在 `History` 检查最近剪藏、本地 body 文件、捕获方式和同步状态。`Copy for Agent` 会复制一段可直接粘贴到本地 Agent session 的标题、来源和当前设备正文路径；`Manage` 里的 `Copy content` 会复制完整 Markdown，供无法读取本机文件的 Agent 使用。History 也支持把条目标记为已处理或永久删除本地副本。`Mark processed` 会从 `inbox.org` 移除条目，但在 Processed 历史中保留内部记录和原始正文；再次剪藏相同内容时，这个条目会回到 Active 和 `inbox.org`。`Delete local copy` 会统一移除 Org 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本，但不会删除已经同步到 Notion 或 flomo 的内容。在 `Sync` 可以配置 Notion 或 flomo。普通用户不需要设置环境变量，也不需要编辑 launcher。
+扩展里的 `Settings` 分为 `Storage`、`History` 和 `Sync` 三个标签页。保存、重复剪藏或重新激活成功后，结果卡的主动作是 `Copy for Agent`：它复制标题、来源和当前设备的 Markdown 正文路径，可直接粘贴到本地 Agent session。`History` 仍可检查捕获方式和同步状态；`Manage` 里的 `Copy content` 适合无法读取本机文件的 Agent。`Mark processed` 会从 `inbox.md` 移除条目，但保留内部记录和原始正文；再次剪藏会让它回到 Active Inbox。`Delete local copy` 会统一移除 Markdown Inbox 条目、历史记录、正文快照及 Clipplane 管理的 local-export 副本。`Storage` 中的 `Copy diagnostics` 只复制操作系统、架构、浏览器、扩展、Host、协议和错误码，不包含笔记路径、网页内容或同步凭据。
 
 ## 外部同步
 
@@ -148,7 +148,7 @@ npm run doctor
 
 ## 参考工作流
 
-Clipplane 的剪藏链路参考了 [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip)：捕获 URL 或选中文本，清理为 Markdown，转换为 org-mode，打标签，追加到本地 `inbox.org`。Clipplane 把这条链路变成浏览器可触发的应用：先写出可复查的本地笔记，外部同步只作为可选的第二步。
+Clipplane 最初参考了 [lijigang/ljg-skill-clip](https://github.com/lijigang/ljg-skill-clip) 的本地优先剪藏链路。`0.8.0` 保留“捕获、清理、打标签、进入 Inbox”的骨架，但不再把 Markdown 转成 Org；同一份 Markdown 可以由人阅读，也可以直接交给 Agent。
 
 ## 工作方式
 
@@ -158,10 +158,10 @@ flowchart LR
   B --> C[Chrome Native Messaging]
   C --> D[本地 Node host]
   D --> E[清理 Markdown]
-  E --> F[转换为 org-mode]
-  F --> G[追加 inbox.org]
-  F --> H[写入 capture body]
-  F --> I[追加 captures.jsonl]
+  E --> G[追加 inbox.md]
+  E --> H[写入 capture body]
+  E --> I[追加 captures.jsonl]
+  G --> N[Copy for Agent]
   I --> J{显式 Save + sync}
   J --> K[Notion API]
   J --> L[flomo webhook API]
@@ -195,9 +195,9 @@ npm run verify:store
 
 `npm run package:extension` 会生成保留公开身份 key、供本地候选测试使用的 `dist/clipplane-extension-vX.zip`。首次及后续 Chrome Web Store 上传使用 `npm run package:store` 生成的 `dist/clipplane-store-vX.zip`；它会从副本清单移除 `key`，不改动源码清单。`npm run verify:store` 审计这个 Store ZIP，并拒绝 `key`、私钥、`.env*`、Native Host 文件、可执行文件、远程代码和权限扩张。两个 ZIP 都只包含浏览器扩展。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。
 
-在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.7.7` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
+公开 Host 下载记录必须固定 release tag、asset 名、Host 版本、SHA-256 和平台签名身份；`npm run verify:host:release` 会从官方 Release 下载并复核这些声明。Windows 源码路径固定完整 commit SHA，不依赖可移动 tag。
 
-公开 Host 下载只能加入 `extension/src/host-distribution.js` 的完整发布记录：immutable release tag、asset 名、SHA-256、Host 版本和平台签名身份缺一不可。上传前用 `node scripts/verify-published-host-release.mjs --version <extension-version> --asset <package-path>` 检查本地包；发布后必须再运行 `npm run verify:host:release -- --version <extension-version>`，从 GitHub 读回 immutable 状态、asset digest、实际字节和 Apple Team ID。
+在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `v0.7.7` immutable release 中面向用户承诺的签名 `.pkg`。
 
 Windows 的私有 unsigned candidate 必须按这个顺序构建和验证：
 

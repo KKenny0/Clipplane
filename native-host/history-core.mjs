@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
+import { recoverCaptureWrites } from "./capture-creation.mjs";
 import { captureBodyPath, inspectCaptureBody, localExportPath, resolveCaptureBodyForRead } from "./capture-record.mjs";
 import {
   assertCaptureStoreWritable,
@@ -10,6 +11,8 @@ import {
 } from "./capture-store.mjs";
 import { ClipplaneError, MAX_CAPTURE_CONTENT_BYTES } from "./clip-core.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
+import { readMarkdownInboxIds, removeMarkdownInboxEntry } from "./inbox-markdown.mjs";
+import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { openTextFile, writeClipboardText } from "./settings-core.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
 
@@ -20,26 +23,26 @@ const LIFECYCLE_FILTERS = new Set(["active", "processed", "all"]);
 
 export async function listCaptureHistory(options = {}) {
   const { paths } = await resolveConfiguredPaths(options);
-  let captureData = await readCaptureRecords(paths.capturesPath);
   let recoveryWarnings = [];
-  const pendingRecords = captureData.records
-    .filter((record) => ["processing", "deleting"].includes(cleanString(record.lifecycle_status)));
-  if (pendingRecords.length) {
+  if (await captureStorageExists(paths)) {
     try {
-      recoveryWarnings = await withCaptureMutationLock(paths, () => recoverPendingLifecycleOperations(paths));
-      captureData = await readCaptureRecords(paths.capturesPath);
+      recoveryWarnings = await withCaptureMutationLock(paths, async () => {
+        await prepareCaptureStorage(paths);
+        return recoverPendingLifecycleOperations(paths);
+      });
     } catch (error) {
       if (error.code !== "unsupported_capture_schema") {
         throw error;
       }
-      recoveryWarnings = pendingRecords.map((record) => ({
-        capture_id: cleanString(record.capture_id),
-        code: "lifecycle_recovery_failed"
-      }));
+      const futureStore = await readCaptureStore(paths.capturesPath);
+      recoveryWarnings = captureRecords(futureStore)
+        .filter((record) => ["creating", "reactivating", "processing", "deleting"].includes(cleanString(record.lifecycle_status)))
+        .map((record) => ({ capture_id: cleanString(record.capture_id), code: "lifecycle_recovery_failed" }));
     }
   }
+  const captureData = await readCaptureRecords(paths.capturesPath);
   const { records, warnings } = captureData;
-  const inboxIds = await readInboxCaptureIds(paths.inboxPath);
+  const inboxIds = await readMarkdownInboxIds(paths.inboxPath);
   const lifecycle = normalizeLifecycleFilter(options.lifecycle);
   const limit = normalizeLimit(options.limit);
   const recentRecords = records
@@ -105,7 +108,10 @@ export async function copyCapture(captureId, mode, options = {}) {
 export async function markCaptureProcessed(captureId, options = {}) {
   const id = requireCaptureId(captureId);
   const { paths } = await resolveConfiguredPaths(options);
-  return withCaptureMutationLock(paths, () => markCaptureProcessedLocked(id, paths));
+  return withCaptureMutationLock(paths, async () => {
+    await prepareCaptureStorage(paths);
+    return markCaptureProcessedLocked(id, paths);
+  });
 }
 
 async function readCaptureBodyForClipboard(contentPath) {
@@ -155,7 +161,10 @@ async function markCaptureProcessedLocked(id, paths) {
 export async function deleteCapture(captureId, options = {}) {
   const id = requireCaptureId(captureId);
   const { paths } = await resolveConfiguredPaths(options);
-  return withCaptureMutationLock(paths, () => deleteCaptureLocked(id, paths));
+  return withCaptureMutationLock(paths, async () => {
+    await prepareCaptureStorage(paths);
+    return deleteCaptureLocked(id, paths);
+  });
 }
 
 async function deleteCaptureLocked(id, paths) {
@@ -211,14 +220,13 @@ async function summarizeCapture(record, paths, inboxIds) {
 }
 
 async function recoverPendingLifecycleOperations(paths) {
+  const warnings = await recoverCaptureWrites(paths);
   const store = await readCaptureStore(paths.capturesPath);
   assertCaptureStoreWritable(store.entries);
   const records = captureRecords(store);
   const pending = records
     .filter((record) => ["processing", "deleting"].includes(cleanString(record.lifecycle_status)))
     .map((record) => ({ id: cleanString(record.capture_id), operation: cleanString(record.lifecycle_status) }));
-  const warnings = [];
-
   for (const item of pending) {
     try {
       if (item.operation === "processing") {
@@ -237,7 +245,7 @@ async function recoverPendingLifecycleOperations(paths) {
 async function finishProcessingCapture(paths, captureId) {
   const store = await readCaptureStore(paths.capturesPath);
   const entry = findUniqueStoreEntry(store.entries, captureId);
-  await removeCaptureFromInbox(paths.inboxPath, captureId);
+  await removeMarkdownInboxEntry(paths.inboxPath, captureId);
   entry.record = {
     ...entry.record,
     lifecycle_status: "processed",
@@ -260,7 +268,7 @@ async function finishDeletingCapture(paths, captureId) {
   );
   const localExportPath = await localExportForDeletion(entry.record, paths);
 
-  await removeCaptureFromInbox(paths.inboxPath, captureId);
+  await removeMarkdownInboxEntry(paths.inboxPath, captureId);
   if (contentPath) {
     await fs.rm(contentPath, { force: true });
   }
@@ -310,95 +318,6 @@ async function safeManagedFileForDeletion(candidate, managedRoot, notesRoot, err
   return resolvedCandidate;
 }
 
-async function removeCaptureFromInbox(inboxPath, captureId) {
-  let text;
-  try {
-    text = await fs.readFile(inboxPath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return false;
-    }
-    throw error;
-  }
-
-  const parsed = parseInboxEntries(text);
-  const matches = parsed.entries.filter((entry) => entry.captureId === captureId);
-  if (matches.length > 1) {
-    throw new ClipplaneError("duplicate_inbox_capture", `Multiple inbox entries use Capture ID: ${captureId}`);
-  }
-  if (!matches.length) {
-    return false;
-  }
-
-  const match = matches[0];
-  const lines = [...parsed.lines];
-  let start = match.start;
-  if (start > 0 && lines[start - 1] === "" && match.end < lines.length && lines[match.end] === "") {
-    start -= 1;
-  }
-  lines.splice(start, match.end - start);
-  await atomicWrite(inboxPath, lines.join(parsed.eol), { expectedBody: text });
-  return true;
-}
-
-async function readInboxCaptureIds(inboxPath) {
-  let text;
-  try {
-    text = await fs.readFile(inboxPath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return new Map();
-    }
-    throw error;
-  }
-
-  const ids = new Map();
-  for (const entry of parseInboxEntries(text).entries) {
-    if (entry.captureId) {
-      ids.set(entry.captureId, (ids.get(entry.captureId) || 0) + 1);
-    }
-  }
-  return ids;
-}
-
-function parseInboxEntries(text) {
-  const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const lines = text.split(/\r?\n/);
-  const starts = [];
-  for (const [index, line] of lines.entries()) {
-    if (/^\*\s+/.test(line)) {
-      starts.push(index);
-    }
-  }
-
-  const entries = starts.map((start, index) => {
-    const end = starts[index + 1] ?? lines.length;
-    let captureId = "";
-    let inProperties = false;
-    for (let lineIndex = start + 1; lineIndex < end; lineIndex += 1) {
-      const line = lines[lineIndex];
-      if (!inProperties && line === ":PROPERTIES:") {
-        inProperties = true;
-        continue;
-      }
-      if (inProperties && line === ":END:") {
-        break;
-      }
-      if (inProperties) {
-        const match = line.match(/^:CAPTURE_ID:\s*(\S.*?)\s*$/);
-        if (match) {
-          captureId = match[1];
-        }
-      } else if (line.trim()) {
-        break;
-      }
-    }
-    return { start, end, captureId };
-  });
-
-  return { eol, lines, entries };
-}
-
 function publicExtractionMethod(value, inputType) {
   const allowed = new Set(["selection", "readability", "fallback", "element"]);
   if (allowed.has(value)) {
@@ -430,29 +349,6 @@ async function readCaptureRecords(capturesPath) {
     records: captureRecords(store),
     warnings: store.warnings
   };
-}
-
-async function atomicWrite(filePath, body, options = {}) {
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  let mode = 0o600;
-  try {
-    mode = (await fs.stat(filePath)).mode & 0o777;
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
-  }
-  try {
-    await fs.writeFile(tempPath, body, { encoding: "utf8", mode });
-    await fs.chmod(tempPath, mode);
-    if (options.expectedBody !== undefined && await fs.readFile(filePath, "utf8") !== options.expectedBody) {
-      throw new ClipplaneError("inbox_changed", "inbox.org changed during cleanup. Review it and try again.");
-    }
-    await fs.rename(tempPath, filePath);
-  } catch (error) {
-    await fs.rm(tempPath, { force: true });
-    throw error;
-  }
 }
 
 function findUniqueRecord(records, captureId) {
@@ -556,6 +452,12 @@ async function fileExists(file) {
   } catch {
     return false;
   }
+}
+
+async function captureStorageExists(paths) {
+  return await fileExists(paths.capturesPath)
+    || await fileExists(paths.inboxPath)
+    || await fileExists(paths.legacyInboxPath);
 }
 
 function cleanString(value) {

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export const CAPTURE_SCHEMA_VERSION = 2;
+export const CAPTURE_SCHEMA_VERSION = 3;
 
 export function normalizeCaptureRecord(record = {}) {
   assertSupportedCaptureRecord(record);
@@ -13,6 +13,8 @@ export function normalizeCaptureRecord(record = {}) {
   normalized.schema_version = CAPTURE_SCHEMA_VERSION;
   delete normalized.local_path;
   delete normalized.content_path;
+  delete normalized.org_heading;
+  delete normalized.org_timestamp;
 
   if (normalized.sinks && typeof normalized.sinks === "object" && !Array.isArray(normalized.sinks)) {
     normalized.sinks = Object.fromEntries(

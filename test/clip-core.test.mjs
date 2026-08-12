@@ -7,7 +7,6 @@ import {
   classifyTags,
   cleanCapturedMarkdown,
   clipPayload,
-  markdownToOrg,
   MAX_CAPTURE_CONTENT_BYTES,
   normalizePayload
 } from "../native-host/clip-core.mjs";
@@ -42,15 +41,6 @@ test("oversized captures fail before any local file is written", async () => {
     (error) => error.code === "capture_too_large" && /Selection or Element/.test(error.message)
   );
   assert.deepEqual(await fs.readdir(notesDir), []);
-});
-
-test("markdownToOrg converts headings, links, bold, and code fences", () => {
-  const org = markdownToOrg("# Title\n\nSee [site](https://example.com).\n\n**Bold**\n\n```js\nconsole.log(1)\n```");
-  assert.match(org, /^\*\* Title/m);
-  assert.match(org, /\[\[https:\/\/example\.com\]\[site\]\]/);
-  assert.match(org, /\*Bold\*/);
-  assert.match(org, /#\+begin_src js/);
-  assert.match(org, /#\+end_src/);
 });
 
 test("classifyTags returns at most two content tags", () => {
@@ -89,17 +79,19 @@ test("clipPayload writes inbox and skips duplicates", async () => {
   assert.equal(second.duplicate, true);
   assert.equal(second.capture.content_hash, first.capture.content_hash);
 
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
-  assert.match(inbox, /\* Agent Notes :ai:/);
-  assert.match(inbox, /:STATUS: inbox/);
-  assert.match(inbox, /:CAPTURE_METHOD: fallback/);
-  assert.match(inbox, /\*\* Agent Notes/);
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
+  assert.match(inbox, /^# Inbox/m);
+  assert.match(inbox, /## Agent Notes/);
+  assert.match(inbox, /- Method: `fallback`/);
+  assert.match(inbox, /^# Agent Notes$/m);
   assert.equal(await fileExists(first.capture.content_path), true);
 
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   assert.equal(captures.trim().split(/\r?\n/).length, 1);
   const record = JSON.parse(captures.trim());
-  assert.equal(record.schema_version, 2);
+  assert.equal(record.schema_version, 3);
+  assert.equal("org_heading" in record, false);
+  assert.equal("org_timestamp" in record, false);
   assert.equal("local_path" in record, false);
   assert.equal("content_path" in record, false);
   assert.equal("path" in record.sinks.local, false);
@@ -120,8 +112,8 @@ test("clipPayload records capture methods for selected areas", async () => {
 
   assert.equal(result.capture.input_type, "element");
   assert.equal(result.capture.extraction_method, "element");
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
-  assert.match(inbox, /:CAPTURE_METHOD: element/);
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
+  assert.match(inbox, /- Method: `element`/);
 });
 
 test("clipPayload does not write keyboard shortcut boilerplate into inbox", async () => {
@@ -143,9 +135,9 @@ test("clipPayload does not write keyboard shortcut boilerplate into inbox", asyn
 
   await clipPayload(payload, { notesDir, configDir });
 
-  const inbox = await fs.readFile(path.join(notesDir, "inbox.org"), "utf8");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
   assert.doesNotMatch(inbox, /To view keyboard shortcuts/);
-  assert.match(inbox, /\*\*\* Article/);
+  assert.match(inbox, /^## Article$/m);
   assert.match(inbox, /Actual article body\./);
 });
 
@@ -176,7 +168,7 @@ test("clipPayload backfills capture body for legacy duplicates", async () => {
   assert.equal(await fileExists(second.capture.content_path), true);
   const captures = await fs.readFile(path.join(notesDir, ".clipplane", "captures.jsonl"), "utf8");
   const migrated = JSON.parse(captures.trim());
-  assert.equal(migrated.schema_version, 2);
+  assert.equal(migrated.schema_version, 3);
   assert.equal("local_path" in migrated, false);
   assert.equal("content_path" in migrated, false);
   assert.equal("path" in migrated.sinks.local, false);
@@ -215,9 +207,9 @@ test("re-clipping a future-schema duplicate cannot recreate its missing body", a
   };
   const first = await clipPayload(payload, { notesDir, configDir });
   const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
-  const inboxPath = path.join(notesDir, "inbox.org");
+  const inboxPath = path.join(notesDir, "inbox.md");
   const futureRecord = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
-  futureRecord.schema_version = 3;
+  futureRecord.schema_version = 4;
   futureRecord.future_state = { preserved: true };
   await fs.writeFile(capturesPath, `${JSON.stringify(futureRecord)}\n`, "utf8");
   await fs.rm(first.capture.content_path);
@@ -253,12 +245,12 @@ test("a mixed-schema store is rejected before repairing a portable duplicate", a
   };
   const duplicate = await clipPayload(duplicatePayload, { notesDir, configDir });
   const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
-  const inboxPath = path.join(notesDir, "inbox.org");
+  const inboxPath = path.join(notesDir, "inbox.md");
   const records = (await fs.readFile(capturesPath, "utf8"))
     .trim()
     .split(/\r?\n/)
     .map((line) => JSON.parse(line));
-  records.find((record) => record.capture_id === future.capture.capture_id).schema_version = 3;
+  records.find((record) => record.capture_id === future.capture.capture_id).schema_version = 4;
   await fs.writeFile(capturesPath, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`, "utf8");
   await fs.rm(duplicate.capture.content_path);
   const capturesBefore = await fs.readFile(capturesPath, "utf8");
@@ -274,6 +266,69 @@ test("a mixed-schema store is rejected before repairing a portable duplicate", a
   assert.equal(await fs.readFile(capturesPath, "utf8"), capturesBefore);
   assert.equal(await fs.readFile(inboxPath, "utf8"), inboxBefore);
   assert.equal(await fs.readFile(future.capture.content_path, "utf8"), futureBodyBefore);
+});
+
+test("new captures use a timestamp plus a full random UUID", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-random-id-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const result = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/random-id",
+    sourceTitle: "Random ID",
+    title: "Random ID",
+    contentMarkdown: "Random ID body"
+  }, { notesDir, configDir });
+
+  assert.match(result.capture.capture_id, /^\d{8}T\d{6}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test("re-clipping refuses an unfinished processing or deleting operation", async () => {
+  for (const lifecycleStatus of ["processing", "deleting"]) {
+    const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), `clipplane-pending-${lifecycleStatus}-`));
+    const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+    const payload = {
+      inputType: "selection",
+      sourceUrl: `https://example.com/pending-${lifecycleStatus}`,
+      sourceTitle: "Pending",
+      title: "Pending",
+      contentMarkdown: "Pending body"
+    };
+    const first = await clipPayload(payload, { notesDir, configDir });
+    const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+    const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+    record.lifecycle_status = lifecycleStatus;
+    record.lifecycle_started_at = new Date().toISOString();
+    await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
+
+    await assert.rejects(
+      clipPayload(payload, { notesDir, configDir }),
+      (error) => error.code === "capture_lifecycle_pending"
+    );
+    assert.equal(await fileExists(first.capture.content_path), true);
+  }
+});
+
+test("a failed creating recovery cannot be reported as a successful duplicate", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-creating-failure-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const payload = {
+    inputType: "selection",
+    sourceUrl: "https://example.com/creating-failure",
+    sourceTitle: "Creating failure",
+    title: "Creating failure",
+    contentMarkdown: "Creating failure body"
+  };
+  await clipPayload(payload, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  record.lifecycle_status = "creating";
+  record.lifecycle_started_at = new Date().toISOString();
+  await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n${JSON.stringify(record)}\n`, "utf8");
+
+  await assert.rejects(
+    clipPayload(payload, { notesDir, configDir }),
+    (error) => error.code === "lifecycle_recovery_failed"
+  );
 });
 
 async function fileExists(file) {
