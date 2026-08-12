@@ -16,31 +16,36 @@
 
 Clipplane 是面向笔记工作流的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展按边界捕获选区、可读正文或页面元素；本地 host 清理内容、转换为 org-mode，并写入 notes 目录。先成为本地笔记，再由你决定要不要同步；外部服务只是可选目标，不影响本地保存。
 
-扩展首次安装页会检查 Host 版本。macOS arm64 会指向与扩展版本一致的 GitHub Release asset；Windows 会指向源码安装指南。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
+扩展首次安装页会检查 Host 版本。macOS arm64 只会指向不可变 GitHub Release 中、已固定摘要与 Apple Team ID 的 asset；Windows 会指向固定 commit 的源码安装指南。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
 
 ## 当前状态
 
-Clipplane `0.7.6` 采用 macOS-first 的公开分发边界，同时保留 Windows 源码安装：
+Clipplane `0.7.7` 采用 macOS-first 的公开分发边界，同时保留 Windows 源码安装：
 
-- GitHub Release 提供 `clipplane-extension-v0.7.6.zip` 用于手动 `Load unpacked`，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
-- macOS arm64 提供签名、公证并 stapled 的 `clipplane-host-v0.7.6-macos-arm64.pkg`。
-- Windows 不提供公开二进制安装器；用户需要 Node 20.19 或更高的 Node 20，并从官方源码运行 PowerShell setup 脚本。
+- GitHub Release 提供 `clipplane-extension-v0.7.7.zip` 用于手动 `Load unpacked`，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
+- macOS arm64 继续使用签名、公证并 stapled 的 Host `0.7.6` 包；`v0.7.7` immutable release 固定其 SHA-256 `2d2c…fa4d6` 与 Apple Team ID `S7V7CK2G9T`。
+- Windows 不提供公开二进制安装器；用户需要 Node 20.19 或更高的 Node 20，并从下方完整 commit SHA 固定的官方源码运行 PowerShell setup 脚本。
 - Chrome Web Store 条目尚未提交审核或公开发布；Edge Add-ons 也尚未上架。
 - setup 默认同时允许 canonical Store ID 和旧 GitHub dev-preview ID，迁移用户不需要手动复制 ID。
 - Edge Add-ons 可以作为后续免费商店分发路径单独推进。
 
-Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。Clipplane 的 `manifest.key` 是 Chrome Web Store 提供的公开身份 key，用于让本地加载的 `0.7.6` 候选与 Store Item ID 保持一致；它不是签名私钥，仓库也不保存 `.pem` 或其他私钥文件。Store 上传 ZIP 会在 staging 副本中移除该字段。
+Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展来源，不能使用通配符。Clipplane 的 `manifest.key` 是 Chrome Web Store 提供的公开身份 key，用于让本地加载的 `0.7.7` 候选与 Store Item ID 保持一致；它不是签名私钥，仓库也不保存 `.pem` 或其他私钥文件。Store 上传 ZIP 会在 staging 副本中移除该字段。
 
 ## 5 分钟开始
 
 ### 1. 准备文件
 
-从 Release 试用时，先下载 `clipplane-extension-v0.7.6.zip`。macOS arm64 用户再下载同一 Release 中的已签名 `.pkg`；Windows 用户下载 `Source code` 并安装 Node 20.19 或更高的 Node 20。
+从 `v0.7.7` Release 试用时，先下载 `clipplane-extension-v0.7.7.zip`。macOS arm64 用户再下载同一 immutable Release 中的已签名 `.pkg`。Windows 用户安装 Git、Node 20.19 或更高的 Node 20，并使用下面固定的源码 commit；不要执行 tag 的 `Source code` 压缩包。
 
-Windows 或源码测试者在 `Source code` 目录里运行：
+Windows x64 使用已审核的 Host `0.7.6` 源码 commit：
 
 ```powershell
-npm ci
+$clipplaneCommit = "3c7f01bf3af587a6af7a3fdb45b8b6484fca1707"
+git clone https://github.com/KKenny0/Clipplane.git
+Set-Location .\Clipplane
+git checkout --detach $clipplaneCommit
+if ((git rev-parse HEAD).Trim() -ne $clipplaneCommit) { throw "Clipplane commit verification failed." }
+npm ci --omit=dev --ignore-scripts
 npm run smoke
 ```
 
@@ -52,7 +57,7 @@ npm run smoke
 2. 开启 `Developer mode`。
 3. 点击 `Load unpacked`。
 4. 选择解压后的 `clipplane-extension-vX` 目录，或源码仓库里的 `extension` 目录。
-5. 当前源码或 `0.7.6` 候选应显示 `emacefnmbogjdcblglmipolnickjnmbl`；已发布的 `v0.5.0` dev-preview 包仍显示 legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`。
+5. 当前源码或 `0.7.7` 候选应显示 `emacefnmbogjdcblglmipolnickjnmbl`；已发布的 `v0.5.0` dev-preview 包仍显示 legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`。
 
 ### 3. 注册本地 host
 
@@ -190,7 +195,9 @@ npm run verify:store
 
 `npm run package:extension` 会生成保留公开身份 key、供本地候选测试使用的 `dist/clipplane-extension-vX.zip`。首次及后续 Chrome Web Store 上传使用 `npm run package:store` 生成的 `dist/clipplane-store-vX.zip`；它会从副本清单移除 `key`，不改动源码清单。`npm run verify:store` 审计这个 Store ZIP，并拒绝 `key`、私钥、`.env*`、Native Host 文件、可执行文件、远程代码和权限扩张。两个 ZIP 都只包含浏览器扩展。打包前会从受版本锁定的 `@mozilla/readability` 准备正文提取器及 Apache-2.0 许可证。
 
-在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.7.6` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
+在目标系统的 Node 20.19 或更高 Node 20 版本下，`npm run package:host:windows` 或 `npm run package:host:macos` 会生成包含固定 Node runtime 和生产依赖的 Host bundle。CI 会分别重建并启动两端 bundle。这些 ZIP 是安装器输入，不是 `0.7.7` 面向用户承诺的签名 `.exe` 或已公证 `.pkg`。
+
+公开 Host 下载只能加入 `extension/src/host-distribution.js` 的完整发布记录：immutable release tag、asset 名、SHA-256、Host 版本和平台签名身份缺一不可。上传前用 `node scripts/verify-published-host-release.mjs --version <extension-version> --asset <package-path>` 检查本地包；发布后必须再运行 `npm run verify:host:release -- --version <extension-version>`，从 GitHub 读回 immutable 状态、asset digest、实际字节和 Apple Team ID。
 
 Windows 的私有 unsigned candidate 必须按这个顺序构建和验证：
 

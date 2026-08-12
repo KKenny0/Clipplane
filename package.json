@@ -1,6 +1,6 @@
 {
   "name": "clipplane",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "private": true,
   "type": "module",
   "description": "Browser clipper that turns web pages and selections into clean org-mode notes with an inspectable trail.",
@@ -21,6 +21,7 @@
     "package:extension": "npm run prepare:extension && node scripts/package-extension.mjs",
     "package:store": "npm run prepare:extension && node scripts/package-extension.mjs --store",
     "verify:pages": "node scripts/verify-pages.mjs",
+    "verify:host:release": "node scripts/verify-published-host-release.mjs",
     "package:host:windows": "node scripts/package-native-host.mjs --target windows",
     "package:host:windows:installer": "pwsh -NoLogo -NoProfile -File scripts/package-native-host-windows-installer.ps1",
     "package:host:windows:installer:candidate": "pwsh -NoLogo -NoProfile -File scripts/package-native-host-windows-installer.ps1 -AllowUnsigned",

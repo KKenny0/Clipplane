@@ -68,6 +68,18 @@ for (const relative of activePages) {
   }
 }
 
+const setupSource = await readFile(path.join(docs, "setup/index.html"), "utf8");
+const windowsSourceCommit = "3c7f01bf3af587a6af7a3fdb45b8b6484fca1707";
+if (!setupSource.includes(windowsSourceCommit) || !setupSource.includes("git checkout --detach")) {
+  errors.push("docs/setup/index.html: Windows source setup must pin and verify the reviewed full commit SHA.");
+}
+if (!setupSource.includes("npm ci --omit=dev --ignore-scripts")) {
+  errors.push("docs/setup/index.html: Windows source setup must omit development packages and suppress npm lifecycle scripts.");
+}
+if (/archive\/refs\/tags|codeload\.github\.com\/[^\s\"']+\/tag\//i.test(setupSource)) {
+  errors.push("docs/setup/index.html: Windows source setup must not execute a tag archive.");
+}
+
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exitCode = 1;

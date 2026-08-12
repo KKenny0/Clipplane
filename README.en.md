@@ -16,31 +16,36 @@
 
 Clipplane is a web clipper built for note workflows, with two parts: a browser extension and a local Native Messaging host. The extension captures a selection, readable page, or chosen element by an explicit boundary. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. Clips become local notes first; external services are optional sinks, not a requirement for saving.
 
-The extension's first-install page checks the Host version. On macOS arm64 it links to the version-matched GitHub Release asset; on Windows it points to the source setup guide. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
+The extension's first-install page checks the Host version. On macOS arm64 it links only to an asset in an immutable GitHub Release with a pinned digest and Apple Team ID; on Windows it points to a commit-pinned source setup guide. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
 
 ## Current Status
 
-Clipplane `0.7.6` uses a macOS-first public distribution boundary while retaining source setup on Windows:
+Clipplane `0.7.7` uses a macOS-first public distribution boundary while retaining source setup on Windows:
 
-- GitHub Releases provide `clipplane-extension-v0.7.6.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
-- macOS arm64 gets the signed, notarized, and stapled `clipplane-host-v0.7.6-macos-arm64.pkg`.
-- Windows has no public binary installer. Users need Node 20.19 or later in the Node 20 line and run the PowerShell setup from the official source.
+- GitHub Releases provide `clipplane-extension-v0.7.7.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
+- macOS arm64 continues to use the signed, notarized, and stapled Host `0.7.6` package. The immutable `v0.7.7` release pins SHA-256 `2d2c…fa4d6` and Apple Team ID `S7V7CK2G9T`.
+- Windows has no public binary installer. Users need Node 20.19 or later in the Node 20 line and run the PowerShell setup from the full commit SHA below.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
 
-Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.7.6` candidate aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
+Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.7.7` candidate aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
 
 ## 5-Minute Start
 
 ### 1. Prepare the files
 
-For a quick trial, first download `clipplane-extension-v0.7.6.zip`. macOS arm64 users also download the signed `.pkg` from the same Release. Windows users download `Source code` and install Node 20.19 or later in the Node 20 line.
+For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git plus Node 20.19 or later in the Node 20 line and use the pinned source commit below; do not execute a tag's `Source code` archive.
 
-Windows users and source testers run this from the `Source code` folder:
+Windows x64 uses the reviewed Host `0.7.6` source commit:
 
 ```powershell
-npm ci
+$clipplaneCommit = "3c7f01bf3af587a6af7a3fdb45b8b6484fca1707"
+git clone https://github.com/KKenny0/Clipplane.git
+Set-Location .\Clipplane
+git checkout --detach $clipplaneCommit
+if ((git rev-parse HEAD).Trim() -ne $clipplaneCommit) { throw "Clipplane commit verification failed." }
+npm ci --omit=dev --ignore-scripts
 npm run smoke
 ```
 
@@ -52,7 +57,7 @@ If you are running directly from the Git repo, run the same commands from the re
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the unzipped `clipplane-extension-vX` folder, or the source repo's `extension` folder.
-5. Current source and `0.7.6` candidates should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
+5. Current source and `0.7.7` candidates should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
 
 ### 3. Register the local host
 
@@ -190,7 +195,9 @@ npm run verify:store
 
 `npm run package:extension` writes `dist/clipplane-extension-vX.zip`, preserving the public identity key for local candidate testing. First and subsequent Chrome Web Store uploads use `npm run package:store`, which writes `dist/clipplane-store-vX.zip` after removing `key` from the staging manifest without changing the source manifest. `npm run verify:store` audits the Store ZIP and rejects `key`, private keys, `.env*`, Native Host files, executables, remote code, and permission expansion. Both ZIPs contain only the browser extension. Before packaging, Clipplane prepares the pinned `@mozilla/readability` extractor and its Apache-2.0 license.
 
-On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.6`.
+On Node 20.19 or later in the Node 20 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.exe` or notarized `.pkg` promised to end users for `0.7.7`.
+
+A public Host download may be added to `extension/src/host-distribution.js` only as a complete release record: immutable release tag, asset name, SHA-256, Host version, and platform signing identity are all required. Before upload, run `node scripts/verify-published-host-release.mjs --version <extension-version> --asset <package-path>` against the local package. After publication, run `npm run verify:host:release -- --version <extension-version>` to read back GitHub's immutable state, asset digest, actual bytes, and Apple Team ID.
 
 Build and verify a private unsigned Windows candidate in this order:
 

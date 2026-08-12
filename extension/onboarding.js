@@ -1,5 +1,5 @@
 import { isHostOutdated, isHostUnavailable, safeErrorMessage } from "./setup-guide.js";
-import { getHostAsset, getHostDownloadUrl } from "./src/host-distribution.js";
+import { getHostDownloadUrl, getHostRelease } from "./src/host-distribution.js";
 import { getUiState, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 
 const stateEl = document.querySelector("#host-state");
@@ -21,12 +21,12 @@ init();
 async function init() {
   const platform = await chrome.runtime.getPlatformInfo();
   const version = chrome.runtime.getManifest().version;
-  const asset = getHostAsset(platform.os, platform.arch, version);
+  const release = getHostRelease(platform.os, platform.arch, version);
 
-  if (asset) {
+  if (release) {
     downloadEl.href = getHostDownloadUrl(platform.os, platform.arch, version);
     downloadEl.hidden = false;
-    platformNoteEl.textContent = `${platformLabel(platform.os)} ${architectureLabel(platform.arch)}, Clipplane Host ${version}.`;
+    platformNoteEl.textContent = `${platformLabel(platform.os)} ${architectureLabel(platform.arch)}, Clipplane Host ${release.hostVersion}.`;
   } else {
     downloadEl.hidden = true;
     platformNoteEl.textContent = platform.os === "win"
