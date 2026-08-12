@@ -20,27 +20,27 @@ The extension's first-install page checks the Host version. On macOS arm64 it li
 
 ## Current Status
 
-Current source is the breaking `0.8.0` storage candidate: the active Inbox is Markdown and Host protocol is 3. The published stable extension is `0.7.7`, with a macOS-first distribution boundary:
+The current stable release is `0.8.0`: the active Inbox is Markdown, Host protocol is 3, and distribution remains macOS-first:
 
-- GitHub Releases provide `clipplane-extension-v0.7.7.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
-- macOS arm64 keeps the signed, notarized, and stapled Host `0.7.6` package; the immutable `v0.7.7` release pins SHA-256 `2d2c…fa4d6` and Apple Team ID `S7V7CK2G9T`.
+- GitHub Releases provide `clipplane-extension-v0.8.0.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
+- macOS arm64 uses the signed, notarized, and stapled Host `0.8.0` package; the immutable `v0.8.0` release pins SHA-256 `1f714c…9521c` and Apple Team ID `S7V7CK2G9T`.
 - Windows has no public binary installer. Users need Git and Node 24.13 or later in the Node 24 line, then run the PowerShell setup from the full commit SHA documented below.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
 
-Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.7.7` candidate aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
+Chrome Native Messaging requires the local host to list the exact extension origins allowed to access it. Wildcards are not allowed. Clipplane's `manifest.key` is the public identity key from Chrome Web Store, keeping a locally loaded `0.8.0` package aligned with the Store Item ID. It is not a signing private key, and the repo does not store `.pem` files or other private keys. Store packaging removes this field from the staging copy before upload.
 
 ## 5-Minute Start
 
 ### 1. Prepare the files
 
-For a quick trial, first download `clipplane-extension-v0.7.7.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git and Node 24.13 or later in the Node 24 line, then use the pinned source commit below; do not execute a tag's `Source code` archive.
+For a quick trial, first download `clipplane-extension-v0.8.0.zip`. macOS arm64 users also download the signed `.pkg` from the same immutable Release. Windows users install Git and Node 24.13 or later in the Node 24 line, then use the pinned source commit below; do not execute a tag's `Source code` archive.
 
-Windows x64 uses the reviewed Host `0.7.6` source commit:
+Windows x64 uses the reviewed Host `0.8.0` source commit:
 
 ```powershell
-$clipplaneCommit = "3c7f01bf3af587a6af7a3fdb45b8b6484fca1707"
+$clipplaneCommit = "ffe658b1820cafda130684f8b98b467052136426"
 git clone https://github.com/KKenny0/Clipplane.git
 Set-Location .\Clipplane
 git checkout --detach $clipplaneCommit
@@ -57,7 +57,7 @@ If you are running directly from the Git repo, run the same commands from the re
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the unzipped `clipplane-extension-vX` folder, or the source repo's `extension` folder.
-5. Current source and the `0.7.7` package should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
+5. Current source and the `0.8.0` package should show `emacefnmbogjdcblglmipolnickjnmbl`; the published `v0.5.0` dev-preview package still shows legacy ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
 
 ### 3. Register the local host
 
@@ -199,7 +199,7 @@ npm run verify:store
 
 Every public Host download record must pin its release tag, asset name, Host version, SHA-256 digest, and platform signing identity. `npm run verify:host:release` downloads the official release asset and verifies those claims. The Windows source path pins a full commit SHA instead of trusting a movable tag.
 
-On Node 24.13 or later in the Node 24 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are an installer input, not the signed `.pkg` promised to end users in the immutable `v0.7.7` release.
+On Node 24.13 or later in the Node 24 line, `npm run package:host:windows` or `npm run package:host:macos` builds a target-native Host bundle with its own Node runtime and production dependencies. CI rebuilds and launches both bundles. These ZIP bundles are installer input; the macOS end-user asset is the signed and notarized `.pkg` in the immutable `v0.8.0` release.
 
 Build and verify a private unsigned Windows candidate in this order:
 

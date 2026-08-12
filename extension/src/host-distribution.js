@@ -1,5 +1,12 @@
 const RELEASES_BASE = "https://github.com/KKenny0/Clipplane/releases/download";
 const PUBLISHED_HOST_RELEASES = new Map([
+  ["mac:arm64:0.8.0", Object.freeze({
+    releaseTag: "v0.8.0",
+    asset: "clipplane-host-v0.8.0-macos-arm64.pkg",
+    hostVersion: "0.8.0",
+    sha256: "1f714ca3a455458f3669e60cec02b1038be105270f4add05083637338479521c",
+    appleTeamId: "S7V7CK2G9T"
+  })],
   ["mac:arm64:0.7.7", Object.freeze({
     releaseTag: "v0.7.7",
     asset: "clipplane-host-v0.7.6-macos-arm64.pkg",

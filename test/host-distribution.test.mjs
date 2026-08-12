@@ -30,8 +30,18 @@ test("0.7.7 points only to the immutable, identity-pinned macOS Host release", (
   assert.equal(getHostAsset("mac", "x86-64", "0.7.7"), null);
 });
 
-test("the 0.8.0 source candidate does not advertise an unpublished installer", () => {
-  assert.equal(getHostDownloadUrl("mac", "arm64", "0.8.0"), null);
+test("0.8.0 points only to its identity-pinned macOS Host release", () => {
+  assert.deepEqual(getHostRelease("mac", "arm64", "0.8.0"), {
+    releaseTag: "v0.8.0",
+    asset: "clipplane-host-v0.8.0-macos-arm64.pkg",
+    hostVersion: "0.8.0",
+    sha256: "1f714ca3a455458f3669e60cec02b1038be105270f4add05083637338479521c",
+    appleTeamId: "S7V7CK2G9T"
+  });
+  assert.equal(
+    getHostDownloadUrl("mac", "arm64", "0.8.0"),
+    "https://github.com/KKenny0/Clipplane/releases/download/v0.8.0/clipplane-host-v0.8.0-macos-arm64.pkg"
+  );
   assert.equal(getHostDownloadUrl("win", "x86-64", "0.8.0"), null);
 });
 
