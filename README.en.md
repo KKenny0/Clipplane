@@ -16,15 +16,15 @@
 
 Clipplane is a web clipper built for note workflows, with two parts: a browser extension and a local Native Messaging host. The extension captures a selection, readable page, or chosen element by an explicit boundary. The local host cleans the content, converts it to org-mode, and writes it into your notes folder. Clips become local notes first; external services are optional sinks, not a requirement for saving.
 
-The extension's first-install page checks the Host version and links to a version-matched GitHub Release asset. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
+The extension's first-install page checks the Host version. On macOS arm64 it links to the version-matched GitHub Release asset; on Windows it points to the source setup guide. The Host reports an explicit protocol version so an outdated local component can be distinguished from a missing one.
 
 ## Current Status
 
-Clipplane's public release is still a GitHub dev preview; the current source is now the `0.7.6` Chrome Web Store candidate:
+Clipplane `0.7.6` uses a macOS-first public distribution boundary while retaining source setup on Windows:
 
-- GitHub Releases provide a packaged extension zip for manual `Load unpacked`, with the stable extension ID `mhgcfphfcgbgabhbegdonadkedfaddhc`.
-- The current `0.7.6` source and Chrome Web Store draft use canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
-- The local host and setup scripts come from the source repo, or from the Release `Source code` package.
+- GitHub Releases provide `clipplane-extension-v0.7.6.zip` for manual `Load unpacked`, with canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
+- macOS arm64 gets the signed, notarized, and stapled `clipplane-host-v0.7.6-macos-arm64.pkg`.
+- Windows has no public binary installer. Users need Node 20.19 or later in the Node 20 line and run the PowerShell setup from the official source.
 - The Chrome Web Store item has not been submitted or published, and Clipplane is not on Edge Add-ons.
 - Setup allows both the canonical Store ID and the legacy GitHub dev-preview ID during migration, so users do not need to copy an ID.
 - Edge Add-ons can be handled later as a separate free store-distribution path.
@@ -35,15 +35,12 @@ Chrome Native Messaging requires the local host to list the exact extension orig
 
 ### 1. Prepare the files
 
-For a quick trial, download two files from the latest Release:
+For a quick trial, first download `clipplane-extension-v0.7.6.zip`. macOS arm64 users also download the signed `.pkg` from the same Release. Windows users download `Source code` and install Node 20.19 or later in the Node 20 line.
 
-- `Source code`: the local host and setup scripts.
-- `clipplane-extension-vX.zip`: the browser extension package.
-
-Unzip both into stable folders. Then run this from the `Source code` folder:
+Windows users and source testers run this from the `Source code` folder:
 
 ```powershell
-npm install
+npm ci
 npm run smoke
 ```
 
@@ -59,6 +56,8 @@ If you are running directly from the Git repo, run the same commands from the re
 
 ### 3. Register the local host
 
+On macOS arm64, open the Release `.pkg`, complete installation, then fully quit and reopen the browser. Windows uses the best-effort source setup path:
+
 Windows Chrome:
 
 ```powershell
@@ -71,7 +70,7 @@ Windows Edge:
 pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge
 ```
 
-macOS Chrome:
+The macOS source setup below is only for maintainer debugging. Chrome:
 
 ```bash
 bash scripts/setup-macos.sh --browser chrome

@@ -8,6 +8,15 @@ test("unpublished Host installers never produce public download links", () => {
   assert.equal(getHostDownloadUrl("mac", "arm64", "0.6.0"), null);
 });
 
+test("0.7.6 publishes only the notarized macOS arm64 Host", () => {
+  assert.equal(
+    getHostDownloadUrl("mac", "arm64", "0.7.6"),
+    "https://github.com/KKenny0/Clipplane/releases/download/v0.7.6/clipplane-host-v0.7.6-macos-arm64.pkg"
+  );
+  assert.equal(getHostAsset("win", "x86-64", "0.7.6"), null);
+  assert.equal(getHostAsset("mac", "x86-64", "0.7.6"), null);
+});
+
 test("published Host download URLs require exact immutable assets", () => {
   const options = {
     publishedAssets: new Set([

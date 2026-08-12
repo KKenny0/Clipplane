@@ -1,5 +1,7 @@
 const RELEASES_BASE = "https://github.com/KKenny0/Clipplane/releases/download";
-const PUBLISHED_HOST_ASSETS = new Set();
+const PUBLISHED_HOST_ASSETS = new Set([
+  "clipplane-host-v0.7.6-macos-arm64.pkg"
+]);
 
 export function getHostAsset(os, arch, version, options = {}) {
   const asset = hostAssetName(os, arch, version);

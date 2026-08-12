@@ -16,15 +16,15 @@
 
 Clipplane 是面向笔记工作流的网页剪藏工具，由浏览器扩展和本地 Native Messaging host 组成。扩展按边界捕获选区、可读正文或页面元素；本地 host 清理内容、转换为 org-mode，并写入 notes 目录。先成为本地笔记，再由你决定要不要同步；外部服务只是可选目标，不影响本地保存。
 
-扩展首次安装页会检查 Host 版本，并指向与当前扩展版本一致的 GitHub Release asset。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
+扩展首次安装页会检查 Host 版本。macOS arm64 会指向与扩展版本一致的 GitHub Release asset；Windows 会指向源码安装指南。Host 提供明确的协议版本，因此扩展可以区分“尚未安装”和“需要升级”。
 
 ## 当前状态
 
-Clipplane 的公开版本仍是 GitHub dev preview；当前源码已进入 `0.7.6` Chrome Web Store 候选阶段：
+Clipplane `0.7.6` 采用 macOS-first 的公开分发边界，同时保留 Windows 源码安装：
 
-- GitHub Release 提供打包好的扩展 zip，用于手动 `Load unpacked`，扩展 ID 固定为 `mhgcfphfcgbgabhbegdonadkedfaddhc`。
-- 当前 `0.7.6` 源码和 Chrome Web Store 草稿的 canonical extension ID 是 `emacefnmbogjdcblglmipolnickjnmbl`。
-- 本地 host 和 setup 脚本来自源码仓库，或 Release 自带的 `Source code` 包。
+- GitHub Release 提供 `clipplane-extension-v0.7.6.zip` 用于手动 `Load unpacked`，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
+- macOS arm64 提供签名、公证并 stapled 的 `clipplane-host-v0.7.6-macos-arm64.pkg`。
+- Windows 不提供公开二进制安装器；用户需要 Node 20.19 或更高的 Node 20，并从官方源码运行 PowerShell setup 脚本。
 - Chrome Web Store 条目尚未提交审核或公开发布；Edge Add-ons 也尚未上架。
 - setup 默认同时允许 canonical Store ID 和旧 GitHub dev-preview ID，迁移用户不需要手动复制 ID。
 - Edge Add-ons 可以作为后续免费商店分发路径单独推进。
@@ -35,15 +35,12 @@ Chrome Native Messaging 要求本地 host 明确列出允许访问它的扩展�
 
 ### 1. 准备文件
 
-如果你从 Release 试用，下载两样东西：
+从 Release 试用时，先下载 `clipplane-extension-v0.7.6.zip`。macOS arm64 用户再下载同一 Release 中的已签名 `.pkg`；Windows 用户下载 `Source code` 并安装 Node 20.19 或更高的 Node 20。
 
-- `Source code`：本地 host 和 setup 脚本。
-- `clipplane-extension-vX.zip`：浏览器要加载的扩展包。
-
-把两者解压到固定目录。然后在 `Source code` 目录里运行：
+Windows 或源码测试者在 `Source code` 目录里运行：
 
 ```powershell
-npm install
+npm ci
 npm run smoke
 ```
 
@@ -59,6 +56,8 @@ npm run smoke
 
 ### 3. 注册本地 host
 
+macOS arm64 用户打开 Release 中的 `.pkg` 完成安装，然后完全退出并重开浏览器。Windows 为 best-effort 源码安装：
+
 Windows Chrome：
 
 ```powershell
@@ -71,7 +70,7 @@ Windows Edge：
 pwsh -NoLogo -NoProfile -File .\scripts\setup-windows.ps1 -Browser edge
 ```
 
-macOS Chrome：
+macOS 源码安装仅供维护者调试。Chrome：
 
 ```bash
 bash scripts/setup-macos.sh --browser chrome

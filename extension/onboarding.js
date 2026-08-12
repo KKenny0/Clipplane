@@ -29,9 +29,11 @@ async function init() {
     platformNoteEl.textContent = `${platformLabel(platform.os)} ${architectureLabel(platform.arch)}, Clipplane Host ${version}.`;
   } else {
     downloadEl.hidden = true;
-    platformNoteEl.textContent = ["win", "mac"].includes(platform.os)
-      ? "The signed installer for this release is not public yet. Use the source setup guide for this private candidate."
-      : "Public Host installers are available only for Windows and macOS.";
+    platformNoteEl.textContent = platform.os === "win"
+      ? "Windows uses the source setup path. Install Node 20, then follow the setup guide for Chrome or Edge."
+      : platform.os === "mac"
+        ? "No signed Host package is published for this macOS architecture."
+        : "The public Host package is available only for macOS arm64; Windows uses source setup.";
   }
 
   await refreshStatus();

@@ -1,5 +1,7 @@
 # Clipplane 未来优化与跨平台首次剪藏方案
 
+> **2026-08-12 决策更新：** Clipplane 改为 macOS-first。公开分发只提供签名、公证的 macOS arm64 `.pkg`；Windows 保留 Host、PowerShell setup 与 CI，但仅提供源码安装和 best-effort 支持，不再以 Authenticode 安装器作为发布门槛。本文中“双平台签名安装器同时公开”的段落保留为 2026-07-30 的历史决策快照，不再执行。
+>
 > 状态：2026-07-30 的决策快照；后续实施状态不在本文持续更新。
 >
 > 当前基线：`main` at `d9707a2`，产品版本 `0.7.5`。
