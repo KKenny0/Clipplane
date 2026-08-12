@@ -43,6 +43,17 @@ test("oversized captures fail before any local file is written", async () => {
   assert.deepEqual(await fs.readdir(notesDir), []);
 });
 
+test("frontmatter overhead cannot leave a record for a near-limit capture", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-render-limit-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  await assert.rejects(
+    clipPayload({ sourceUrl: "https://example.com/near-limit", sourceTitle: "x".repeat(500), contentMarkdown: "x".repeat(MAX_CAPTURE_CONTENT_BYTES - 100) }, { notesDir, configDir }),
+    (error) => error.code === "capture_too_large"
+  );
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  await assert.rejects(fs.access(capturesPath), (error) => error.code === "ENOENT");
+});
+
 test("classifyTags returns at most two content tags", () => {
   assert.deepEqual(classifyTags("AI agent code API startup design"), ["ai", "tech"]);
 });

@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import path from "node:path";
 import { assertCaptureStoreWritable, captureRecords, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
-import { resolveCaptureBodyForRead } from "./capture-record.mjs";
+import { captureBodyPath, inspectCaptureBody, resolveCaptureBodyForRead, writeNewCaptureBody } from "./capture-record.mjs";
+import { isCaptureDocument, MAX_CAPTURE_DOCUMENT_BYTES, renderCaptureDocument, renderRecoveredOrgBody } from "./capture-document.mjs";
 import {
   MARKDOWN_INBOX_HEADER,
   ensureMarkdownInbox,
@@ -28,13 +29,18 @@ export async function prepareCaptureStorage(paths, options = {}) {
         "Both inbox.md and inbox.org exist. Clipplane will not choose or overwrite either file."
       );
     }
+    if (!await filesEqual(paths.legacyInboxPath, paths.legacyInboxBackupPath)) {
+      throw migrationError("legacy_inbox_changed", "inbox.org differs from the archived migration source. Review both Inbox formats before continuing.");
+    }
     parseMarkdownInbox(await fs.readFile(paths.inboxPath, "utf8"));
+    await upgradeCaptureBodiesIfNeeded(paths, store);
     await upgradeCaptureRecords(paths.capturesPath);
     return { migrated: false, legacyRetained: true };
   }
 
   if (markdownExists) {
     parseMarkdownInbox(await fs.readFile(paths.inboxPath, "utf8"));
+    await upgradeCaptureBodiesIfNeeded(paths, store);
     await upgradeCaptureRecords(paths.capturesPath);
     return { migrated: false };
   }
@@ -70,8 +76,10 @@ function isCurrentCaptureRecord(record) {
 async function rebuildMarkdownInboxFromCurrentRecords(paths, store) {
   const rendered = [];
   for (const record of captureRecords(store).filter(isActiveCaptureRecord)) {
-    const bodyPath = await resolveCaptureBodyForRead(paths, record.capture_id);
-    const markdown = await fs.readFile(bodyPath, "utf8");
+    const inspected = await inspectCaptureBody(paths, record.capture_id);
+    if (inspected.state === "unsafe") throw inspected.error;
+    if (inspected.state === "missing") continue;
+    const markdown = await fs.readFile(inspected.path, "utf8");
     rendered.push(renderMarkdownInboxEntry(record, markdown).trimEnd());
   }
   const markdownBody = `${MARKDOWN_INBOX_HEADER.trimEnd()}${rendered.length ? `\n\n${rendered.join("\n\n")}` : ""}\n`;
@@ -87,7 +95,7 @@ async function rebuildMarkdownInboxFromCurrentRecords(paths, store) {
 }
 
 function isActiveCaptureRecord(record) {
-  return !["processed", "processing", "deleting", "deleted"].includes(cleanString(record.lifecycle_status));
+  return !["creating", "reactivating", "processed", "processing", "deleting", "deleted"].includes(cleanString(record.lifecycle_status));
 }
 
 export function parseLegacyOrgInbox(text) {
@@ -165,6 +173,15 @@ async function migrateLegacyInbox(paths, sourcePath, options) {
     recordsById.set(id, record);
   }
 
+  if (options.createBackup) {
+    await createImmutableBackup(paths.legacyInboxBackupPath, legacyText, "legacy_inbox_backup_conflict");
+    const recordsText = await readOptionalText(paths.capturesPath);
+    await createImmutableBackup(paths.legacyCapturesBackupPath, recordsText, "legacy_captures_backup_conflict");
+  }
+
+  await upgradeCaptureBodies(paths, store, { legacyText, legacyEntries });
+  await markCaptureDocumentUpgrade(paths);
+
   const rendered = [];
   for (const legacyEntry of legacyEntries) {
     const record = recordsById.get(legacyEntry.captureId);
@@ -186,9 +203,6 @@ async function migrateLegacyInbox(paths, sourcePath, options) {
       throw migrationError("inbox_migration_verification_failed", "The Markdown inbox did not preserve the legacy capture IDs.");
     }
 
-    if (options.createBackup) {
-      await createLegacyBackup(paths, legacyText);
-    }
     await publishMarkdownMigration(sourcePath, paths.inboxPath, temporary, legacyText, markdownBody);
     await fs.rm(temporary);
     await upgradeCaptureRecords(paths.capturesPath);
@@ -212,7 +226,6 @@ export async function publishMarkdownMigration(sourcePath, inboxPath, temporary,
     throw error;
   }
   if (!await fileContentsEqual(sourcePath, expectedSource)) {
-    await removePublishedInboxIfUnchanged(inboxPath, markdownBody);
     throw migrationError("legacy_inbox_changed", "inbox.org changed during migration. Review it and try again.");
   }
 }
@@ -228,30 +241,138 @@ async function fileContentsEqual(filePath, expected) {
   }
 }
 
-async function removePublishedInboxIfUnchanged(inboxPath, expected) {
+async function createImmutableBackup(backupPath, body, conflictCode) {
+  await fs.mkdir(path.dirname(backupPath), { recursive: true });
   try {
-    if (await fs.readFile(inboxPath, "utf8") === expected) {
-      await fs.rm(inboxPath);
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
-  }
-}
-
-async function createLegacyBackup(paths, legacyText) {
-  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
-  try {
-    await fs.writeFile(paths.legacyInboxBackupPath, legacyText, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    await fs.writeFile(backupPath, body, { encoding: "utf8", mode: 0o600, flag: "wx" });
   } catch (error) {
     if (error.code !== "EEXIST") {
       throw error;
     }
-    if (await fs.readFile(paths.legacyInboxBackupPath, "utf8") !== legacyText) {
-      throw migrationError("legacy_inbox_backup_conflict", "The existing inbox-v2.org backup has different content.");
+    if (await fs.readFile(backupPath, "utf8") !== body) {
+      throw migrationError(conflictCode, `The existing migration backup has different content: ${path.basename(backupPath)}`);
     }
   }
+}
+
+async function upgradeCaptureBodies(paths, store, options = {}) {
+  const legacyById = new Map((options.legacyEntries || []).map((entry) => [entry.captureId, entry]));
+  for (const record of captureRecords(store)) {
+    const inspected = await inspectCaptureBody(paths, record.capture_id);
+    if (inspected.state === "unsafe") {
+      if (options.legacyText !== undefined) throw inspected.error;
+      continue;
+    }
+    let original = "";
+    let recovery = "";
+    if (inspected.state === "available") {
+      original = await fs.readFile(inspected.path, "utf8");
+      if (isCaptureDocument(original, record.capture_id)) continue;
+    } else {
+      const legacyEntry = legacyById.get(record.capture_id);
+      if (!legacyEntry || !isActiveCaptureRecord(record)) continue;
+      original = renderRecoveredOrgBody(extractLegacyOrgBody(options.legacyText, legacyEntry));
+      recovery = "legacy_org";
+    }
+    const document = renderCaptureDocument(record, original, { recovery });
+    if (Buffer.byteLength(document, "utf8") > MAX_CAPTURE_DOCUMENT_BYTES) {
+      throw migrationError("capture_too_large", `Capture body is too large to migrate safely: ${record.capture_id}`);
+    }
+    const target = captureBodyPath(paths, record.capture_id);
+    if (inspected.state === "missing") {
+      try { await writeNewCaptureBody(paths, record.capture_id, document); }
+      catch (error) { if (error.code === "EEXIST") throw migrationError("recovered_body_conflict", `Capture body appeared during migration: ${record.capture_id}`); throw error; }
+    } else {
+      await atomicReplaceIfUnchanged(target, original, document);
+    }
+  }
+}
+
+async function upgradeCaptureBodiesIfNeeded(paths, store) {
+  if (await fileExists(paths.captureDocumentMarkerPath)) return;
+  let changed = false;
+  for (const record of captureRecords(store)) {
+    const inspected = await inspectCaptureBody(paths, record.capture_id);
+    if (inspected.state !== "available") {
+      const backupPath = captureBodyBackupPath(paths, record.capture_id);
+      if (inspected.state === "missing" && await fileExists(backupPath)) {
+        try { await fs.copyFile(backupPath, captureBodyPath(paths, record.capture_id), fsConstants.COPYFILE_EXCL); }
+        catch (error) { if (error.code !== "EEXIST") throw error; }
+        changed = true;
+        break;
+      }
+      continue;
+    }
+    const handle = await fs.open(inspected.path, "r");
+    let header;
+    try {
+      const buffer = Buffer.alloc(4096);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      header = buffer.subarray(0, bytesRead).toString("utf8");
+    } finally { await handle.close(); }
+    const expectedId = `capture_id: ${JSON.stringify(record.capture_id)}`;
+    if (!header.startsWith("---\nclipplane_body_format: 1\n") || !header.split("\n").includes(expectedId)) { changed = true; break; }
+  }
+  if (changed) await upgradeCaptureBodies(paths, store);
+  await markCaptureDocumentUpgrade(paths);
+}
+
+async function markCaptureDocumentUpgrade(paths) {
+  try { await fs.writeFile(paths.captureDocumentMarkerPath, "1\n", { encoding: "utf8", mode: 0o600, flag: "wx" }); }
+  catch (error) { if (error.code !== "EEXIST") throw error; }
+}
+
+function captureBodyBackupPath(paths, captureId) {
+  return path.join(paths.stateDir, "backups", "capture-bodies-v0", `${captureId}.md`);
+}
+
+function extractLegacyOrgBody(legacyText, entry) {
+  const lines = String(legacyText).split(/\r?\n/).slice(entry.start, entry.end);
+  const drawerEnd = lines.findIndex((line) => line === ":END:");
+  return lines.slice(drawerEnd + 1).join("\n").trim();
+}
+
+async function atomicReplaceIfUnchanged(filePath, expected, body) {
+  const captureId = path.basename(filePath, ".md");
+  const backupPath = path.join(path.dirname(path.dirname(filePath)), "backups", "capture-bodies-v0", `${captureId}.md`);
+  const displacedPath = `${filePath}.${process.pid}.${Date.now()}.pre-upgrade`;
+  await fs.mkdir(path.dirname(backupPath), { recursive: true });
+  try {
+    await fs.link(filePath, backupPath);
+  } catch (error) {
+    if (error.code !== "EEXIST" || !await fileContentsEqual(backupPath, expected)) {
+      throw migrationError("capture_body_backup_conflict", `Capture body backup conflicts with migration: ${path.basename(filePath)}`);
+    }
+  }
+  await fs.rename(filePath, displacedPath);
+  try {
+    if (!await fileContentsEqual(displacedPath, expected)) {
+      await restoreDisplacedBody(displacedPath, filePath);
+      throw migrationError("capture_body_changed", `Capture body changed during migration: ${path.basename(filePath)}`);
+    }
+    await fs.writeFile(filePath, body, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    await fs.rm(displacedPath, { force: true });
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      throw migrationError("capture_body_changed", `Capture body appeared during migration: ${path.basename(filePath)}`);
+    }
+    await restoreDisplacedBody(displacedPath, filePath);
+    throw error;
+  }
+}
+
+async function restoreDisplacedBody(displacedPath, filePath) {
+  try {
+    await fs.link(displacedPath, filePath);
+    await fs.rm(displacedPath, { force: true });
+  } catch (error) {
+    if (error.code !== "EEXIST" && error.code !== "ENOENT") throw error;
+  }
+}
+
+async function readOptionalText(filePath) {
+  try { return await fs.readFile(filePath, "utf8"); }
+  catch (error) { if (error.code === "ENOENT") return ""; throw error; }
 }
 
 async function upgradeCaptureRecords(capturesPath) {

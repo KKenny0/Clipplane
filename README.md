@@ -127,7 +127,9 @@ npm run doctor
 - `~/Documents/notes/.clipplane/captures.jsonl`
 - `~/Documents/notes/.clipplane/captures/<capture-id>.md`
 
-`inbox.md` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。三者通过 `CAPTURE_ID` 表示同一个剪藏项。首次由 0.7.x 升级时，Host 会把原 `inbox.org` 备份为 `.clipplane/backups/inbox-v2.org`，并保留原 Org 文件作为只读迁移证据；验证且排他发布 `inbox.md` 后，运行时只写 Markdown。若迁移期间 Org 被编辑、目标 Markdown 已出现或旧 Inbox 含非 Clipplane 管理的前置内容，迁移会停止而不会覆盖或删除文件。
+`inbox.md` 是你处理剪藏的工作区；`.clipplane` 下的 `captures.jsonl` 和 `captures/` 是由 Clipplane 管理的历史、去重、重试和同步状态，不需要分别手工维护。每个 `captures/<CAPTURE_ID>.md` 都是自包含的 Capture Document：固定 YAML frontmatter 保存标题、来源、作者、发布时间、创建时间、标签和捕获方式，后面保留原始 Markdown 正文，Agent 可以只读取这一份文件。外部同步会去掉这段 Clipplane frontmatter，避免重复属性。
+
+首次由 0.7.x 升级时，Host 会保留原 `inbox.org`，并创建 `.clipplane/backups/inbox-v2.org` 和 `.clipplane/backups/captures-v2.jsonl` 两份不可变备份。已有 body 会无损包装为 Capture Document，包装前版本保存在 `.clipplane/backups/capture-bodies-v0/`；active 记录缺失 body 时，仅在对应 Org 条目具有非空正文的情况下恢复，并标记 `recovery: "legacy_org"`。验证且排他发布 `inbox.md` 后，运行时只写 Markdown。若迁移期间 Org 被编辑、目标 Markdown 已出现、备份冲突或旧 Inbox 含非 Clipplane 管理的前置内容，迁移会停止而不会覆盖或删除文件。
 
 `captures.jsonl` 不保存设备绝对路径。Clipplane 会在每台设备上根据当前 `Storage` 目录和 `CAPTURE_ID` 定位 `inbox.md`、正文快照与 local-export，因此整个 notes 目录可以放进 Git，并在 Windows、macOS 或不同用户目录之间移动。旧版本写入的绝对路径会被忽略，并在下一次记录变更时迁移为可移植格式。
 

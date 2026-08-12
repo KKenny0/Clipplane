@@ -173,3 +173,12 @@ test("Windows installer remains per-user, x64-only, and refuses unsigned public 
     "CI must smoke the installer before uploading it"
   );
 });
+
+test("Windows source setup rejects runtimes outside supported Node 20 before installation", async () => {
+  const setupScript = await readFile(path.join(rootDir, "scripts", "setup-windows.ps1"), "utf8");
+  const validation = setupScript.indexOf("$nodeVersion.Major -ne 20");
+  const install = setupScript.indexOf("& $installScript @installArgs");
+  assert.ok(validation >= 0 && install > validation);
+  assert.match(setupScript, /\$nodeVersion -lt \[version\]"20\.19\.0"/);
+  assert.match(setupScript, /requires Node\.js >=20\.19\.0 <21/);
+});

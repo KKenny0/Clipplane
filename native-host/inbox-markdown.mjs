@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { captureDocumentMarkdown } from "./capture-document.mjs";
 
 const START_PATTERN = /^<!-- clipplane:capture:start id="([A-Za-z0-9_-]+)" -->$/;
 const END_PATTERN = /^<!-- clipplane:capture:end id="([A-Za-z0-9_-]+)" -->$/;
@@ -44,7 +45,7 @@ export function renderMarkdownInboxEntry(capture, markdown) {
   }
   lines.push(
     "",
-    escapeControlMarkers(markdown),
+    escapeControlMarkers(captureDocumentMarkdown(markdown, id)),
     `<!-- clipplane:capture:end id="${id}" -->`
   );
   return `${lines.join("\n").trimEnd()}\n`;

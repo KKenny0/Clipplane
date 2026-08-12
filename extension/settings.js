@@ -242,7 +242,7 @@ async function openFolder() {
       }
       throw new Error(response.error?.message || "Could not open folder.");
     }
-    showResult(`Storage folder opened at ${formatTime(response.opened_at)}`);
+    showResult("Storage folder open request sent");
   } catch (error) {
     showResult(safeErrorMessage(error), true);
   } finally {
@@ -320,7 +320,7 @@ async function handleHistoryAction(event) {
       if (!response.ok) {
         throw new Error(response.error?.message || "Could not open capture body.");
       }
-      showResult(`Capture opened at ${formatTime(response.opened_at)}`);
+      showResult("Capture open request sent");
       return;
     }
 

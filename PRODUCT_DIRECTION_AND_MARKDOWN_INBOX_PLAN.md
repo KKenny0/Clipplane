@@ -248,7 +248,7 @@ Clipplane captures waiting to be processed.
 2. 全新安装直接创建 `inbox.md`。
 3. 旧安装先解析 `inbox.org`，收集每个 Clipplane 条目的 `CAPTURE_ID`。
 4. 如果出现没有 `CAPTURE_ID` 的用户自建一级标题，中止并报告 `legacy_inbox_contains_unmanaged_entries`。
-5. 将原始 `inbox.org` 原子复制到 `.clipplane/backups/inbox-v2.org`；已存在不同内容的备份时不得覆盖，原文件也保留为只读迁移证据。
+5. 将原始 `inbox.org` 和 capture records 分别排他复制到 `.clipplane/backups/inbox-v2.org` 与 `.clipplane/backups/captures-v2.jsonl`；已存在不同内容的备份时不得覆盖，原 Org 也保留为迁移证据。
 6. 根据 capture record 与对应 Markdown body，在同目录生成临时 `inbox.md`。
 7. 只重建旧 Inbox 中实际存在的 ID。若用户此前手动删除了某条，不应在迁移时把它恢复出来。
 8. 重新解析临时文件，核对 ID 集合、条目数量、正文快照和控制标记。

@@ -168,6 +168,20 @@ test("openTextFile uses the macOS text-editor route", async () => {
   assert.deepEqual(captured, [{ command: "open", args: ["-t", "/notes/capture.md"] }]);
 });
 
+test("openTextFile keeps Windows Explorer visible and passes the path directly", async () => {
+  const captured = [];
+  await openTextFile("D:\\Notes & Archive\\中文\\capture.md", {
+    platform: "win32",
+    spawnImpl: (command, args, options) => {
+      captured.push({ command, args, options });
+      return closingChild(1);
+    }
+  });
+  assert.equal(captured[0].command, "explorer.exe");
+  assert.deepEqual(captured[0].args, ["D:\\Notes & Archive\\中文\\capture.md"]);
+  assert.equal(captured[0].options.windowsHide, false);
+});
+
 test("openFolder launches one OS open request per invocation", async () => {
   const captured = [];
 
@@ -185,7 +199,7 @@ test("openFolder launches one OS open request per invocation", async () => {
   for (const call of captured) {
     assert.equal(call.command, "explorer.exe");
     assert.deepEqual(call.args, ["D:\\Notes\\Clipplane"]);
-    assert.equal(call.options.windowsHide, true);
+    assert.equal(call.options.windowsHide, false);
   }
 });
 

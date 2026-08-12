@@ -17,6 +17,7 @@ import {
 } from "../native-host/inbox-markdown.mjs";
 import { parseLegacyOrgInbox, prepareCaptureStorage, publishMarkdownMigration } from "../native-host/inbox-migration.mjs";
 import { getDefaultPaths } from "../native-host/paths.mjs";
+import { parseCaptureDocument } from "../native-host/capture-document.mjs";
 
 test("Markdown inbox keeps body headings and escapes injected control markers", () => {
   const capture = sampleCapture("capture-1");
@@ -116,6 +117,8 @@ test("legacy Org inbox migrates from canonical bodies and keeps a backup", async
   assert.equal(result.migrated, true);
   assert.equal(await fs.readFile(paths.legacyInboxPath, "utf8"), legacy);
   assert.equal(await fs.readFile(paths.legacyInboxBackupPath, "utf8"), legacy);
+  assert.match(await fs.readFile(paths.legacyCapturesBackupPath, "utf8"), /"schema_version":2/);
+  assert.equal(parseCaptureDocument(await fs.readFile(path.join(paths.captureBodiesDir, `${capture.capture_id}.md`), "utf8")).format, 1);
   const markdown = await fs.readFile(paths.inboxPath, "utf8");
   assert.match(markdown, /# Exact Markdown/);
   assert.match(markdown, /\[link\]\(https:\/\/example\.com\)/);
@@ -124,6 +127,69 @@ test("legacy Org inbox migrates from canonical bodies and keeps a backup", async
   assert.equal(migrated.schema_version, 3);
   assert.equal("org_heading" in migrated, false);
   assert.equal("org_timestamp" in migrated, false);
+});
+
+test("legacy migration recovers a missing active body from Org without deleting the source", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-org-body-recovery-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const capture = { ...sampleCapture("missing-body"), schema_version: 2 };
+  await fs.mkdir(paths.stateDir, { recursive: true });
+  await appendCaptureRecord(paths.capturesPath, capture);
+  const legacy = [
+    "#+title: Inbox", "", "* Recovered :clip:", ":PROPERTIES:",
+    `:CAPTURE_ID: ${capture.capture_id}`, ":END:", "", "Original *Org* body."
+  ].join("\n");
+  await fs.writeFile(paths.legacyInboxPath, legacy, "utf8");
+
+  await prepareCaptureStorage(paths);
+
+  const document = parseCaptureDocument(await fs.readFile(path.join(paths.captureBodiesDir, "missing-body.md"), "utf8"));
+  assert.equal(document.metadata.recovery, "legacy_org");
+  assert.match(document.markdown, /Original \*Org\* body/);
+  assert.equal(await fs.readFile(paths.legacyInboxPath, "utf8"), legacy);
+  assert.match(await fs.readFile(paths.inboxPath, "utf8"), /Original \*Org\* body/);
+});
+
+test("an existing Markdown inbox upgrades raw schema-3 bodies to Capture Documents", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-document-upgrade-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const capture = sampleCapture("raw-schema-three");
+  await fs.mkdir(paths.stateDir, { recursive: true });
+  await appendCaptureRecord(paths.capturesPath, capture);
+  const body = "    indented code\r\n\r\nBody  \r\n";
+  await writeNewCaptureBody(paths, capture.capture_id, body);
+  await ensureMarkdownInbox(paths.inboxPath);
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, body);
+
+  await prepareCaptureStorage(paths);
+
+  const document = parseCaptureDocument(await fs.readFile(path.join(paths.captureBodiesDir, `${capture.capture_id}.md`), "utf8"), capture.capture_id);
+  assert.equal(document.format, 1);
+  assert.equal(document.markdown, body);
+});
+
+test("missing-inbox rebuild skips creating records without bodies so lifecycle recovery can continue", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-rebuild-creating-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const pending = { ...sampleCapture("pending-create"), lifecycle_status: "creating" };
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxBackupPath, "archival", "utf8");
+  await appendCaptureRecord(paths.capturesPath, pending);
+
+  await prepareCaptureStorage(paths);
+
+  assert.equal((await readMarkdownInboxIds(paths.inboxPath)).has(pending.capture_id), false);
+});
+
+test("missing-inbox rebuild skips an active missing body so History can report it", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-rebuild-missing-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxBackupPath, "archival", "utf8");
+  const missing = sampleCapture("active-missing");
+  await appendCaptureRecord(paths.capturesPath, missing);
+  await prepareCaptureStorage(paths);
+  assert.equal((await readMarkdownInboxIds(paths.inboxPath)).has(missing.capture_id), false);
 });
 
 test("legacy migration refuses unmanaged Org entries without creating Markdown", async () => {
@@ -219,6 +285,16 @@ test("migration publish refuses a changed Org source and an existing Markdown de
     (error) => error.code === "multiple_inbox_formats"
   );
   assert.equal(await fs.readFile(destination, "utf8"), "# user inbox");
+});
+
+test("a failed publish cannot make a changed Org source look migrated on retry", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-publish-retry-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxPath, "changed source", "utf8");
+  await fs.writeFile(paths.legacyInboxBackupPath, "original source", "utf8");
+  await ensureMarkdownInbox(paths.inboxPath);
+  await assert.rejects(prepareCaptureStorage(paths), (error) => error.code === "legacy_inbox_changed");
 });
 
 test("future schemas are rejected before legacy files are changed", async () => {

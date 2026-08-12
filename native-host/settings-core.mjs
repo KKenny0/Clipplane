@@ -46,6 +46,7 @@ export function openFolder(targetPath, options = {}) {
   const { command, args } = getOpenFolderCommand(targetPath, platform);
   return runOpenCommand(command, args, {
     ...options,
+    windowsHide: platform !== "win32",
     resolveOnSpawn: platform === "win32"
   });
 }
@@ -55,6 +56,7 @@ export function openTextFile(targetPath, options = {}) {
   const { command, args } = getOpenTextFileCommand(targetPath, platform);
   return runOpenCommand(command, args, {
     ...options,
+    windowsHide: platform !== "win32",
     resolveOnSpawn: platform === "win32"
   });
 }
@@ -117,7 +119,7 @@ function runOpenCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawnImpl(command, args, {
       stdio: "ignore",
-      windowsHide: true
+      windowsHide: options.windowsHide ?? true
     });
 
     child.once("error", reject);

@@ -20,6 +20,7 @@ import { getDefaultPaths } from "./paths.mjs";
 import { appendMarkdownInboxEntry } from "./inbox-markdown.mjs";
 import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
+import { MAX_CAPTURE_DOCUMENT_BYTES, renderCaptureDocument } from "./capture-document.mjs";
 
 const TAG_RULES = [
   { tag: "ai", patterns: [/ai\b/i, /llm/i, /agent/i, /model/i, /\u673a\u5668\u5b66\u4e60/, /\u5927\u6a21\u578b/] },
@@ -30,7 +31,7 @@ const TAG_RULES = [
   { tag: "life", patterns: [/habit/i, /life/i, /health/i, /\u751f\u6d3b/, /\u4e60\u60ef/, /\u5065\u5eb7/] },
   { tag: "read", patterns: [/book/i, /paper/i, /article/i, /reading/i, /\u8bfb\u4e66/, /\u8bba\u6587/, /\u9605\u8bfb/] }
 ];
-export const MAX_CAPTURE_CONTENT_BYTES = 4 * 1024 * 1024;
+export const MAX_CAPTURE_CONTENT_BYTES = MAX_CAPTURE_DOCUMENT_BYTES;
 
 export { getDefaultPaths };
 
@@ -56,7 +57,7 @@ async function clipPayloadLocked(normalized, paths) {
     if (["processing", "deleting"].includes(existing.lifecycle_status)) {
       throw new ClipplaneError("capture_lifecycle_pending", "This capture has an unfinished History operation. Open History and try again.");
     }
-    let capture = await ensureDuplicateCaptureBody(paths, existing, normalized.contentMarkdown);
+    let capture = await ensureDuplicateCaptureBody(paths, existing, normalized);
     const reactivated = capture.lifecycle_status === "processed";
     if (reactivated) {
       capture = await reactivateCapture(paths, capture);
@@ -70,9 +71,13 @@ async function clipPayloadLocked(normalized, paths) {
   }
 
   const capture = await buildCapture(normalized, contentHash, paths, store);
+  const document = renderCaptureDocument(capture, normalized.contentMarkdown);
+  if (Buffer.byteLength(document, "utf8") > MAX_CAPTURE_CONTENT_BYTES) {
+    throw new ClipplaneError("capture_too_large", "This clip is too large to save safely. Try Selection or Element instead.");
+  }
   await appendCaptureRecord(paths.capturesPath, capture);
-  await writeNewCaptureBody(paths, capture.capture_id, normalized.contentMarkdown);
-  await appendMarkdownInboxEntry(paths.inboxPath, capture, normalized.contentMarkdown);
+  await writeNewCaptureBody(paths, capture.capture_id, document);
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, document);
   const completed = await finishCreatingCapture(paths, capture.capture_id);
 
   return {
@@ -117,7 +122,11 @@ export function normalizePayload(payload = {}) {
     sourceUrl,
     sourceTitle,
     title,
-    contentMarkdown
+    contentMarkdown,
+    author: cleanMetadata(payload.author, 500),
+    publishedAt: cleanMetadata(payload.publishedAt, 200),
+    description: cleanMetadata(payload.description, 2000),
+    siteName: cleanMetadata(payload.siteName, 500)
   };
 }
 
@@ -165,8 +174,8 @@ function findExistingCapture(store, contentHash) {
   return captureRecords(store).find((record) => record.content_hash === contentHash) || null;
 }
 
-async function ensureDuplicateCaptureBody(paths, existing, markdown) {
-  await ensureCaptureBody(paths, existing.capture_id, markdown);
+async function ensureDuplicateCaptureBody(paths, existing, normalized) {
+  await ensureCaptureBody(paths, existing.capture_id, renderCaptureDocument(existing, normalized.contentMarkdown));
   const updated = { ...existing };
   await replaceCaptureRecord(paths.capturesPath, updated);
   return updated;
@@ -181,6 +190,10 @@ async function buildCapture(normalized, contentHash, paths, store) {
     source_url: normalized.sourceUrl,
     source_title: normalized.sourceTitle,
     title: normalized.title,
+    author: normalized.author,
+    published_at: normalized.publishedAt,
+    description: normalized.description,
+    site_name: normalized.siteName,
     input_type: normalized.inputType,
     extraction_method: normalized.extractionMethod,
     clipped_at: clippedAt.toISOString(),
@@ -244,6 +257,10 @@ function normalizeUrlForHash(value) {
 
 function stringOr(value, fallback) {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function cleanMetadata(value, limit) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
 }
 
 function normalizeExtractionMethod(value, inputType) {

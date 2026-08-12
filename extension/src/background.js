@@ -85,14 +85,6 @@ async function clipTab(tabId, mode, sync = false, tabUrl = "") {
   if (!page.ok) {
     return storeCaptureFailure(page.error);
   }
-  if (mode === "selection") {
-    const selection = await captureSelection(tabId);
-    if (selection) {
-      return saveClip(selection, sync);
-    }
-    mode = "page";
-  }
-
   await ensurePageCapture(tabId);
   if (mode === "element") {
     return beginElementCapture(tabId, sync);
@@ -103,34 +95,6 @@ async function clipTab(tabId, mode, sync = false, tabUrl = "") {
     return storeCaptureFailure(payload.__clipplaneError);
   }
   return saveClip(payload, sync);
-}
-
-async function captureSelection(tabId) {
-  const [{ result }] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: () => {
-      const selectedText = String(window.getSelection?.() || "").trim();
-      if (!selectedText) {
-        return null;
-      }
-      const sourceUrl = location.href;
-      const sourceTitle = document.title || sourceUrl;
-      const title = (selectedText.split(/\r?\n/).find(Boolean) || sourceTitle)
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
-      return {
-        inputType: "selection",
-        extractionMethod: "selection",
-        sourceUrl,
-        sourceTitle,
-        title: title || sourceTitle,
-        contentMarkdown: selectedText,
-        contentText: selectedText
-      };
-    }
-  });
-  return result;
 }
 
 async function ensurePageCapture(tabId) {

@@ -24,6 +24,7 @@
     const selectedText = String(window.getSelection?.() || "").trim();
     const sourceUrl = location.href;
     const sourceTitle = document.title || sourceUrl;
+    const metadata = captureMetadata();
 
     if (mode === "selection" && selectedText) {
       return finalizeCapture({
@@ -32,6 +33,7 @@
         sourceUrl,
         sourceTitle,
         title: firstLine(selectedText, sourceTitle),
+        ...metadata,
         contentMarkdown: selectedText,
         contentText: selectedText
       }, startedAt);
@@ -53,6 +55,7 @@
       sourceUrl,
       sourceTitle,
       title: sourceTitle,
+      ...captureMetadata(),
       contentMarkdown: content.markdown || content.text,
       contentText: content.text
     };
@@ -88,6 +91,7 @@
         sourceUrl,
         sourceTitle,
         title: firstLine(article.title, sourceTitle),
+        ...captureMetadata(article),
         contentMarkdown: content.markdown || content.text,
         contentText: content.text
       };
@@ -207,6 +211,7 @@
     const startedAt = performance.now();
     const sourceUrl = location.href;
     const sourceTitle = document.title || sourceUrl;
+    const metadata = captureMetadata();
     const content = domNormalizer().normalizeElement(element, { profile: "element", sourceUrl });
 
     return finalizeCapture({
@@ -215,6 +220,7 @@
       sourceUrl,
       sourceTitle,
       title: firstLine(content.text, sourceTitle),
+      ...metadata,
       contentMarkdown: content.markdown || content.text,
       contentText: content.text
     }, startedAt);
@@ -258,6 +264,24 @@
 
   function cleanText(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function captureMetadata(readability = {}) {
+    const meta = (names) => {
+      for (const name of names) {
+        const node = document.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
+        const value = cleanText(node?.content);
+        if (value) return value;
+      }
+      return "";
+    };
+    const time = cleanText(document.querySelector("article time[datetime], time[datetime]")?.getAttribute("datetime"));
+    return {
+      author: cleanText(readability.byline) || meta(["author", "article:author"]),
+      publishedAt: cleanText(readability.publishedTime) || meta(["article:published_time", "date", "datePublished"]) || time,
+      description: cleanText(readability.excerpt) || meta(["description", "og:description", "twitter:description"]),
+      siteName: cleanText(readability.siteName) || meta(["og:site_name"]) || location.hostname
+    };
   }
 
   function firstLine(text, fallback) {

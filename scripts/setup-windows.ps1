@@ -15,7 +15,12 @@ $installScript = Join-Path $PSScriptRoot "install-native-host.ps1"
 $checkScript = Join-Path $PSScriptRoot "check-native-host.ps1"
 
 $node = Get-Command node -ErrorAction Stop
-Write-Host "PASS node: $($node.Source)"
+$nodeVersionText = (& $node.Source --version).Trim().TrimStart("v")
+$nodeVersion = [version]$nodeVersionText
+if ($nodeVersion.Major -ne 20 -or $nodeVersion -lt [version]"20.19.0") {
+  throw "Clipplane source setup requires Node.js >=20.19.0 <21. Found $nodeVersionText at $($node.Source). Install Node 20 LTS or use the packaged Host."
+}
+Write-Host "PASS node ${nodeVersionText}: $($node.Source)"
 
 if ($ExtensionId -and $ExtensionId -notmatch "^[a-p]{32}$") {
   throw "ExtensionId must be a 32-character Chrome extension ID using letters a-p."

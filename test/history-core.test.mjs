@@ -263,7 +263,9 @@ test("copyCapture copies exact Markdown from processed captures", async () => {
   });
 
   assert.equal(response.copy_mode, "content");
-  assert.deepEqual(copied, [body]);
+  assert.equal(copied.length, 1);
+  assert.match(copied[0], /^---\nclipplane_body_format: 1/m);
+  assert.match(copied[0], /# 标题\n\nExact \*\*Markdown\*\* body\./);
 });
 
 test("copyCapture rejects unsupported copy formats", async () => {

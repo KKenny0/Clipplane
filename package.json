@@ -31,10 +31,11 @@
     "notarize:host:macos": "bash scripts/notarize-native-host-macos-pkg.sh",
     "smoke:host:bundle": "node scripts/smoke-native-host-bundle.mjs",
     "verify:store": "node scripts/verify-store-package.mjs",
-    "smoke:sync:local": "node scripts/smoke-sync-local.mjs"
+    "smoke:sync:local": "node scripts/smoke-sync-local.mjs",
+    "accept:migration": "node scripts/accept-legacy-migration.mjs"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=20.19.0 <21"
   },
   "devDependencies": {
     "@mozilla/readability": "0.6.0",

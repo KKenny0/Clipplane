@@ -23,6 +23,10 @@ test("page capture prefers Readability and excludes layout noise", async () => {
   assert.match(payload.contentMarkdown, /local tool earns trust/i);
   assert.match(payload.contentMarkdown, /\[implementation guide\]\(https:\/\/example\.com\/guide\)/);
   assert.doesNotMatch(payload.contentMarkdown, /Primary navigation|Newsletter Subscribe|Recommended stories/i);
+  assert.equal(typeof payload.author, "string");
+  assert.equal(typeof payload.publishedAt, "string");
+  assert.equal(typeof payload.description, "string");
+  assert.equal(payload.siteName || "example.com", "example.com");
 });
 
 test("page capture falls back for short pages without dropping the content", async () => {
@@ -33,6 +37,29 @@ test("page capture falls back for short pages without dropping the content", asy
   assert.equal(payload.extractionMethod, "fallback");
   assert.match(payload.contentMarkdown, /One compact update/);
   assert.match(payload.contentMarkdown, /\[Read details\]\(https:\/\/example\.com\/details\)/);
+});
+
+test("all capture modes receive deterministic page metadata", () => {
+  const dom = createDom(`
+    <title>Metadata page</title>
+    <meta name="author" content="Ada Lovelace">
+    <meta property="article:published_time" content="2026-08-12">
+    <meta name="description" content="A useful description">
+    <meta property="og:site_name" content="Example Notes">
+    <p id="body">Selected metadata text.</p>
+  `, "https://example.com/metadata");
+  const range = dom.window.document.createRange();
+  range.selectNodeContents(dom.window.document.querySelector("#body"));
+  dom.window.getSelection().addRange(range);
+  for (const payload of [
+    dom.window.__clipplaneCapture.capture("selection"),
+    dom.window.__clipplaneCapture.captureElement(dom.window.document.querySelector("#body"))
+  ]) {
+    assert.equal(payload.author, "Ada Lovelace");
+    assert.equal(payload.publishedAt, "2026-08-12");
+    assert.equal(payload.description, "A useful description");
+    assert.equal(payload.siteName, "Example Notes");
+  }
 });
 
 test("fallback capture keeps the content root and removes page chrome", async () => {
@@ -86,6 +113,7 @@ test("page capture keeps selected text exact and does not require Readability", 
   assert.equal(payload.inputType, "selection");
   assert.equal(payload.extractionMethod, "selection");
   assert.equal(payload.contentMarkdown, "Choose this precise text.");
+  assert.deepEqual(Object.keys(payload).filter((key) => ["author", "publishedAt", "description", "siteName"].includes(key)).sort(), ["author", "description", "publishedAt", "siteName"]);
 });
 
 test("element capture preserves the chosen region and omits unsafe links", () => {

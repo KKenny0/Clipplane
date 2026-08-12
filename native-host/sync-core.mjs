@@ -8,6 +8,7 @@ import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
 import { syncLocalExport } from "./sinks/local-export.mjs";
 import { syncNotionApi } from "./sinks/notion-api.mjs";
+import { captureDocumentMarkdown } from "./capture-document.mjs";
 
 const SINKS = {
   "local-export": syncLocalExport,
@@ -151,7 +152,7 @@ export function chooseSinkNames(requested, config) {
 }
 
 async function readCaptureMarkdown(capture, paths) {
-  return fs.readFile(await resolveCaptureBodyForRead(paths, capture.capture_id), "utf8");
+  return captureDocumentMarkdown(await fs.readFile(await resolveCaptureBodyForRead(paths, capture.capture_id), "utf8"), capture.capture_id);
 }
 
 function updateCaptureSinks(capture, results) {

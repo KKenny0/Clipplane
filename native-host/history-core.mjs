@@ -15,6 +15,7 @@ import { readMarkdownInboxIds, removeMarkdownInboxEntry } from "./inbox-markdown
 import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { openTextFile, writeClipboardText } from "./settings-core.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
+import { captureDocumentMarkdown } from "./capture-document.mjs";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -194,7 +195,7 @@ async function summarizeCapture(record, paths, inboxIds) {
   const contentExists = inspectedBody.state === "available";
   const inputType = ["selection", "element"].includes(record.input_type) ? record.input_type : "page";
   const extractionMethod = publicExtractionMethod(record.extraction_method, inputType);
-  const preview = ["selection", "element"].includes(inputType) && contentExists ? await readCapturePreview(contentPath) : "";
+  const preview = ["selection", "element"].includes(inputType) && contentExists ? await readCapturePreview(contentPath, record.capture_id) : "";
   const captureId = cleanString(record.capture_id);
   const inboxMatches = inboxIds.get(captureId) || 0;
 
@@ -326,10 +327,10 @@ function publicExtractionMethod(value, inputType) {
   return inputType === "selection" ? "selection" : inputType === "element" ? "element" : "legacy_page";
 }
 
-async function readCapturePreview(contentPath) {
+async function readCapturePreview(contentPath, captureId) {
   try {
     const text = await fs.readFile(contentPath, "utf8");
-    return cleanPreview(text);
+    return cleanPreview(captureDocumentMarkdown(text, captureId));
   } catch {
     return "";
   }
