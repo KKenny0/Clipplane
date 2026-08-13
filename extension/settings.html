@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clipplane Settings</title>
     <link rel="icon" href="icons/icon-32.png">
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="brand.css">
     <link rel="stylesheet" href="settings.css">
   </head>
@@ -67,6 +68,17 @@
             <button id="copy-diagnostics" class="secondary" type="button">Copy diagnostics</button>
           </div>
           <p id="storage-note" class="note"></p>
+          <div class="appearance-row" aria-labelledby="appearance-title">
+            <div>
+              <h3 id="appearance-title">Appearance</h3>
+              <p class="note">Use your system theme or keep Clipplane in one mode.</p>
+            </div>
+            <div class="theme-switch" role="group" aria-label="Appearance theme">
+              <button class="theme-option" type="button" data-theme-option="system" aria-pressed="true">System</button>
+              <button class="theme-option" type="button" data-theme-option="light" aria-pressed="false">Light</button>
+              <button class="theme-option" type="button" data-theme-option="dark" aria-pressed="false">Dark</button>
+            </div>
+          </div>
         </section>
       </div>
 

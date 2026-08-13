@@ -3,6 +3,7 @@ import path from "node:path";
 const REQUIRED_FILES = new Set([
   "manifest.json",
   "brand.css",
+  "theme.js",
   "onboarding.css",
   "onboarding.html",
   "onboarding.js",
@@ -28,7 +29,7 @@ const FORBIDDEN_EXTENSIONS = new Set([
   ".bat", ".cmd", ".dll", ".exe", ".key", ".node", ".p12", ".pfx", ".pem", ".ps1", ".sh"
 ]);
 
-export function validateStorePackage(files, packageVersion) {
+export function validateStorePackage(files, packageVersion, { expectedManifestKey = null } = {}) {
   const names = [...files.keys()].map(normalizeArchivePath);
   const errors = [];
 
@@ -73,7 +74,9 @@ export function validateStorePackage(files, packageVersion) {
   if (manifest.minimum_chrome_version !== "102") {
     errors.push("minimum_chrome_version must be 102");
   }
-  if (Object.hasOwn(manifest, "key")) {
+  if (expectedManifestKey !== null && manifest.key !== expectedManifestKey) {
+    errors.push("manifest.json does not contain the reviewed extension identity key");
+  } else if (expectedManifestKey === null && Object.hasOwn(manifest, "key")) {
     errors.push("manifest.json must not contain a key field in a Chrome Web Store package");
   }
   if (manifest.host_permissions?.length) {

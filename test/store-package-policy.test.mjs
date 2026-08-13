@@ -4,6 +4,7 @@ import { validateStorePackage } from "../scripts/store-package-policy.mjs";
 
 const requiredFiles = {
   "brand.css": ":root {}",
+  "theme.js": "(() => {})();",
   "onboarding.css": "body {}",
   "onboarding.html": "<!doctype html>",
   "onboarding.js": "export {};",
@@ -43,6 +44,22 @@ test("store package policy rejects a manifest key", () => {
   });
   const errors = validateStorePackage(files, "0.6.0");
   assert.ok(errors.some((error) => error.includes("must not contain a key field")));
+});
+
+test("release extension package policy requires the reviewed identity key", () => {
+  const reviewedKey = "development-only-public-key";
+  const files = packageFiles({
+    "manifest.json": JSON.stringify({
+      version: "0.6.0",
+      minimum_chrome_version: "102",
+      key: reviewedKey,
+      permissions: ["activeTab", "contextMenus", "nativeMessaging", "scripting", "storage"]
+    })
+  });
+
+  assert.deepEqual(validateStorePackage(files, "0.6.0", { expectedManifestKey: reviewedKey }), []);
+  const errors = validateStorePackage(files, "0.6.0", { expectedManifestKey: "different-key" });
+  assert.ok(errors.some((error) => error.includes("reviewed extension identity key")));
 });
 
 function packageFiles(extra = {}) {

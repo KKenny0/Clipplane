@@ -7,8 +7,11 @@ import { validateStorePackage } from "./store-package-policy.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(await readFile(path.join(rootDir, "package.json"), "utf8"));
-const archive = path.join(rootDir, "dist", `clipplane-store-v${packageJson.version}.zip`);
-const extractDir = await mkdtemp(path.join(os.tmpdir(), "clipplane-store-package-"));
+const sourceManifest = JSON.parse(await readFile(path.join(rootDir, "extension", "manifest.json"), "utf8"));
+const verifyExtension = process.argv.includes("--extension");
+const packageName = verifyExtension ? "clipplane-extension" : "clipplane-store";
+const archive = path.join(rootDir, "dist", `${packageName}-v${packageJson.version}.zip`);
+const extractDir = await mkdtemp(path.join(os.tmpdir(), `${packageName}-package-`));
 
 try {
   if (os.platform() === "win32") {
@@ -24,9 +27,12 @@ try {
     files.set(relative, await readFile(file, "utf8"));
   }
 
-  const errors = validateStorePackage(files, packageJson.version);
+  const errors = validateStorePackage(files, packageJson.version, {
+    expectedManifestKey: verifyExtension ? sourceManifest.key : null
+  });
   if (errors.length) {
-    throw new Error(`Chrome Web Store package verification failed:\n- ${errors.join("\n- ")}`);
+    const label = verifyExtension ? "GitHub Release extension" : "Chrome Web Store";
+    throw new Error(`${label} package verification failed:\n- ${errors.join("\n- ")}`);
   }
 
   console.log(`Verified ${path.relative(rootDir, archive)}`);

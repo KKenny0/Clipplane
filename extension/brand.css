@@ -1,36 +1,39 @@
 :root {
-  --cp-ink: oklch(31% 0.018 65);
-  --cp-ink-strong: oklch(20% 0.014 65);
-  --cp-paper: oklch(97.5% 0.01 83);
-  --cp-surface: oklch(99.4% 0.004 83);
-  --cp-surface-subtle: oklch(94.5% 0.014 83);
-  --cp-line: oklch(84% 0.014 78);
-  --cp-muted: oklch(49% 0.018 70);
-  --cp-moss: oklch(36% 0.085 158);
-  --cp-moss-hover: oklch(40% 0.09 158);
-  --cp-moss-soft: oklch(91.5% 0.035 150);
-  --cp-success: oklch(45% 0.095 145);
-  --cp-success-soft: oklch(91.5% 0.045 145);
-  --cp-signal: oklch(65% 0.145 45);
-  --cp-signal-soft: oklch(94% 0.045 55);
-  --cp-danger: oklch(50% 0.15 28);
-  --cp-danger-soft: oklch(94% 0.035 28);
-  --cp-on-accent: oklch(97.5% 0.01 83);
-  --cp-on-accent-muted: oklch(89% 0.025 145);
-  --cp-warning-ink: oklch(43% 0.1 55);
-  --cp-warning-strong: oklch(38% 0.1 55);
-  --cp-warning-border: oklch(82% 0.06 60);
-  --cp-success-border: oklch(82% 0.05 145);
-  --cp-success-quiet-border: oklch(82% 0.05 160);
-  --cp-danger-border: oklch(82% 0.055 28);
-  --cp-danger-strong-border: oklch(76% 0.07 28);
-  --cp-tag-border: oklch(85% 0.028 160);
-  --cp-hover-line: oklch(72% 0.045 150);
-  --cp-identity-surface: var(--cp-ink);
-  --cp-identity-text: var(--cp-paper);
-  --cp-radius-sm: 5px;
-  --cp-radius: 8px;
-  --cp-radius-lg: 12px;
+  --cp-canvas: oklch(98.5% 0.006 160);
+  --cp-paper: var(--cp-canvas);
+  --cp-surface: oklch(100% 0 0);
+  --cp-surface-subtle: oklch(95.5% 0.012 160);
+  --cp-surface-raised: oklch(99.2% 0.004 160);
+  --cp-line: oklch(87% 0.014 160);
+  --cp-ink: oklch(31% 0.018 165);
+  --cp-ink-strong: oklch(23% 0.02 165);
+  --cp-muted: oklch(52% 0.018 165);
+  --cp-moss: oklch(43% 0.085 160);
+  --cp-moss-hover: oklch(39% 0.09 160);
+  --cp-moss-soft: oklch(94% 0.04 155);
+  --cp-focus: oklch(57% 0.12 160);
+  --cp-success: oklch(45% 0.1 150);
+  --cp-success-soft: oklch(94% 0.04 150);
+  --cp-signal: oklch(65% 0.14 55);
+  --cp-signal-soft: oklch(95% 0.035 62);
+  --cp-danger: oklch(50% 0.14 28);
+  --cp-danger-soft: oklch(95% 0.03 28);
+  --cp-on-accent: oklch(98% 0.006 160);
+  --cp-on-accent-muted: oklch(91% 0.022 155);
+  --cp-warning-ink: oklch(45% 0.09 58);
+  --cp-warning-strong: oklch(39% 0.09 58);
+  --cp-warning-border: oklch(84% 0.05 62);
+  --cp-success-border: oklch(84% 0.045 150);
+  --cp-success-quiet-border: oklch(86% 0.035 160);
+  --cp-danger-border: oklch(84% 0.045 28);
+  --cp-danger-strong-border: oklch(76% 0.065 28);
+  --cp-tag-border: oklch(86% 0.025 160);
+  --cp-hover-line: oklch(73% 0.04 155);
+  --cp-identity-surface: oklch(24% 0.035 165);
+  --cp-identity-text: oklch(96% 0.012 155);
+  --cp-radius-sm: 6px;
+  --cp-radius: 10px;
+  --cp-radius-lg: 14px;
   --cp-control-height: 40px;
   --cp-space-1: 4px;
   --cp-space-2: 8px;
@@ -41,57 +44,108 @@
   --cp-ease-out: cubic-bezier(.16, 1, .3, 1);
   --cp-duration-fast: 120ms;
   --cp-duration-state: 180ms;
-  --cp-shadow-control: 0 1px 2px oklch(20% 0.02 70 / 0.14);
-  --cp-shadow-button: 0 1px 1px oklch(20% 0.02 70 / 0.08), 0 2px 5px oklch(20% 0.02 70 / 0.06);
-  --cp-shadow-primary: 0 1px 1px oklch(20% 0.04 155 / 0.18), inset 0 1px 0 oklch(100% 0 0 / 0.12);
-  --cp-shadow-floating: 0 10px 28px oklch(20% 0.02 70 / 0.16);
-  --cp-shadow-result: 0 6px 24px oklch(20% 0.02 70 / 0.12);
-  --cp-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --cp-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cp-shadow-control: 0 1px 3px oklch(23% 0.02 165 / 0.12);
+  --cp-shadow-button: 0 1px 2px oklch(23% 0.02 165 / 0.08), 0 3px 8px oklch(23% 0.02 165 / 0.05);
+  --cp-shadow-primary: 0 1px 2px oklch(23% 0.06 160 / 0.22), inset 0 1px 0 oklch(100% 0 0 / 0.14);
+  --cp-shadow-panel: 0 1px 3px oklch(23% 0.02 165 / 0.1), 0 14px 36px oklch(23% 0.02 165 / 0.045);
+  --cp-shadow-floating: 0 16px 36px oklch(23% 0.02 165 / 0.16);
+  --cp-shadow-result: 0 10px 30px oklch(23% 0.02 165 / 0.12);
+  --cp-brand: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --cp-display: "Segoe UI Variable Display", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cp-ui: "Segoe UI Variable", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
 }
 
 html {
   min-height: 100%;
-  background: var(--cp-paper);
+  background: var(--cp-canvas);
   color-scheme: light dark;
 }
 
+:root[data-theme="light"] { color-scheme: light; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-canvas: oklch(15.5% 0.012 165);
+  --cp-paper: var(--cp-canvas);
+  --cp-surface: oklch(20.5% 0.014 165);
+  --cp-surface-subtle: oklch(25% 0.016 165);
+  --cp-surface-raised: oklch(28% 0.017 165);
+  --cp-line: oklch(33% 0.018 165);
+  --cp-ink: oklch(86% 0.012 160);
+  --cp-ink-strong: oklch(94% 0.008 160);
+  --cp-muted: oklch(68% 0.016 160);
+  --cp-moss: oklch(74% 0.105 160);
+  --cp-moss-hover: oklch(79% 0.1 160);
+  --cp-moss-soft: oklch(26% 0.04 155);
+  --cp-focus: oklch(74% 0.105 160);
+  --cp-success: oklch(76% 0.095 150);
+  --cp-success-soft: oklch(25% 0.04 150);
+  --cp-signal: oklch(79% 0.1 62);
+  --cp-signal-soft: oklch(27% 0.035 62);
+  --cp-danger: oklch(74% 0.11 28);
+  --cp-danger-soft: oklch(27% 0.035 28);
+  --cp-on-accent: oklch(18% 0.02 165);
+  --cp-on-accent-muted: oklch(28% 0.024 160);
+  --cp-warning-ink: oklch(82% 0.085 62);
+  --cp-warning-strong: oklch(88% 0.07 62);
+  --cp-warning-border: oklch(46% 0.055 62);
+  --cp-success-border: oklch(44% 0.06 150);
+  --cp-success-quiet-border: oklch(42% 0.05 160);
+  --cp-danger-border: oklch(46% 0.06 28);
+  --cp-danger-strong-border: oklch(52% 0.07 28);
+  --cp-tag-border: oklch(42% 0.04 160);
+  --cp-hover-line: oklch(48% 0.045 155);
+  --cp-identity-surface: oklch(11% 0.014 165);
+  --cp-identity-text: oklch(94% 0.01 160);
+  --cp-shadow-control: 0 1px 2px oklch(5% 0.01 165 / 0.42), inset 0 1px 0 oklch(100% 0 0 / 0.05);
+  --cp-shadow-button: 0 1px 2px oklch(5% 0.01 165 / 0.44), inset 0 1px 0 oklch(100% 0 0 / 0.045);
+  --cp-shadow-primary: 0 1px 2px oklch(5% 0.02 160 / 0.36), inset 0 1px 0 oklch(100% 0 0 / 0.14);
+  --cp-shadow-panel: inset 0 1px 0 oklch(100% 0 0 / 0.045), 0 0 0 1px oklch(100% 0 0 / 0.035);
+  --cp-shadow-floating: 0 18px 42px oklch(5% 0.01 165 / 0.58), inset 0 1px 0 oklch(100% 0 0 / 0.055);
+  --cp-shadow-result: 0 12px 32px oklch(5% 0.01 165 / 0.5), inset 0 1px 0 oklch(100% 0 0 / 0.045);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --cp-ink: oklch(86% 0.012 83);
-    --cp-ink-strong: oklch(94% 0.008 83);
-    --cp-paper: oklch(17% 0.01 83);
-    --cp-surface: oklch(21% 0.012 83);
-    --cp-surface-subtle: oklch(26% 0.014 83);
-    --cp-line: oklch(35% 0.015 83);
-    --cp-muted: oklch(68% 0.014 83);
-    --cp-moss: oklch(74% 0.08 158);
-    --cp-moss-hover: oklch(79% 0.085 158);
-    --cp-moss-soft: oklch(25% 0.035 150);
-    --cp-success: oklch(74% 0.09 145);
-    --cp-success-soft: oklch(25% 0.045 145);
-    --cp-signal: oklch(78% 0.11 45);
-    --cp-signal-soft: oklch(27% 0.045 55);
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --cp-canvas: oklch(15.5% 0.012 165);
+    --cp-paper: var(--cp-canvas);
+    --cp-surface: oklch(20.5% 0.014 165);
+    --cp-surface-subtle: oklch(25% 0.016 165);
+    --cp-surface-raised: oklch(28% 0.017 165);
+    --cp-line: oklch(33% 0.018 165);
+    --cp-ink: oklch(86% 0.012 160);
+    --cp-ink-strong: oklch(94% 0.008 160);
+    --cp-muted: oklch(68% 0.016 160);
+    --cp-moss: oklch(74% 0.105 160);
+    --cp-moss-hover: oklch(79% 0.1 160);
+    --cp-moss-soft: oklch(26% 0.04 155);
+    --cp-focus: oklch(74% 0.105 160);
+    --cp-success: oklch(76% 0.095 150);
+    --cp-success-soft: oklch(25% 0.04 150);
+    --cp-signal: oklch(79% 0.1 62);
+    --cp-signal-soft: oklch(27% 0.035 62);
     --cp-danger: oklch(74% 0.11 28);
-    --cp-danger-soft: oklch(27% 0.04 28);
-    --cp-on-accent: oklch(18% 0.02 83);
-    --cp-on-accent-muted: oklch(28% 0.025 145);
-    --cp-warning-ink: oklch(82% 0.09 55);
-    --cp-warning-strong: oklch(88% 0.075 55);
-    --cp-warning-border: oklch(47% 0.07 60);
-    --cp-success-border: oklch(45% 0.065 145);
-    --cp-success-quiet-border: oklch(45% 0.06 160);
-    --cp-danger-border: oklch(46% 0.065 28);
-    --cp-danger-strong-border: oklch(52% 0.075 28);
-    --cp-tag-border: oklch(43% 0.045 160);
-    --cp-hover-line: oklch(48% 0.045 150);
-    --cp-identity-surface: oklch(12% 0.012 83);
-    --cp-identity-text: oklch(92% 0.01 83);
-    --cp-shadow-control: 0 1px 2px oklch(7% 0.01 83 / 0.36), inset 0 1px 0 oklch(100% 0 0 / 0.035);
-    --cp-shadow-button: 0 1px 2px oklch(7% 0.01 83 / 0.4), inset 0 1px 0 oklch(100% 0 0 / 0.035);
-    --cp-shadow-primary: 0 1px 2px oklch(7% 0.02 155 / 0.35), inset 0 1px 0 oklch(100% 0 0 / 0.12);
-    --cp-shadow-floating: 0 12px 30px oklch(5% 0.01 83 / 0.48), inset 0 1px 0 oklch(100% 0 0 / 0.035);
-    --cp-shadow-result: 0 8px 24px oklch(5% 0.01 83 / 0.42), inset 0 1px 0 oklch(100% 0 0 / 0.03);
+    --cp-danger-soft: oklch(27% 0.035 28);
+    --cp-on-accent: oklch(18% 0.02 165);
+    --cp-on-accent-muted: oklch(28% 0.024 160);
+    --cp-warning-ink: oklch(82% 0.085 62);
+    --cp-warning-strong: oklch(88% 0.07 62);
+    --cp-warning-border: oklch(46% 0.055 62);
+    --cp-success-border: oklch(44% 0.06 150);
+    --cp-success-quiet-border: oklch(42% 0.05 160);
+    --cp-danger-border: oklch(46% 0.06 28);
+    --cp-danger-strong-border: oklch(52% 0.07 28);
+    --cp-tag-border: oklch(42% 0.04 160);
+    --cp-hover-line: oklch(48% 0.045 155);
+    --cp-identity-surface: oklch(11% 0.014 165);
+    --cp-identity-text: oklch(94% 0.01 160);
+    --cp-shadow-control: 0 1px 2px oklch(5% 0.01 165 / 0.42), inset 0 1px 0 oklch(100% 0 0 / 0.05);
+    --cp-shadow-button: 0 1px 2px oklch(5% 0.01 165 / 0.44), inset 0 1px 0 oklch(100% 0 0 / 0.045);
+    --cp-shadow-primary: 0 1px 2px oklch(5% 0.02 160 / 0.36), inset 0 1px 0 oklch(100% 0 0 / 0.14);
+    --cp-shadow-panel: inset 0 1px 0 oklch(100% 0 0 / 0.045), 0 0 0 1px oklch(100% 0 0 / 0.035);
+    --cp-shadow-floating: 0 18px 42px oklch(5% 0.01 165 / 0.58), inset 0 1px 0 oklch(100% 0 0 / 0.055);
+    --cp-shadow-result: 0 12px 32px oklch(5% 0.01 165 / 0.5), inset 0 1px 0 oklch(100% 0 0 / 0.045);
   }
 }
 
@@ -109,10 +163,10 @@ html {
 .brand-name {
   display: block;
   color: var(--cp-ink-strong);
-  font-family: var(--cp-display);
+  font-family: var(--cp-brand);
   font-size: 21px;
   font-weight: 700;
-  line-height: .9;
+  line-height: .92;
   letter-spacing: 0;
 }
 
@@ -121,11 +175,10 @@ html {
   display: block;
   margin-top: 5px;
   color: var(--cp-muted);
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: .01em;
+  line-height: 1.15;
 }
 
 .status-dot {
@@ -140,7 +193,7 @@ html {
 }
 
 .is-neutral .status-dot { background: var(--cp-muted); box-shadow: 0 0 0 3px var(--cp-surface-subtle); }
-.is-working .status-dot { background: var(--cp-signal); box-shadow: 0 0 0 3px var(--cp-signal-soft); }
+.is-working .status-dot { background: var(--cp-focus); box-shadow: 0 0 0 3px var(--cp-moss-soft); }
 .is-ready .status-dot { background: var(--cp-success); box-shadow: 0 0 0 3px var(--cp-success-soft); }
 .is-warning .status-dot { background: var(--cp-signal); box-shadow: 0 0 0 3px var(--cp-signal-soft); }
 .is-error .status-dot { background: var(--cp-danger); box-shadow: 0 0 0 3px var(--cp-danger-soft); }

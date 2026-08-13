@@ -57,6 +57,10 @@ test("settings follows tab and keyboard accessibility structure", async () => {
   assert.equal(sinkFields.length, 2);
   assert.ok(sinkFields.every((fields) => fields.querySelectorAll(".field").length === 2));
   assert.ok(document.querySelector("#copy-diagnostics"));
+
+  const themeOptions = [...document.querySelectorAll("[data-theme-option]")];
+  assert.deepEqual(themeOptions.map((button) => button.dataset.themeOption), ["system", "light", "dark"]);
+  assert.ok(themeOptions.every((button) => button.type === "button"));
 });
 
 test("history keeps destructive actions inside a capture-scoped management disclosure", async () => {
@@ -93,11 +97,63 @@ test("shared brand tokens follow the system color scheme without per-surface col
   assert.match(brandCss, /@media\s*\(prefers-color-scheme:\s*dark\)/);
   assert.match(brandCss, /--cp-on-accent:/);
   assert.match(brandCss, /--cp-warning-border:/);
+  assert.match(brandCss, /:root\[data-theme="dark"\]/);
+  assert.match(brandCss, /:root\[data-theme="light"\]/);
 
   for (const file of ["popup.css", "onboarding.css", "settings.css"]) {
     const css = await readFile(path.join(rootDir, "extension", file), "utf8");
     assert.doesNotMatch(css, /oklch\(/, `${file} must consume shared semantic color tokens`);
   }
+});
+
+test("every extension surface loads the shared appearance controller", async () => {
+  const themeScript = await readFile(path.join(rootDir, "extension", "theme.js"), "utf8");
+  assert.match(themeScript, /clipplane\.appearance/);
+  assert.match(themeScript, /Set\(\["system", "light", "dark"\]\)/);
+
+  for (const file of ["popup.html", "onboarding.html", "settings.html"]) {
+    const document = await loadDocument(`extension/${file}`);
+    assert.equal(document.querySelector('head script[src="theme.js"]')?.getAttribute("src"), "theme.js");
+  }
+});
+
+test("appearance controls apply and persist an explicit theme", async () => {
+  const [html, themeScript] = await Promise.all([
+    readFile(path.join(rootDir, "extension", "settings.html"), "utf8"),
+    readFile(path.join(rootDir, "extension", "theme.js"), "utf8")
+  ]);
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://clipplane.test/settings.html" });
+  dom.window.eval(themeScript);
+  dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+  const dark = dom.window.document.querySelector('[data-theme-option="dark"]');
+  dark.click();
+
+  assert.equal(dom.window.document.documentElement.dataset.theme, "dark");
+  assert.equal(dom.window.localStorage.getItem("clipplane.appearance"), "dark");
+  assert.equal(dark.getAttribute("aria-pressed"), "true");
+  assert.equal(dom.window.document.querySelector('[data-theme-option="system"]').getAttribute("aria-pressed"), "false");
+});
+
+test("appearance controls follow preference changes from another extension page", async () => {
+  const [html, themeScript] = await Promise.all([
+    readFile(path.join(rootDir, "extension", "settings.html"), "utf8"),
+    readFile(path.join(rootDir, "extension", "theme.js"), "utf8")
+  ]);
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://clipplane.test/settings.html" });
+  dom.window.eval(themeScript);
+  dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+  dom.window.localStorage.setItem("clipplane.appearance", "dark");
+  dom.window.dispatchEvent(new dom.window.StorageEvent("storage", {
+    key: "clipplane.appearance",
+    newValue: "dark",
+    storageArea: dom.window.localStorage
+  }));
+
+  assert.equal(dom.window.document.documentElement.dataset.theme, "dark");
+  assert.equal(dom.window.document.querySelector('[data-theme-option="dark"]').getAttribute("aria-pressed"), "true");
+  assert.equal(dom.window.document.querySelector('[data-theme-option="system"]').getAttribute("aria-pressed"), "false");
 });
 
 async function loadDocument(relativePath) {
