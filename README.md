@@ -27,7 +27,7 @@
 
 Clipplane 由浏览器扩展和本地 Native Messaging Host 组成。扩展负责捕获选区、可读正文或页面元素，本地 Host 清理内容并写入 notes 目录。每次剪藏都会先成为可追溯的本地 capture，是否交给 Agent 或同步到外部服务由你决定。
 
-当前稳定版是 `0.8.0`。macOS arm64 可以安装已签名并公证的 Host 包；Windows x64 目前从固定源码安装。Chrome Web Store 和 Edge Add-ons 尚未上架。
+当前稳定版是 `0.9.0`。macOS arm64 安装已签名并公证的 Host 包（`0.9.0` 复用 `0.8.0` 包，协议不变）；Windows x64 目前从固定源码安装。Chrome Web Store 和 Edge Add-ons 尚未上架。
 
 ## Clipplane 怎么工作
 
@@ -49,7 +49,7 @@ flowchart LR
 
 ## 安装
 
-先从 [`v0.8.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.8.0) 下载并解压 `clipplane-extension-v0.8.0.zip`。
+先从 [`v0.9.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.9.0) 下载并解压 `clipplane-extension-v0.9.0.zip`。
 
 ### macOS arm64
 
@@ -59,10 +59,10 @@ flowchart LR
 
 ### Windows x64
 
-Windows 需要 Git、Node 24.13 或更高的 Node 24 版本。Host `0.8.0` 使用下面这个经过审核的固定源码 commit：
+Windows 需要 Git、Node 24.13 或更高的 Node 24 版本。Host `0.9.0` 使用下面这个经过审核的固定源码 commit：
 
 ```powershell
-$clipplaneCommit = "ffe658b1820cafda130684f8b98b467052136426"
+$clipplaneCommit = "d4e5463aa61222f9309fc41f8b0fcea88db6cb8f"
 git clone https://github.com/KKenny0/Clipplane.git
 Set-Location .\Clipplane
 git checkout --detach $clipplaneCommit
@@ -79,7 +79,7 @@ Edge 用户把最后一行的 `chrome` 改成 `edge`。不要执行 tag 页面�
 1. 打开 `chrome://extensions` 或 `edge://extensions`。
 2. 开启 `Developer mode`。
 3. 点击 `Load unpacked`。
-4. 选择解压后的 `clipplane-extension-v0.8.0` 目录，或源码仓库里的 `extension` 目录。
+4. 选择解压后的 `clipplane-extension-v0.9.0` 目录，或源码仓库里的 `extension` 目录。
 5. 确认扩展 ID 是 `emacefnmbogjdcblglmipolnickjnmbl`。
 
 打开 Clipplane 弹窗，状态显示 `Ready` 即可开始使用。从源码安装时也可以运行：

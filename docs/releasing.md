@@ -4,10 +4,10 @@
 
 ## 当前发行边界
 
-稳定版 `0.8.0` 使用 Host 协议 3，活动 Inbox 为 Markdown。
+稳定版 `0.9.0` 使用 Host 协议 3，活动 Inbox 为 Markdown。
 
-- GitHub Release 的 `clipplane-extension-v0.8.0.zip` 保留公开身份 key，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
-- macOS arm64 的 Host `0.8.0` 包已经签名、公证并 stapled。immutable `v0.8.0` release 固定 SHA-256 `1f714c…9521c` 和 Apple Team ID `S7V7CK2G9T`。
+- GitHub Release 的 `clipplane-extension-v0.9.0.zip` 保留公开身份 key，canonical extension ID 为 `emacefnmbogjdcblglmipolnickjnmbl`。
+- macOS arm64 的 Host 包已经签名、公证并 stapled；扩展 `0.9.0` 复用 `0.8.0` 包。immutable `v0.8.0` release 固定 SHA-256 `1f714c…9521c` 和 Apple Team ID `S7V7CK2G9T`。
 - Windows 没有公开二进制安装器，普通用户从 README 中记录的完整 commit SHA 安装。
 - Chrome Web Store 和 Edge Add-ons 尚未上架。
 

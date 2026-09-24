@@ -27,7 +27,7 @@
 
 Clipplane combines a browser extension with a local Native Messaging Host. The extension captures a selection, readable page, or chosen element. The local Host cleans it into Markdown and writes it to your notes folder. Every clip becomes a traceable local capture before you decide whether to process it, hand it to an Agent, or sync it elsewhere.
 
-The current stable release is `0.8.0`. macOS arm64 has a signed and notarized Host package. Windows x64 currently installs the Host from pinned source. Clipplane is not yet available through Chrome Web Store or Edge Add-ons.
+The current stable release is `0.9.0`. macOS arm64 installs the signed and notarized Host package (`0.9.0` reuses the `0.8.0` package; the protocol is unchanged). Windows x64 currently installs the Host from pinned source. Clipplane is not yet available through Chrome Web Store or Edge Add-ons.
 
 ## How Clipplane works
 
@@ -49,7 +49,7 @@ The full capture is written locally before any external sync attempt. Saving and
 
 ## Install
 
-Download and extract `clipplane-extension-v0.8.0.zip` from the [`v0.8.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.8.0).
+Download and extract `clipplane-extension-v0.9.0.zip` from the [`v0.9.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.9.0).
 
 ### macOS arm64
 
@@ -59,10 +59,10 @@ Download and extract `clipplane-extension-v0.8.0.zip` from the [`v0.8.0` Release
 
 ### Windows x64
 
-Windows requires Git and Node 24.13 or later in the Node 24 line. Host `0.8.0` uses this reviewed source commit:
+Windows requires Git and Node 24.13 or later in the Node 24 line. Host `0.9.0` uses this reviewed source commit:
 
 ```powershell
-$clipplaneCommit = "ffe658b1820cafda130684f8b98b467052136426"
+$clipplaneCommit = "d4e5463aa61222f9309fc41f8b0fcea88db6cb8f"
 git clone https://github.com/KKenny0/Clipplane.git
 Set-Location .\Clipplane
 git checkout --detach $clipplaneCommit
@@ -79,7 +79,7 @@ For Edge, change `chrome` on the last line to `edge`. Do not execute the automat
 1. Open `chrome://extensions` or `edge://extensions`.
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
-4. Select the extracted `clipplane-extension-v0.8.0` folder, or the source repository's `extension` folder.
+4. Select the extracted `clipplane-extension-v0.9.0` folder, or the source repository's `extension` folder.
 5. Confirm that the extension ID is `emacefnmbogjdcblglmipolnickjnmbl`.
 
 Open the Clipplane popup. A `Ready` status means the installation works. From a source checkout, you can also run:

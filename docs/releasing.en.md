@@ -4,10 +4,10 @@ This maintainer document records the release constraints for the browser extensi
 
 ## Current distribution boundary
 
-Stable release `0.8.0` uses Host protocol 3 and a Markdown active Inbox.
+Stable release `0.9.0` uses Host protocol 3 and a Markdown active Inbox.
 
-- The GitHub Release asset `clipplane-extension-v0.8.0.zip` keeps the public identity key and canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
-- The macOS arm64 Host `0.8.0` package is signed, notarized, and stapled. The immutable `v0.8.0` release pins SHA-256 `1f714c…9521c` and Apple Team ID `S7V7CK2G9T`.
+- The GitHub Release asset `clipplane-extension-v0.9.0.zip` keeps the public identity key and canonical extension ID `emacefnmbogjdcblglmipolnickjnmbl`.
+- The macOS arm64 Host package is signed, notarized, and stapled; extension `0.9.0` reuses the `0.8.0` package. The immutable `v0.8.0` release pins SHA-256 `1f714c…9521c` and Apple Team ID `S7V7CK2G9T`.
 - Windows has no public binary installer. Users install from the full commit SHA documented in the README.
 - Clipplane is not yet available through Chrome Web Store or Edge Add-ons.
 
