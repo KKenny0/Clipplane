@@ -52,6 +52,17 @@ ledger.applySyncResults(id, results) → { capture }       // 统一执行 lifec
 - background.js 的转发列表与 host-protocol 的门控集从副本派生。
 - 新增消息类型只改词汇表一处（host 分发表加 handler 是新增能力，非定义同步）。
 
+## 扩展页面模块（extension/src/）
+
+- **Host link（主机链接）** `host-link.js` —— `createHostLink({ sendMessage }).send(message) → { response, problem }`；
+  problem = null | host-outdated | host-unavailable | unsupported | failed，失败分类的唯一权威。
+- **History view（历史视图）** `history-view.js` —— 捕获轨迹的全部 UX（加载、渲染、六种行内动作、
+  confirm 对话框、管理菜单、过滤模式）在一个 interface 后面；hostLink/confirm/notify/
+  onHostUnavailable/hostAvailable 全部注入，jsdom 可直接驱动。
+- **Settings form（设置表单）** `settings-form.js` —— 字段渲染、存储/同步保存流、consent 状态；
+  失败抛出，由页面统一呈现。
+- `settings.js` —— 剩余为组合层：Tab 骨架、反馈原语、主机面板、诊断。
+
 ## 相邻模块
 
 - `clip-core.mjs` — payload 纯函数（normalizePayload / cleanCapturedMarkdown）+ 响应组装；classifyTags 与 contentHash 是 ledger 的 implementation（classifyTags 导出供测试）。
