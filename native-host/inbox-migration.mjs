@@ -29,7 +29,7 @@ export async function prepareCaptureStorage(paths, options = {}) {
         "Both inbox.md and inbox.org exist. Clipplane will not choose or overwrite either file."
       );
     }
-    if (!await filesEqual(paths.legacyInboxPath, paths.legacyInboxBackupPath)) {
+    if (!await filesEqualIgnoringLineEndings(paths.legacyInboxPath, paths.legacyInboxBackupPath)) {
       throw migrationError("legacy_inbox_changed", "inbox.org differs from the archived migration source. Review both Inbox formats before continuing.");
     }
     parseMarkdownInbox(await fs.readFile(paths.inboxPath, "utf8"));
@@ -48,7 +48,7 @@ export async function prepareCaptureStorage(paths, options = {}) {
   if (legacyExists) {
     if (backupExists
       && store.entries.every((entry) => !entry.record || isCurrentCaptureRecord(entry.record))
-      && (store.entries.some((entry) => entry.record) || await filesEqual(paths.legacyInboxPath, paths.legacyInboxBackupPath))) {
+      && (store.entries.some((entry) => entry.record) || await filesEqualIgnoringLineEndings(paths.legacyInboxPath, paths.legacyInboxBackupPath))) {
       await rebuildMarkdownInboxFromCurrentRecords(paths, store);
       return { migrated: false, archivePresent: true };
     }
@@ -230,6 +230,9 @@ export async function publishMarkdownMigration(sourcePath, inboxPath, temporary,
   }
 }
 
+// Intentionally byte-exact: a same-moment race guard (the publish window and
+// body upgrades verify a file that was read moments earlier), not a drift
+// guard. Line-ending tolerance belongs only to the retained-legacy check.
 async function fileContentsEqual(filePath, expected) {
   try {
     return await fs.readFile(filePath, "utf8") === expected;
@@ -249,6 +252,10 @@ async function createImmutableBackup(backupPath, body, conflictCode) {
     if (error.code !== "EEXIST") {
       throw error;
     }
+    // Intentionally byte-exact: `body` was read from the same source moments
+    // earlier in this run, and the backup is the immutable forensic reference
+    // Clipplane manages under .clipplane/. The EOL-tolerant drift check on the
+    // user-vault inbox.org lives in prepareCaptureStorage.
     if (await fs.readFile(backupPath, "utf8") !== body) {
       throw migrationError(conflictCode, `The existing migration backup has different content: ${path.basename(backupPath)}`);
     }
@@ -384,8 +391,18 @@ async function upgradeCaptureRecords(capturesPath) {
   return true;
 }
 
-async function filesEqual(first, second) {
-  return await fs.readFile(first, "utf8") === await fs.readFile(second, "utf8");
+// This is a months-later drift guard on a user-vault file the host never writes.
+// External editors or git (core.autocrlf) may rewrite inbox.org line endings
+// without changing content, so compare the way the parser reads: the legacy
+// parser is EOL-agnostic (split(/\r?\n/)). Real content changes must still
+// fail this check. Same-moment race guards elsewhere stay byte-exact.
+async function filesEqualIgnoringLineEndings(first, second) {
+  const [left, right] = await Promise.all([fs.readFile(first, "utf8"), fs.readFile(second, "utf8")]);
+  return normalizeLineEndings(left) === normalizeLineEndings(right);
+}
+
+function normalizeLineEndings(text) {
+  return text.replace(/\r\n/g, "\n");
 }
 
 async function fileExists(file) {

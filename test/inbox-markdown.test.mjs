@@ -297,6 +297,80 @@ test("a failed publish cannot make a changed Org source look migrated on retry",
   await assert.rejects(prepareCaptureStorage(paths), (error) => error.code === "legacy_inbox_changed");
 });
 
+test("retained legacy inbox tolerates an external line-ending rewrite", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-eol-retained-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const lines = [
+    "#+title: Inbox",
+    "",
+    "* Managed capture",
+    ":PROPERTIES:",
+    ":CAPTURE_ID: legacy-one",
+    ":END:",
+    "",
+    "Legacy body"
+  ];
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxBackupPath, `${lines.join("\r\n")}\r\n`, "utf8");
+  await fs.writeFile(paths.legacyInboxPath, `${lines.join("\n")}\n`, "utf8");
+  await ensureMarkdownInbox(paths.inboxPath);
+  const inboxBefore = await fs.readFile(paths.inboxPath, "utf8");
+
+  const result = await prepareCaptureStorage(paths);
+
+  assert.equal(result.migrated, false);
+  assert.equal(result.legacyRetained, true);
+  assert.equal(await fs.readFile(paths.inboxPath, "utf8"), inboxBefore);
+});
+
+test("retained legacy inbox still refuses a real content change", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-eol-retained-change-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const lines = [
+    "#+title: Inbox",
+    "",
+    "* Managed capture",
+    ":PROPERTIES:",
+    ":CAPTURE_ID: legacy-one",
+    ":END:",
+    "",
+    "Legacy body"
+  ];
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxBackupPath, `${lines.join("\r\n")}\r\n`, "utf8");
+  lines[lines.length - 1] = "Tampered body";
+  await fs.writeFile(paths.legacyInboxPath, `${lines.join("\r\n")}\r\n`, "utf8");
+  await ensureMarkdownInbox(paths.inboxPath);
+
+  await assert.rejects(prepareCaptureStorage(paths), (error) => error.code === "legacy_inbox_changed");
+});
+
+test("legacy-only startup with rewritten line endings rebuilds without re-migrating", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-eol-legacy-only-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const lines = [
+    "#+title: Inbox",
+    "",
+    "* Managed capture",
+    ":PROPERTIES:",
+    ":CAPTURE_ID: legacy-one",
+    ":END:",
+    "",
+    "Legacy body"
+  ];
+  await fs.mkdir(path.dirname(paths.legacyInboxBackupPath), { recursive: true });
+  await fs.writeFile(paths.legacyInboxBackupPath, `${lines.join("\r\n")}\r\n`, "utf8");
+  const rewritten = `${lines.join("\n")}\n`;
+  await fs.writeFile(paths.legacyInboxPath, rewritten, "utf8");
+
+  const result = await prepareCaptureStorage(paths);
+
+  assert.equal(result.migrated, false);
+  assert.equal(result.archivePresent, true);
+  assert.match(await fs.readFile(paths.inboxPath, "utf8"), /^# Inbox/);
+  assert.equal(await fs.readFile(paths.legacyInboxPath, "utf8"), rewritten);
+});
+
 test("future schemas are rejected before legacy files are changed", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-future-migration-"));
   const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });

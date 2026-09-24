@@ -174,6 +174,8 @@ export async function atomicWrite(filePath, body, options = {}) {
   try {
     await fs.writeFile(tempPath, body, { encoding: "utf8", mode, flag: "wx" });
     await fs.chmod(tempPath, mode);
+    // Intentionally byte-exact: expectedBody is a same-moment race guard
+    // against concurrent edits, not a line-ending drift guard.
     if (options.expectedBody !== undefined && await fs.readFile(filePath, "utf8") !== options.expectedBody) {
       throw inboxError("inbox_changed", "inbox.md changed during an update. Review it and try again.");
     }
