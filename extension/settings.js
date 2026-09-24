@@ -1,8 +1,6 @@
 import {
   copySetupCommand,
   getSetupCommand,
-  isHostUnavailable,
-  isHostOutdated,
   openOnboarding,
   openSetupGuide,
   safeErrorMessage
@@ -11,6 +9,9 @@ import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
 import { historyActionDisabled } from "./src/history-actions.js";
 import { getUiState, nextTabIndex, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 import { browserLabel, buildDiagnostics } from "./src/diagnostics.js";
+import { createHostLink } from "./src/host-link.js";
+
+const hostLink = createHostLink();
 
 const stateEl = document.querySelector("#settings-state");
 const resultEl = document.querySelector("#result");
@@ -103,25 +104,25 @@ async function loadSettings() {
   setBusy(true, "Loading");
   let loaded = false;
   try {
-    const hostStatus = await sendNative({ type: "status" });
-    if (!hostStatus.ok) {
-      if (isHostUnavailable(hostStatus) || isHostOutdated(hostStatus)) {
-        renderHostUnavailable(isHostOutdated(hostStatus));
-        return;
-      }
-      throw new Error(hostStatus.error?.message || "Could not check the local Host.");
+    const status = await hostLink.send({ type: "status" });
+    if (status.problem === "host-outdated" || status.problem === "host-unavailable") {
+      renderHostUnavailable(status.problem === "host-outdated");
+      return;
     }
-    const response = await sendNative({ type: "get_config" });
-    if (!response.ok) {
-      if (isHostUnavailable(response) || isHostOutdated(response)) {
-        renderHostUnavailable(isHostOutdated(response));
-        return;
-      }
-      throw new Error(response.error?.message || "Could not load settings.");
+    if (status.problem) {
+      throw new Error(status.response.error?.message || "Could not check the local Host.");
+    }
+    const response = await hostLink.send({ type: "get_config" });
+    if (response.problem === "host-outdated" || response.problem === "host-unavailable") {
+      renderHostUnavailable(response.problem === "host-outdated");
+      return;
+    }
+    if (response.problem) {
+      throw new Error(response.response.error?.message || "Could not load settings.");
     }
     hostAvailable = true;
     hostPanelEl.hidden = true;
-    renderSettings(response);
+    renderSettings(response.response);
     if (activeTab === "history") {
       await loadHistory();
     }
@@ -142,7 +143,7 @@ async function loadSettings() {
 async function saveStorage() {
   setBusy(true, "Saving");
   try {
-    const response = await sendNative({
+    const response = await hostLink.send({
       type: "set_config",
       config: {
         storage: {
@@ -150,14 +151,14 @@ async function saveStorage() {
         }
       }
     });
-    if (!response.ok) {
-      if (isHostUnavailable(response)) {
-        renderHostUnavailable();
-        throw new Error("Run local host setup, then retry.");
-      }
-      throw new Error(response.error?.message || "Could not save folder.");
+    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
+      renderHostUnavailable(response.problem === "host-outdated");
+      throw new Error("Run local host setup, then retry.");
     }
-    renderSettings(response);
+    if (response.problem) {
+      throw new Error(response.response.error?.message || "Could not save folder.");
+    }
+    renderSettings(response.response);
     showResult("Storage folder saved");
   } catch (error) {
     showResult(safeErrorMessage(error), true);
@@ -192,7 +193,7 @@ async function saveSync() {
       }
     ]);
 
-    const response = await sendNative({
+    const response = await hostLink.send({
       type: "set_config",
       config: {
         sync: { defaultSinks },
@@ -211,18 +212,18 @@ async function saveSync() {
         }
       }
     });
-    if (!response.ok) {
-      if (isHostUnavailable(response)) {
-        renderHostUnavailable();
-        throw new Error("Run local host setup, then retry.");
-      }
-      throw new Error(response.error?.message || "Could not save sync settings.");
+    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
+      renderHostUnavailable(response.problem === "host-outdated");
+      throw new Error("Run local host setup, then retry.");
+    }
+    if (response.problem) {
+      throw new Error(response.response.error?.message || "Could not save sync settings.");
     }
     fields.flomoWebhook.value = "";
     fields.notionToken.value = "";
     syncConsent = nextConsent;
     await chrome.storage.local.set({ syncConsent });
-    renderSettings(response);
+    renderSettings(response.response);
     showResult("Sync settings saved");
   } catch (error) {
     showResult(safeErrorMessage(error), true);
@@ -234,13 +235,13 @@ async function saveSync() {
 async function openFolder() {
   setBusy(true, "Opening");
   try {
-    const response = await sendNative({ type: "open_notes_dir" });
-    if (!response.ok) {
-      if (isHostUnavailable(response)) {
-        renderHostUnavailable();
-        throw new Error("Run local host setup, then retry.");
-      }
-      throw new Error(response.error?.message || "Could not open folder.");
+    const response = await hostLink.send({ type: "open_notes_dir" });
+    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
+      renderHostUnavailable(response.problem === "host-outdated");
+      throw new Error("Run local host setup, then retry.");
+    }
+    if (response.problem) {
+      throw new Error(response.response.error?.message || "Could not open folder.");
     }
     showResult("Storage folder open request sent");
   } catch (error) {
@@ -260,20 +261,20 @@ async function loadHistory() {
   historyWarningEl.hidden = true;
   historyListEl.innerHTML = '<div class="history-empty">Loading capture history</div>';
   try {
-    const response = await sendNative({ type: "history", limit: 50, lifecycle: historyMode });
-    if (!response.ok) {
-      if (isHostUnavailable(response)) {
-        renderHostUnavailable();
-        return;
-      }
-      if (isUnsupportedMessage(response)) {
-        renderHistoryUpgradeRequired();
-        return;
-      }
-      throw new Error(response.error?.message || "Could not load capture history.");
+    const response = await hostLink.send({ type: "history", limit: 50, lifecycle: historyMode });
+    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
+      renderHostUnavailable();
+      return;
     }
-    historyItems = response.history?.items || [];
-    renderHistory(response.history || { items: [], warnings: [] });
+    if (response.problem === "unsupported") {
+      renderHistoryUpgradeRequired();
+      return;
+    }
+    if (response.problem) {
+      throw new Error(response.response.error?.message || "Could not load capture history.");
+    }
+    historyItems = response.response.history?.items || [];
+    renderHistory(response.response.history || { items: [], warnings: [] });
     historyLoaded = true;
   } catch (error) {
     setStatus(historyStatusEl, "Error", "warning");
@@ -302,12 +303,12 @@ async function handleHistoryAction(event) {
   try {
     if (["copy-agent", "copy-content"].includes(button.dataset.action)) {
       const mode = button.dataset.action === "copy-agent" ? "agent-reference" : "content";
-      const response = await sendNative({ type: "copy_capture", captureId, mode });
-      if (!response.ok) {
-        if (isUnsupportedMessage(response)) {
-          throw new Error("Update the local Host to copy captures.");
-        }
-        throw new Error(response.error?.message || "Could not copy capture.");
+      const response = await hostLink.send({ type: "copy_capture", captureId, mode });
+      if (response.problem === "unsupported") {
+        throw new Error("Update the local Host to copy captures.");
+      }
+      if (response.problem) {
+        throw new Error(response.response.error?.message || "Could not copy capture.");
       }
       showResult(mode === "agent-reference"
         ? "Agent reference copied. Paste it into your Agent session."
@@ -316,18 +317,18 @@ async function handleHistoryAction(event) {
     }
 
     if (button.dataset.action === "open-body") {
-      const response = await sendNative({ type: "open_capture_body", captureId });
-      if (!response.ok) {
-        throw new Error(response.error?.message || "Could not open capture body.");
+      const response = await hostLink.send({ type: "open_capture_body", captureId });
+      if (response.problem) {
+        throw new Error(response.response.error?.message || "Could not open capture body.");
       }
       showResult("Capture open request sent");
       return;
     }
 
     if (button.dataset.action === "retry-sync") {
-      const response = await sendNative({ type: "sync", captureId });
-      if (!response.ok) {
-        throw new Error(response.error?.message || "Could not retry sync.");
+      const response = await hostLink.send({ type: "sync", captureId });
+      if (response.problem) {
+        throw new Error(response.response.error?.message || "Could not retry sync.");
       }
       showResult(syncResultMessage(response));
       await loadHistory();
@@ -342,9 +343,9 @@ async function handleHistoryAction(event) {
       if (!window.confirm(detail)) {
         return;
       }
-      const response = await sendNative({ type: "process_capture", captureId });
-      if (!response.ok) {
-        throw new Error(response.error?.message || "Could not mark capture as processed.");
+      const response = await hostLink.send({ type: "process_capture", captureId });
+      if (response.problem) {
+        throw new Error(response.response.error?.message || "Could not mark capture as processed.");
       }
       showResult("Capture marked as processed");
       await loadHistory();
@@ -355,9 +356,9 @@ async function handleHistoryAction(event) {
       if (!window.confirm("Permanently delete this local capture from inbox.md, History, and its source snapshot? Copies already sent to Notion or flomo will not be deleted.")) {
         return;
       }
-      const response = await sendNative({ type: "delete_capture", captureId });
-      if (!response.ok) {
-        throw new Error(response.error?.message || "Could not delete local capture.");
+      const response = await hostLink.send({ type: "delete_capture", captureId });
+      if (response.problem) {
+        throw new Error(response.response.error?.message || "Could not delete local capture.");
       }
       showResult("Local note permanently deleted. External copies were not changed.");
       await loadHistory();
@@ -662,17 +663,14 @@ function formatDateTime(value) {
   });
 }
 
-function sendNative(message) {
-  return chrome.runtime.sendMessage(message);
-}
-
 async function copyDiagnostics() {
   setBusy(true, "Checking");
   try {
-    const [platform, status] = await Promise.all([
+    const [platform, statusOutcome] = await Promise.all([
       chrome.runtime.getPlatformInfo(),
-      sendNative({ type: "status" })
+      hostLink.send({ type: "status" })
     ]);
+    const status = statusOutcome.response;
     const diagnostics = buildDiagnostics({
       platform,
       browser: browserLabel(navigator.userAgentData, navigator.userAgent),
@@ -896,11 +894,6 @@ async function copySetup() {
   } catch {
     showResult("Could not copy. Select the command shown above.", true);
   }
-}
-
-function isUnsupportedMessage(response) {
-  return response?.error?.code === "unknown_message"
-    || /Unsupported native host message/i.test(response?.error?.message || "");
 }
 
 function setWorkspaceState(value) {

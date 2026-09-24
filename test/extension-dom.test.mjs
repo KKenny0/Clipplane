@@ -68,7 +68,7 @@ test("history keeps destructive actions inside a capture-scoped management discl
   assert.match(script, /manage\.className = "history-manage"/);
   assert.match(script, /copyAgent\.dataset\.action = "copy-agent"/);
   assert.match(script, /copyContent\.dataset\.action = "copy-content"/);
-  assert.match(script, /sendNative\(\{ type: "copy_capture", captureId, mode \}\)/);
+  assert.match(script, /hostLink\.send\(\{ type: "copy_capture", captureId, mode \}\)/);
   assert.match(script, /manageSummary\.setAttribute\("aria-label", `Manage /);
   assert.match(script, /manageActions\.append\(remove\)/);
   assert.match(script, /actions\.append\(quickActions, manage\)/);
