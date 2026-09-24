@@ -1,13 +1,7 @@
-import { withCaptureMutationLock } from "./capture-lock.mjs";
-import { findUniqueStoreEntry, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
 import {
   ClipplaneError,
-  finishDeletingCapture,
-  finishProcessingCapture,
   openCaptureLedger
 } from "./capture-ledger.mjs";
-import { resolveConfiguredPaths } from "./config.mjs";
-import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { openTextFile, writeClipboardText } from "./settings-core.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
 
@@ -65,59 +59,20 @@ export async function copyCapture(captureId, mode, options = {}) {
 }
 
 export async function markCaptureProcessed(captureId, options = {}) {
-  const id = requireCaptureId(captureId);
-  const { paths } = await resolveConfiguredPaths(options);
-  return withCaptureMutationLock(paths, async () => {
-    await prepareCaptureStorage(paths);
-    return markCaptureProcessedLocked(id, paths);
-  });
-}
-
-async function markCaptureProcessedLocked(id, paths) {
-  const store = await readCaptureStore(paths.capturesPath);
-  const entry = findUniqueStoreEntry(store.entries, id);
-
-  if (publicLifecycleStatus(entry.record) === "processed") {
-    return lifecycleResponse(entry.record, "processed");
-  }
-
-  entry.record = {
-    ...entry.record,
-    lifecycle_status: "processing",
-    lifecycle_started_at: new Date().toISOString()
-  };
-  await writeCaptureStore(paths.capturesPath, store.entries);
-
-  const processed = await finishProcessingCapture(paths, id);
-  return lifecycleResponse(processed, "processed");
+  const ledger = await openCaptureLedger(options);
+  const { capture } = await ledger.markProcessed(captureId);
+  return lifecycleResponse(capture, "processed");
 }
 
 export async function deleteCapture(captureId, options = {}) {
-  const id = requireCaptureId(captureId);
-  const { paths } = await resolveConfiguredPaths(options);
-  return withCaptureMutationLock(paths, async () => {
-    await prepareCaptureStorage(paths);
-    return deleteCaptureLocked(id, paths);
-  });
-}
-
-async function deleteCaptureLocked(id, paths) {
-  const store = await readCaptureStore(paths.capturesPath);
-  const entry = findUniqueStoreEntry(store.entries, id);
-
-  entry.record = {
-    ...entry.record,
-    lifecycle_status: "deleting",
-    lifecycle_started_at: new Date().toISOString()
-  };
-  await writeCaptureStore(paths.capturesPath, store.entries);
-  await finishDeletingCapture(paths, id);
+  const ledger = await openCaptureLedger(options);
+  const { deletedAt } = await ledger.remove(captureId);
 
   return {
     ok: true,
-    capture_id: id,
+    capture_id: cleanString(captureId),
     lifecycle_status: "deleted",
-    deleted_at: new Date().toISOString(),
+    deleted_at: deletedAt,
     remote_copies_affected: false
   };
 }
@@ -143,10 +98,6 @@ function lifecycleResponse(record, lifecycleStatus) {
     lifecycle_status: lifecycleStatus,
     processed_at: cleanString(record.processed_at)
   };
-}
-
-function publicLifecycleStatus(record) {
-  return cleanString(record.lifecycle_status) === "processed" ? "processed" : "active";
 }
 
 function requireCaptureId(value) {

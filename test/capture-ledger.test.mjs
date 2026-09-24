@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { MAX_CAPTURE_CONTENT_BYTES, openCaptureLedger, recoverPendingCaptures } from "../native-host/capture-ledger.mjs";
-import { writeNewCaptureBody } from "../native-host/capture-record.mjs";
+import { localExportPath, writeLocalExport, writeNewCaptureBody } from "../native-host/capture-record.mjs";
 import { appendCaptureRecord, readCaptureStore } from "../native-host/capture-store.mjs";
 import { appendMarkdownInboxEntry, readMarkdownInboxIds } from "../native-host/inbox-markdown.mjs";
 import { prepareCaptureStorage } from "../native-host/inbox-migration.mjs";
@@ -181,6 +181,104 @@ test("get guards oversized bodies only when the body is requested", async () => 
     ledger.get(capture.capture_id, { withBody: true }),
     (error) => error.code === "capture_too_large"
   );
+});
+
+test("markProcessed removes the inbox entry and reports processed state", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-process-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = sampleCapture("to-process");
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Body to process");
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, "Body to process");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const first = await ledger.markProcessed(capture.capture_id);
+  const second = await ledger.markProcessed(capture.capture_id);
+
+  assert.equal(first.capture.lifecycle_status, "processed");
+  assert.ok(first.capture.processed_at);
+  assert.equal(second.capture.capture_id, capture.capture_id);
+  assert.equal((await readMarkdownInboxIds(paths.inboxPath)).has(capture.capture_id), false);
+  const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.equal(record.lifecycle_status, "processed");
+});
+
+test("remove clears the record, body, inbox entry, and local export", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-remove-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = sampleCapture("to-remove");
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Doomed body");
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, "Doomed body");
+  await writeLocalExport(paths, capture.capture_id, "{\"saved\":true}");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const { deletedAt } = await ledger.remove(capture.capture_id);
+
+  assert.ok(deletedAt);
+  const records = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.deepEqual(records, []);
+  await assert.rejects(fs.access(path.join(paths.captureBodiesDir, `${capture.capture_id}.md`)), (error) => error.code === "ENOENT");
+  await assert.rejects(fs.access(localExportPath(paths, capture.capture_id)), (error) => error.code === "ENOENT");
+  assert.equal((await readMarkdownInboxIds(paths.inboxPath)).has(capture.capture_id), false);
+});
+
+test("markProcessed self-heals a stuck processing capture through recovery", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-process-heal-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = { ...sampleCapture("stuck-process"), lifecycle_status: "processing", lifecycle_started_at: new Date().toISOString() };
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Stuck body");
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, "Stuck body");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const { capture: processed } = await ledger.markProcessed(capture.capture_id);
+
+  assert.equal(processed.capture_id, capture.capture_id);
+  assert.equal(processed.lifecycle_status, "processed");
+});
+
+test("remove self-heals a stuck deleting capture and then reports it missing", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-remove-heal-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = { ...sampleCapture("stuck-remove"), lifecycle_status: "deleting", lifecycle_started_at: new Date().toISOString() };
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Stuck body");
+  await appendMarkdownInboxEntry(paths.inboxPath, capture, "Stuck body");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  await assert.rejects(
+    ledger.remove(capture.capture_id),
+    (error) => error.code === "capture_not_found"
+  );
+  const records = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.deepEqual(records, []);
+});
+
+test("mutations refuse to run while another capture cannot be recovered", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-mutate-blocked-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const healthy = sampleCapture("healthy");
+  await appendCaptureRecord(paths.capturesPath, healthy);
+  await writeNewCaptureBody(paths, healthy.capture_id, "Healthy body");
+  const stuck = { ...sampleCapture("stuck"), lifecycle_status: "creating", lifecycle_started_at: new Date().toISOString() };
+  await appendCaptureRecord(paths.capturesPath, stuck);
+  await appendCaptureRecord(paths.capturesPath, stuck);
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  for (const operation of [() => ledger.markProcessed(healthy.capture_id), () => ledger.remove(healthy.capture_id)]) {
+    await assert.rejects(
+      operation(),
+      (error) => error.code === "lifecycle_recovery_failed"
+    );
+  }
+  const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.equal(record.capture_id, healthy.capture_id);
 });
 
 function sampleCapture(captureId) {

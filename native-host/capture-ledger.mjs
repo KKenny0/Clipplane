@@ -37,8 +37,60 @@ export async function openCaptureLedger(options = {}) {
     config,
     recoverPending: () => recoverPendingCaptures(paths),
     list: (query = {}) => listCaptures(paths, query),
-    get: (captureId, query = {}) => getCapture(paths, captureId, query)
+    get: (captureId, query = {}) => getCapture(paths, captureId, query),
+    markProcessed: (captureId) => mutateCapture(paths, () => markProcessedCapture(paths, captureId)),
+    remove: (captureId) => mutateCapture(paths, () => removeCapture(paths, captureId))
   };
+}
+
+async function mutateCapture(paths, operation) {
+  return withCaptureMutationLock(paths, async () => {
+    await prepareCaptureStorage(paths);
+    const warnings = await recoverPendingCaptures(paths);
+    if (warnings.length) {
+      throw new ClipplaneError(
+        "lifecycle_recovery_failed",
+        "A previous capture could not be recovered. Open History before trying again."
+      );
+    }
+    return operation();
+  });
+}
+
+async function markProcessedCapture(paths, captureId) {
+  const id = requireCaptureId(captureId);
+  const store = await readCaptureStore(paths.capturesPath);
+  const entry = findUniqueStoreEntry(store.entries, id);
+
+  if (publicLifecycleStatus(entry.record) === "processed") {
+    return { capture: entry.record };
+  }
+
+  entry.record = {
+    ...entry.record,
+    lifecycle_status: "processing",
+    lifecycle_started_at: new Date().toISOString()
+  };
+  await writeCaptureStore(paths.capturesPath, store.entries);
+
+  const capture = await finishProcessingCapture(paths, id);
+  return { capture };
+}
+
+async function removeCapture(paths, captureId) {
+  const id = requireCaptureId(captureId);
+  const store = await readCaptureStore(paths.capturesPath);
+  const entry = findUniqueStoreEntry(store.entries, id);
+
+  entry.record = {
+    ...entry.record,
+    lifecycle_status: "deleting",
+    lifecycle_started_at: new Date().toISOString()
+  };
+  await writeCaptureStore(paths.capturesPath, store.entries);
+  await finishDeletingCapture(paths, id);
+
+  return { deletedAt: new Date().toISOString() };
 }
 
 async function listCaptures(paths, query = {}) {
