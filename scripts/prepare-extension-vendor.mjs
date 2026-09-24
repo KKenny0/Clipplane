@@ -17,4 +17,11 @@ await copyFile(
   path.join(vendorDir, "Readability-LICENSE.md")
 );
 
-console.log("Prepared Mozilla Readability for the extension package.");
+// The host protocol vocabulary is defined once in native-host and
+// vendored into the extension so both sides load the same contract.
+await copyFile(
+  path.join(rootDir, "native-host", "host-protocol.mjs"),
+  path.join(rootDir, "extension", "src", "host-protocol.js")
+);
+
+console.log("Prepared Mozilla Readability and the Host protocol vocabulary for the extension package.");
