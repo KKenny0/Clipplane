@@ -62,7 +62,7 @@ Download and extract `clipplane-extension-v0.9.0.zip` from the [`v0.9.0` Release
 Windows requires Git and Node 24.13 or later in the Node 24 line. Host `0.9.0` uses this reviewed source commit:
 
 ```powershell
-$clipplaneCommit = "d4e5463aa61222f9309fc41f8b0fcea88db6cb8f"
+$clipplaneCommit = "1c19c56f2745e32a156f4659d93cca865f553695"
 git clone https://github.com/KKenny0/Clipplane.git
 Set-Location .\Clipplane
 git checkout --detach $clipplaneCommit

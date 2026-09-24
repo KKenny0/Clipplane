@@ -62,7 +62,7 @@ flowchart LR
 Windows 需要 Git、Node 24.13 或更高的 Node 24 版本。Host `0.9.0` 使用下面这个经过审核的固定源码 commit：
 
 ```powershell
-$clipplaneCommit = "d4e5463aa61222f9309fc41f8b0fcea88db6cb8f"
+$clipplaneCommit = "1c19c56f2745e32a156f4659d93cca865f553695"
 git clone https://github.com/KKenny0/Clipplane.git
 Set-Location .\Clipplane
 git checkout --detach $clipplaneCommit
