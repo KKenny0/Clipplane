@@ -5,12 +5,11 @@ import {
   openSetupGuide,
   safeErrorMessage
 } from "./setup-guide.js";
-import { buildSyncConsent, hasSyncConsent } from "./src/sync-consent.js";
-import { historyActionDisabled } from "./src/history-actions.js";
 import { getUiState, nextTabIndex, resolveHostUiState, stateClassName } from "./src/ui-state.js";
 import { browserLabel, buildDiagnostics } from "./src/diagnostics.js";
 import { createHostLink } from "./src/host-link.js";
 import { createHistoryView } from "./src/history-view.js";
+import { createSettingsForm } from "./src/settings-form.js";
 
 const hostLink = createHostLink();
 
@@ -60,7 +59,14 @@ const hostDependentControls = [
 ];
 let hostAvailable = true;
 let activeTab = "history";
-let syncConsent = { version: "", sinks: {} };
+
+const settingsForm = createSettingsForm({
+  elements: { fields, storageStatus: storageStatusEl, syncStatus: syncStatusEl },
+  hostLink,
+  notify: (message, isError) => showResult(message, isError),
+  onHostUnavailable: () => renderHostUnavailable(),
+  storage: chrome.storage.local
+});
 
 const historyView = createHistoryView({
   elements: {
@@ -80,14 +86,14 @@ for (const button of tabButtons) {
   button.addEventListener("click", () => setActiveTab(button.dataset.tab, { persist: true, updateHash: true }));
   button.addEventListener("keydown", handleTabKeydown);
 }
-document.querySelector("#save-storage").addEventListener("click", saveStorage);
-document.querySelector("#open-folder").addEventListener("click", openFolder);
+document.querySelector("#save-storage").addEventListener("click", () => runHostTask("Saving", () => settingsForm.saveStorage()));
+document.querySelector("#open-folder").addEventListener("click", () => runHostTask("Opening", () => settingsForm.openFolder()));
 document.querySelector("#copy-diagnostics").addEventListener("click", copyDiagnostics);
 document.querySelector("#refresh-history").addEventListener("click", () => historyView.load());
 for (const button of historyFilterButtons) {
   button.addEventListener("click", () => historyView.setMode(button.dataset.historyFilter));
 }
-document.querySelector("#save-sync").addEventListener("click", saveSync);
+document.querySelector("#save-sync").addEventListener("click", () => runHostTask("Saving", () => settingsForm.saveSync()));
 document.querySelector("#sync-form").addEventListener("submit", (event) => event.preventDefault());
 document.querySelector("#copy-setup").addEventListener("click", copySetup);
 document.querySelector("#open-guide").addEventListener("click", openSetupGuide);
@@ -103,7 +109,7 @@ window.addEventListener("hashchange", () => {
 initSettings();
 
 async function initSettings() {
-  syncConsent = (await chrome.storage.local.get("syncConsent")).syncConsent || syncConsent;
+  await settingsForm.init();
   const preferred = tabFromHash() || await loadSavedTab() || "history";
   setActiveTab(preferred, { persist: false, updateHash: false });
   await loadSettings();
@@ -131,7 +137,7 @@ async function loadSettings() {
     }
     hostAvailable = true;
     hostPanelEl.hidden = true;
-    renderSettings(response.response);
+    settingsForm.render(response.response);
     if (activeTab === "history") {
       await historyView.load();
     }
@@ -149,172 +155,8 @@ async function loadSettings() {
   }
 }
 
-async function saveStorage() {
-  setBusy(true, "Saving");
-  try {
-    const response = await hostLink.send({
-      type: "set_config",
-      config: {
-        storage: {
-          notesDir: fields.notesDir.value.trim()
-        }
-      }
-    });
-    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
-      renderHostUnavailable(response.problem === "host-outdated");
-      throw new Error("Run local host setup, then retry.");
-    }
-    if (response.problem) {
-      throw new Error(response.response.error?.message || "Could not save folder.");
-    }
-    renderSettings(response.response);
-    showResult("Storage folder saved");
-  } catch (error) {
-    showResult(safeErrorMessage(error), true);
-  } finally {
-    setBusy(false, "Ready");
-  }
-}
 
-async function saveSync() {
-  setBusy(true, "Saving");
-  try {
-    const defaultSinks = [];
-    if (fields.flomoEnabled.checked) {
-      defaultSinks.push("flomo-api");
-    }
-    if (fields.notionEnabled.checked) {
-      defaultSinks.push("notion-api");
-    }
 
-    const nextConsent = buildSyncConsent(syncConsent, [
-      {
-        sink: "flomo-api",
-        label: "flomo",
-        enabled: fields.flomoEnabled.checked,
-        confirmed: fields.flomoConsent.checked
-      },
-      {
-        sink: "notion-api",
-        label: "Notion",
-        enabled: fields.notionEnabled.checked,
-        confirmed: fields.notionConsent.checked
-      }
-    ]);
-
-    const response = await hostLink.send({
-      type: "set_config",
-      config: {
-        sync: { defaultSinks },
-        sinks: {
-          "flomo-api": {
-            enabled: fields.flomoEnabled.checked,
-            webhookUrl: fields.flomoWebhook.value.trim(),
-            tags: splitTags(fields.flomoTags.value)
-          },
-          "notion-api": {
-            enabled: fields.notionEnabled.checked,
-            parentType: "page",
-            parentId: fields.notionPage.value.trim(),
-            token: fields.notionToken.value.trim()
-          }
-        }
-      }
-    });
-    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
-      renderHostUnavailable(response.problem === "host-outdated");
-      throw new Error("Run local host setup, then retry.");
-    }
-    if (response.problem) {
-      throw new Error(response.response.error?.message || "Could not save sync settings.");
-    }
-    fields.flomoWebhook.value = "";
-    fields.notionToken.value = "";
-    syncConsent = nextConsent;
-    await chrome.storage.local.set({ syncConsent });
-    renderSettings(response.response);
-    showResult("Sync settings saved");
-  } catch (error) {
-    showResult(safeErrorMessage(error), true);
-  } finally {
-    setBusy(false, "Ready");
-  }
-}
-
-async function openFolder() {
-  setBusy(true, "Opening");
-  try {
-    const response = await hostLink.send({ type: "open_notes_dir" });
-    if (response.problem === "host-unavailable" || response.problem === "host-outdated") {
-      renderHostUnavailable(response.problem === "host-outdated");
-      throw new Error("Run local host setup, then retry.");
-    }
-    if (response.problem) {
-      throw new Error(response.response.error?.message || "Could not open folder.");
-    }
-    showResult("Storage folder open request sent");
-  } catch (error) {
-    showResult(safeErrorMessage(error), true);
-  } finally {
-    setBusy(false, "Ready");
-  }
-}
-
-function renderSettings(response) {
-  const config = response.config;
-  fields.notesDir.value = response.storage.notes_dir;
-  fields.storageNote.textContent = response.storage.using_env_override
-    ? "CLIPPLANE_NOTES_DIR is overriding this setting."
-    : `Default: ${response.storage.default_notes_dir}`;
-  setStatus(storageStatusEl, "Ready", "ready");
-
-  const flomo = config.sinks["flomo-api"];
-  fields.flomoEnabled.checked = flomo.enabled;
-  fields.flomoWebhook.placeholder = flomo.webhookConfigured ? "Webhook saved" : "https://flomoapp.com/iwh/...";
-  fields.flomoTags.value = flomo.tags.join(", ");
-  fields.flomoConsent.checked = hasSyncConsent(syncConsent, "flomo-api");
-  fields.flomoState.textContent = flomo.credentialMigrationRequired
-    ? "Webhook uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
-    : flomoReady(flomo)
-      ? fields.flomoConsent.checked ? "Ready" : "Credentials saved. Confirm external data handling to enable sync."
-      : "Paste a webhook URL to enable flomo sync.";
-
-  const notion = config.sinks["notion-api"];
-  fields.notionEnabled.checked = notion.enabled;
-  fields.notionPage.value = notion.parentId;
-  fields.notionToken.placeholder = notion.tokenConfigured ? "Token saved" : "secret_xxx";
-  fields.notionConsent.checked = hasSyncConsent(syncConsent, "notion-api");
-  fields.notionState.textContent = notion.credentialMigrationRequired
-    ? "Token uses legacy plaintext storage. Save sync settings to move it into the operating system credential store."
-    : notionReady(notion)
-      ? fields.notionConsent.checked ? "Ready" : "Credentials saved. Confirm external data handling to enable sync."
-      : "Add a page ID and integration token to enable Notion sync.";
-
-  const configuredSinks = [
-    { ready: flomoReady(flomo), consented: fields.flomoConsent.checked },
-    { ready: notionReady(notion), consented: fields.notionConsent.checked }
-  ].filter((sink) => sink.ready);
-  const approvedCount = configuredSinks.filter((sink) => sink.consented).length;
-  const syncSummary = configuredSinks.length === 0
-    ? { text: "Not configured", state: "warning" }
-    : approvedCount === configuredSinks.length
-      ? { text: `${approvedCount} ready`, state: "ready" }
-      : { text: `${configuredSinks.length} configured, ${approvedCount} approved`, state: "warning" };
-  setStatus(syncStatusEl, syncSummary.text, syncSummary.state);
-}
-
-function flomoReady(flomo) {
-  return Boolean(flomo.enabled && flomo.webhookConfigured);
-}
-
-function notionReady(notion) {
-  return Boolean(notion.enabled && notion.parentId && notion.tokenConfigured);
-}
-
-function setStatus(element, text, state) {
-  element.textContent = text;
-  element.className = `status-pill ${state ? `is-${state}` : "is-neutral"}`;
-}
 
 function setBusy(isBusy, label) {
   setWorkspaceState(isBusy ? label : (hostAvailable ? label : "Host unavailable"));
@@ -325,18 +167,22 @@ function setBusy(isBusy, label) {
   historyView.setBusy(isBusy);
 }
 
+async function runHostTask(label, task) {
+  setBusy(true, label);
+  try {
+    await task();
+  } catch (error) {
+    showResult(safeErrorMessage(error), true);
+  } finally {
+    setBusy(false, "Ready");
+  }
+}
+
 function showResult(message, isError = false) {
   resultEl.hidden = !message;
   resultMessageEl.textContent = message;
   const uiState = getUiState(isError ? "error" : "saved-local");
   resultEl.className = stateClassName("result", uiState);
-}
-
-function splitTags(value) {
-  return value
-    .split(/[,\s]+/)
-    .map((tag) => tag.replace(/^#/, "").trim())
-    .filter(Boolean);
 }
 
 async function copyDiagnostics() {
@@ -397,8 +243,7 @@ function renderHostUnavailable(outdated = false) {
   document.querySelector("#host-status").className = `status-pill is-${uiState.tone}`;
   document.querySelector("#install-host").textContent = uiState.action;
   setWorkspaceState(uiState.key);
-  setStatus(storageStatusEl, uiState.label, "warning");
-  setStatus(syncStatusEl, uiState.label, "warning");
+  settingsForm.markUnavailable(uiState.label);
   historyView.setUnavailable();
   updateHostDependentControls();
 }
