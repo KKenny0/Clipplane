@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { openCaptureLedger, recoverPendingCaptures } from "../native-host/capture-ledger.mjs";
+import { MAX_CAPTURE_CONTENT_BYTES, openCaptureLedger, recoverPendingCaptures } from "../native-host/capture-ledger.mjs";
 import { writeNewCaptureBody } from "../native-host/capture-record.mjs";
 import { appendCaptureRecord, readCaptureStore } from "../native-host/capture-store.mjs";
 import { appendMarkdownInboxEntry, readMarkdownInboxIds } from "../native-host/inbox-markdown.mjs";
@@ -113,6 +113,74 @@ test("unrecoverable records surface as lifecycle warnings instead of throwing", 
     { capture_id: capture.capture_id, code: "lifecycle_recovery_failed" },
     { capture_id: capture.capture_id, code: "lifecycle_recovery_failed" }
   ]);
+});
+
+test("list summarizes the record/body/inbox triple and normalizes the lifecycle filter", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-list-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const selection = sampleCapture("listed-selection");
+  selection.input_type = "selection";
+  selection.extraction_method = "selection";
+  const processed = { ...sampleCapture("listed-processed"), lifecycle_status: "processed", processed_at: "2026-08-12T03:00:00.000Z" };
+  await appendCaptureRecord(paths.capturesPath, selection);
+  await appendCaptureRecord(paths.capturesPath, processed);
+  await writeNewCaptureBody(paths, selection.capture_id, "# Preview\n\nSelection body text");
+  await writeNewCaptureBody(paths, processed.capture_id, "# Processed body");
+  await appendMarkdownInboxEntry(paths.inboxPath, selection, "# Preview\n\nSelection body text");
+
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+  const active = await ledger.list({ lifecycle: "bogus" });
+
+  assert.equal(active.lifecycle, "active");
+  assert.deepEqual(active.summaries.map((summary) => summary.capture_id), [selection.capture_id]);
+  const [summary] = active.summaries;
+  assert.equal(summary.inbox_state, "present");
+  assert.equal(summary.body_state, "available");
+  assert.equal(summary.content_exists, true);
+  assert.match(summary.preview, /Selection body text/);
+  assert.equal(summary.source_host, "example.com");
+
+  const processedView = await ledger.list({ lifecycle: "processed" });
+  assert.deepEqual(processedView.summaries.map((item) => item.capture_id), [processed.capture_id]);
+  assert.equal(processedView.summaries[0].lifecycle_status, "processed");
+});
+
+test("get returns the capture, its verified body path, and an optional guarded body", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-get-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = sampleCapture("gettable");
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "# Gettable body");
+
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const meta = await ledger.get(capture.capture_id);
+  assert.equal(meta.capture.title, capture.title);
+  assert.equal(meta.bodyPath, path.join(paths.captureBodiesDir, `${capture.capture_id}.md`));
+  assert.equal("body" in meta, false);
+
+  const withBody = await ledger.get(capture.capture_id, { withBody: true });
+  assert.equal(withBody.body, "# Gettable body");
+});
+
+test("get guards oversized bodies only when the body is requested", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-huge-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = sampleCapture("huge");
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "x".repeat(MAX_CAPTURE_CONTENT_BYTES + 1));
+
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const meta = await ledger.get(capture.capture_id);
+  assert.ok(meta.bodyPath);
+  await assert.rejects(
+    ledger.get(capture.capture_id, { withBody: true }),
+    (error) => error.code === "capture_too_large"
+  );
 });
 
 function sampleCapture(captureId) {

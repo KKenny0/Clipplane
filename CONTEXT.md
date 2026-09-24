@@ -27,8 +27,8 @@ openCaptureLedger(options) → ledger   // 解析 notesDir/configDir 覆盖，�
 ledger.create(payload)        → { capture, duplicate, reactivated }
 ledger.markProcessed(id)      → { capture }
 ledger.remove(id)             → { deletedAt }
-ledger.list({lifecycle,limit}) → { summaries, warnings }
-ledger.get(id)                → { capture, body }        // body 读取含尺寸守卫
+ledger.list({lifecycle,limit}) → { summaries, warnings, lifecycle }
+ledger.get(id, {withBody})     → { capture, bodyPath, body? }   // withBody 读取含尺寸守卫
 ledger.applySyncResults(id, results) → { capture }       // 统一执行 lifecycle 拒绝规则
 ```
 
