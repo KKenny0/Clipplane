@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
 import { resolveCaptureBodyForRead, withRuntimeCapturePaths } from "./capture-record.mjs";
 import { assertCaptureStoreWritable, captureRecords, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
-import { ClipplaneError } from "./clip-core.mjs";
+import { ClipplaneError } from "./capture-ledger.mjs";
 import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
 import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";

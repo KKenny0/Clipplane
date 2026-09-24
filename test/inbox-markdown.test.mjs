@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { recoverCreatingCaptures } from "../native-host/capture-creation.mjs";
 import { writeNewCaptureBody } from "../native-host/capture-record.mjs";
 import { appendCaptureRecord, readCaptureStore } from "../native-host/capture-store.mjs";
 import {
@@ -419,25 +418,6 @@ test("legacy parser rejects duplicate capture IDs", () => {
     () => parseLegacyOrgInbox(`${entry}\n${entry}`),
     (error) => error.code === "duplicate_inbox_capture"
   );
-});
-
-test("creating records recover from a body or disappear when no body was written", async () => {
-  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-create-recovery-"));
-  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
-  await prepareCaptureStorage(paths, { create: true });
-  const recoverable = { ...sampleCapture("recoverable"), lifecycle_status: "creating", lifecycle_started_at: new Date().toISOString() };
-  const empty = { ...sampleCapture("empty"), lifecycle_status: "creating", lifecycle_started_at: new Date().toISOString() };
-  await appendCaptureRecord(paths.capturesPath, recoverable);
-  await appendCaptureRecord(paths.capturesPath, empty);
-  await writeNewCaptureBody(paths, recoverable.capture_id, "Recover this body");
-
-  const warnings = await recoverCreatingCaptures(paths);
-
-  assert.deepEqual(warnings, []);
-  const records = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
-  assert.deepEqual(records.map((record) => record.capture_id), [recoverable.capture_id]);
-  assert.equal("lifecycle_status" in records[0], false);
-  assert.match(await fs.readFile(paths.inboxPath, "utf8"), /Recover this body/);
 });
 
 function sampleCapture(captureId) {

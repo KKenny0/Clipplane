@@ -293,7 +293,7 @@ test("new captures use a timestamp plus a full random UUID", async () => {
   assert.match(result.capture.capture_id, /^\d{8}T\d{6}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
-test("re-clipping refuses an unfinished processing or deleting operation", async () => {
+test("re-clipping self-heals an unfinished processing or deleting operation", async () => {
   for (const lifecycleStatus of ["processing", "deleting"]) {
     const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), `clipplane-pending-${lifecycleStatus}-`));
     const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
@@ -311,11 +311,22 @@ test("re-clipping refuses an unfinished processing or deleting operation", async
     record.lifecycle_started_at = new Date().toISOString();
     await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
 
-    await assert.rejects(
-      clipPayload(payload, { notesDir, configDir }),
-      (error) => error.code === "capture_lifecycle_pending"
-    );
-    assert.equal(await fileExists(first.capture.content_path), true);
+    const second = await clipPayload(payload, { notesDir, configDir });
+
+    assert.equal(second.ok, true);
+    const stored = (await fs.readFile(capturesPath, "utf8")).trim().split(/\n/).map((line) => JSON.parse(line));
+    if (lifecycleStatus === "processing") {
+      assert.equal(second.duplicate, true);
+      assert.equal(second.reactivated, true);
+      assert.deepEqual(stored.map((entry) => entry.capture_id), [first.capture.capture_id]);
+      assert.equal("lifecycle_status" in stored[0], false);
+      assert.equal(await fileExists(first.capture.content_path), true);
+    } else {
+      assert.equal(second.duplicate, false);
+      assert.notEqual(second.capture.capture_id, first.capture.capture_id);
+      assert.equal(await fileExists(first.capture.content_path), false);
+      assert.equal(await fileExists(second.capture.content_path), true);
+    }
   }
 });
 

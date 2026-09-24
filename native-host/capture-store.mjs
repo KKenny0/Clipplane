@@ -78,6 +78,21 @@ export async function replaceCaptureRecord(capturesPath, updated) {
   await writeCaptureStore(capturesPath, store.entries);
 }
 
+export function findUniqueStoreEntry(entries, captureId) {
+  const matches = entries.filter((entry) => entry.record && cleanString(entry.record.capture_id) === captureId);
+  if (!matches.length) {
+    const error = new Error(`Capture not found: ${captureId}`);
+    error.code = "capture_not_found";
+    throw error;
+  }
+  if (matches.length > 1) {
+    const error = new Error(`Multiple records use Capture ID: ${captureId}`);
+    error.code = "duplicate_capture_record";
+    throw error;
+  }
+  return matches[0];
+}
+
 export async function writeCaptureStore(capturesPath, entries) {
   assertCaptureStoreWritable(entries);
   await assertCaptureStorePath(capturesPath);

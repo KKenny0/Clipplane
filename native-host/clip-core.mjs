@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
-import { finishCreatingCapture, finishReactivatingCapture, recoverCaptureWrites } from "./capture-creation.mjs";
+import { finishCreatingCapture, finishReactivatingCapture } from "./capture-creation.mjs";
+import { ClipplaneError, recoverPendingCaptures } from "./capture-ledger.mjs";
 import {
   assertSupportedCaptureRecord,
   ensureCaptureBody,
@@ -43,7 +44,7 @@ export async function clipPayload(payload, options = {}) {
 
 async function clipPayloadLocked(normalized, paths) {
   await prepareCaptureStorage(paths, { create: true });
-  const recoveryWarnings = await recoverCaptureWrites(paths);
+  const recoveryWarnings = await recoverPendingCaptures(paths);
   if (recoveryWarnings.length) {
     throw new ClipplaneError("lifecycle_recovery_failed", "A previous capture could not be recovered. Open History before clipping again.");
   }
@@ -162,13 +163,7 @@ export function createContentHash(normalized) {
   return crypto.createHash("sha256").update(body).digest("hex");
 }
 
-export class ClipplaneError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.name = "ClipplaneError";
-    this.code = code;
-  }
-}
+export { ClipplaneError };
 
 function findExistingCapture(store, contentHash) {
   return captureRecords(store).find((record) => record.content_hash === contentHash) || null;
