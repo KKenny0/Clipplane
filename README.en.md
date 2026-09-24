@@ -39,7 +39,7 @@ flowchart LR
   D --> E[Clean Markdown]
   E --> F[inbox.md]
   E --> G[Capture body]
-  F --> H[Copy for Agent]
+  G --> H[Copy for Agent]
   G --> I{Explicit Save + sync}
   I --> J[Notion]
   I --> K[flomo]
@@ -53,7 +53,7 @@ Download and extract `clipplane-extension-v0.9.0.zip` from the [`v0.9.0` Release
 
 ### macOS arm64
 
-1. Download and install the signed `.pkg` from the same Release.
+1. Download and install the signed `clipplane-host-v0.8.0-macos-arm64.pkg` from the [`v0.8.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.8.0) (`0.9.0` reuses this package).
 2. Fully quit and reopen Chrome or Edge.
 3. Load the browser extension using the steps below.
 
@@ -173,6 +173,7 @@ npm run verify:store
 ```
 
 - [Advanced configuration](docs/configuration.en.md): environment variables, custom extension identity, config format, and credential storage.
+- [Domain glossary and module map](CONTEXT.md): core terms plus the capture ledger and extension page module interfaces.
 - [Release and trust chain](docs/releasing.en.md): extension identity, Host assets, signing, notarization, packaging, and installer acceptance.
 - [Privacy Policy](PRIVACY.md): local data, external sync, and credential boundaries.
 

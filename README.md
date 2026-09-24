@@ -39,7 +39,7 @@ flowchart LR
   D --> E[清理 Markdown]
   E --> F[inbox.md]
   E --> G[独立 capture body]
-  F --> H[Copy for Agent]
+  G --> H[Copy for Agent]
   G --> I{显式 Save + sync}
   I --> J[Notion]
   I --> K[flomo]
@@ -53,7 +53,7 @@ flowchart LR
 
 ### macOS arm64
 
-1. 从同一个 Release 下载并安装已签名的 `.pkg`。
+1. 从 [`v0.8.0` Release](https://github.com/KKenny0/Clipplane/releases/tag/v0.8.0) 下载并安装已签名的 `clipplane-host-v0.8.0-macos-arm64.pkg`（`0.9.0` 沿用此包）。
 2. 完全退出并重新打开 Chrome 或 Edge。
 3. 按下方步骤加载浏览器扩展。
 
@@ -173,6 +173,7 @@ npm run verify:store
 ```
 
 - [高级配置](docs/configuration.md)：环境变量、自定义扩展 ID、配置文件和凭据存储。
+- [领域词汇与模块边界](CONTEXT.md)：核心术语，以及 Capture ledger 和扩展页面模块的接口契约。
 - [发布与信任链](docs/releasing.md)：扩展身份、Host 资产、签名、公证、打包和安装器验收。
 - [隐私政策](PRIVACY.md)：本地数据、外部同步和凭据边界。
 
