@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { clipPayload, MAX_CAPTURE_CONTENT_BYTES } from "../native-host/clip-core.mjs";
+import { clipPayload } from "../native-host/clip-core.mjs";
+import { MAX_CAPTURE_CONTENT_BYTES } from "../native-host/capture-ledger.mjs";
 import {
   copyCapture,
   deleteCapture,

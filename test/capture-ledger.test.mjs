@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { MAX_CAPTURE_CONTENT_BYTES, openCaptureLedger, recoverPendingCaptures } from "../native-host/capture-ledger.mjs";
+import { MAX_CAPTURE_CONTENT_BYTES, classifyTags, openCaptureLedger, recoverPendingCaptures } from "../native-host/capture-ledger.mjs";
 import { localExportPath, writeLocalExport, writeNewCaptureBody } from "../native-host/capture-record.mjs";
 import { appendCaptureRecord, readCaptureStore } from "../native-host/capture-store.mjs";
 import { appendMarkdownInboxEntry, readMarkdownInboxIds } from "../native-host/inbox-markdown.mjs";
@@ -279,6 +279,46 @@ test("mutations refuse to run while another capture cannot be recovered", async 
   }
   const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
   assert.equal(record.capture_id, healthy.capture_id);
+});
+
+test("create writes the triple, dedupes by content hash, and reactivates processed captures", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-create-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+  const normalized = {
+    inputType: "selection",
+    extractionMethod: "selection",
+    sourceUrl: "https://example.com/article#fragment",
+    sourceTitle: "Article",
+    title: "Article",
+    contentMarkdown: "Hashed body",
+    author: "",
+    publishedAt: "",
+    description: "",
+    siteName: ""
+  };
+
+  const first = await ledger.create(normalized);
+
+  assert.equal(first.duplicate, false);
+  assert.equal(first.capture.content_hash.length, 64);
+  assert.equal(first.capture.tags.length > 0, true);
+  assert.equal((await readMarkdownInboxIds(paths.inboxPath)).get(first.capture.capture_id), 1);
+  assert.match(await fs.readFile(path.join(paths.captureBodiesDir, `${first.capture.capture_id}.md`), "utf8"), /Hashed body/);
+
+  const duplicate = await ledger.create(normalized);
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(duplicate.reactivated, false);
+  assert.equal(duplicate.capture.capture_id, first.capture.capture_id);
+
+  const processed = await ledger.markProcessed(first.capture.capture_id);
+  assert.equal(processed.capture.lifecycle_status, "processed");
+
+  const reactivated = await ledger.create(normalized);
+  assert.equal(reactivated.duplicate, true);
+  assert.equal(reactivated.reactivated, true);
+  const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.equal("lifecycle_status" in record, false);
 });
 
 function sampleCapture(captureId) {

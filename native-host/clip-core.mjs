@@ -1,101 +1,20 @@
-import crypto from "node:crypto";
-import { withCaptureMutationLock } from "./capture-lock.mjs";
-import { finishCreatingCapture, finishReactivatingCapture } from "./capture-creation.mjs";
-import { ClipplaneError, recoverPendingCaptures } from "./capture-ledger.mjs";
-import {
-  assertSupportedCaptureRecord,
-  ensureCaptureBody,
-  inspectCaptureBody,
-  withRuntimeCapturePaths,
-  writeNewCaptureBody
-} from "./capture-record.mjs";
-import {
-  appendCaptureRecord,
-  assertCaptureStoreWritable,
-  captureRecords,
-  readCaptureStore,
-  replaceCaptureRecord
-} from "./capture-store.mjs";
-import { resolveConfiguredPaths } from "./config.mjs";
-import { getDefaultPaths } from "./paths.mjs";
-import { appendMarkdownInboxEntry } from "./inbox-markdown.mjs";
-import { prepareCaptureStorage } from "./inbox-migration.mjs";
+import { ClipplaneError, openCaptureLedger } from "./capture-ledger.mjs";
+import { withRuntimeCapturePaths } from "./capture-record.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
-import { MAX_CAPTURE_DOCUMENT_BYTES, renderCaptureDocument } from "./capture-document.mjs";
 
-const TAG_RULES = [
-  { tag: "ai", patterns: [/ai\b/i, /llm/i, /agent/i, /model/i, /\u673a\u5668\u5b66\u4e60/, /\u5927\u6a21\u578b/] },
-  { tag: "tech", patterns: [/code/i, /programming/i, /software/i, /api\b/i, /\u7f16\u7a0b/, /\u4ee3\u7801/, /\u5f00\u53d1/] },
-  { tag: "biz", patterns: [/startup/i, /business/i, /market/i, /pricing/i, /\u521b\u4e1a/, /\u5546\u4e1a/, /\u6295\u8d44/] },
-  { tag: "think", patterns: [/philosophy/i, /cognition/i, /reason/i, /\u54f2\u5b66/, /\u601d\u8003/, /\u8ba4\u77e5/] },
-  { tag: "design", patterns: [/design/i, /ux\b/i, /ui\b/i, /\u8bbe\u8ba1/] },
-  { tag: "life", patterns: [/habit/i, /life/i, /health/i, /\u751f\u6d3b/, /\u4e60\u60ef/, /\u5065\u5eb7/] },
-  { tag: "read", patterns: [/book/i, /paper/i, /article/i, /reading/i, /\u8bfb\u4e66/, /\u8bba\u6587/, /\u9605\u8bfb/] }
-];
-export const MAX_CAPTURE_CONTENT_BYTES = MAX_CAPTURE_DOCUMENT_BYTES;
-
-export { getDefaultPaths };
+export { ClipplaneError };
 
 export async function clipPayload(payload, options = {}) {
-  const { paths } = await resolveConfiguredPaths(options);
   const normalized = normalizePayload(payload);
-  return withCaptureMutationLock(paths, () => clipPayloadLocked(normalized, paths));
-}
-
-async function clipPayloadLocked(normalized, paths) {
-  await prepareCaptureStorage(paths, { create: true });
-  const recoveryWarnings = await recoverPendingCaptures(paths);
-  if (recoveryWarnings.length) {
-    throw new ClipplaneError("lifecycle_recovery_failed", "A previous capture could not be recovered. Open History before clipping again.");
-  }
-  const contentHash = createContentHash(normalized);
-  const store = await readCaptureStore(paths.capturesPath);
-  assertCaptureStoreWritable(store.entries);
-  const existing = findExistingCapture(store, contentHash);
-
-  if (existing) {
-    assertSupportedCaptureRecord(existing);
-    if (["processing", "deleting"].includes(existing.lifecycle_status)) {
-      throw new ClipplaneError("capture_lifecycle_pending", "This capture has an unfinished History operation. Open History and try again.");
-    }
-    let capture = await ensureDuplicateCaptureBody(paths, existing, normalized);
-    const reactivated = capture.lifecycle_status === "processed";
-    if (reactivated) {
-      capture = await reactivateCapture(paths, capture);
-    }
-    return {
-      ok: true,
-      duplicate: true,
-      reactivated,
-      capture: withRuntimeCapturePaths(capture, paths)
-    };
-  }
-
-  const capture = await buildCapture(normalized, contentHash, paths, store);
-  const document = renderCaptureDocument(capture, normalized.contentMarkdown);
-  if (Buffer.byteLength(document, "utf8") > MAX_CAPTURE_CONTENT_BYTES) {
-    throw new ClipplaneError("capture_too_large", "This clip is too large to save safely. Try Selection or Element instead.");
-  }
-  await appendCaptureRecord(paths.capturesPath, capture);
-  await writeNewCaptureBody(paths, capture.capture_id, document);
-  await appendMarkdownInboxEntry(paths.inboxPath, capture, document);
-  const completed = await finishCreatingCapture(paths, capture.capture_id);
+  const ledger = await openCaptureLedger(options);
+  const { capture, duplicate, reactivated } = await ledger.create(normalized);
 
   return {
     ok: true,
-    duplicate: false,
-    capture: withRuntimeCapturePaths(completed, paths)
+    duplicate,
+    reactivated,
+    capture: withRuntimeCapturePaths(capture, ledger.paths)
   };
-}
-
-async function reactivateCapture(paths, capture) {
-  const pending = {
-    ...capture,
-    lifecycle_status: "reactivating",
-    lifecycle_started_at: new Date().toISOString()
-  };
-  await replaceCaptureRecord(paths.capturesPath, pending);
-  return finishReactivatingCapture(paths, capture.capture_id);
 }
 
 export function normalizePayload(payload = {}) {
@@ -105,12 +24,6 @@ export function normalizePayload(payload = {}) {
 
   if (!contentMarkdown) {
     throw new ClipplaneError("empty_content", "Nothing to clip.");
-  }
-  if (Buffer.byteLength(contentMarkdown, "utf8") > MAX_CAPTURE_CONTENT_BYTES) {
-    throw new ClipplaneError(
-      "capture_too_large",
-      "This clip is too large to save safely. Try Selection or Element instead."
-    );
   }
 
   const title = cleanTitle(stringOr(payload.title, sourceTitle));
@@ -141,121 +54,12 @@ export function cleanCapturedMarkdown(markdown) {
     .trim();
 }
 
-export function classifyTags(text) {
-  const tags = [];
-  for (const rule of TAG_RULES) {
-    if (rule.patterns.some((pattern) => pattern.test(text))) {
-      tags.push(rule.tag);
-    }
-    if (tags.length >= 2) {
-      break;
-    }
-  }
-  return tags.length ? tags : ["clip"];
-}
-
-export function createContentHash(normalized) {
-  const body = [
-    normalized.inputType,
-    normalizeUrlForHash(normalized.sourceUrl),
-    normalized.contentMarkdown.replace(/\s+/g, " ").trim()
-  ].join("\n");
-  return crypto.createHash("sha256").update(body).digest("hex");
-}
-
-export { ClipplaneError };
-
-function findExistingCapture(store, contentHash) {
-  return captureRecords(store).find((record) => record.content_hash === contentHash) || null;
-}
-
-async function ensureDuplicateCaptureBody(paths, existing, normalized) {
-  await ensureCaptureBody(paths, existing.capture_id, renderCaptureDocument(existing, normalized.contentMarkdown));
-  const updated = { ...existing };
-  await replaceCaptureRecord(paths.capturesPath, updated);
-  return updated;
-}
-
-async function buildCapture(normalized, contentHash, paths, store) {
-  const clippedAt = new Date();
-  const tags = classifyTags(`${normalized.title}\n${normalized.contentMarkdown}`);
-  const captureId = await createUniqueCaptureId(clippedAt, paths, store);
-  return {
-    capture_id: captureId,
-    source_url: normalized.sourceUrl,
-    source_title: normalized.sourceTitle,
-    title: normalized.title,
-    author: normalized.author,
-    published_at: normalized.publishedAt,
-    description: normalized.description,
-    site_name: normalized.siteName,
-    input_type: normalized.inputType,
-    extraction_method: normalized.extractionMethod,
-    clipped_at: clippedAt.toISOString(),
-    content_hash: contentHash,
-    tags,
-    lifecycle_status: "creating",
-    lifecycle_started_at: clippedAt.toISOString(),
-    sync_status: "local_saved",
-    sinks: {
-      local: { status: "saved" }
-    },
-    error: null
-  };
-}
-
-async function createUniqueCaptureId(clippedAt, paths, store) {
-  const existingIds = new Set(captureRecords(store).map((record) => record.capture_id));
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const captureId = `${formatCompactTimestamp(clippedAt)}-${crypto.randomUUID()}`;
-    if (existingIds.has(captureId)) {
-      continue;
-    }
-    const body = await inspectCaptureBody(paths, captureId);
-    if (body.state === "unsafe") {
-      throw body.error;
-    }
-    if (body.state === "missing") {
-      return captureId;
-    }
-  }
-  throw new ClipplaneError("capture_id_unavailable", "Could not allocate a unique capture ID.");
-}
-
 function cleanTitle(value) {
   const title = stringOr(value, "Untitled")
     .replace(/\s+/g, " ")
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
     .trim();
   return (title || "Untitled").slice(0, 120);
-}
-
-function formatCompactTimestamp(date) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  const sec = String(date.getSeconds()).padStart(2, "0");
-  return `${yyyy}${mm}${dd}T${hh}${min}${sec}`;
-}
-
-function normalizeUrlForHash(value) {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return value;
-  }
-}
-
-function stringOr(value, fallback) {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-function cleanMetadata(value, limit) {
-  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
 }
 
 function normalizeExtractionMethod(value, inputType) {
@@ -270,6 +74,14 @@ function normalizeExtractionMethod(value, inputType) {
     return "element";
   }
   return "fallback";
+}
+
+function stringOr(value, fallback) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function cleanMetadata(value, limit) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
 }
 
 function isCaptureBoilerplateLine(line) {

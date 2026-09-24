@@ -24,7 +24,7 @@ Interface（领域数据进出，不含 wire envelope）：
 
 ```
 openCaptureLedger(options) → ledger   // 解析 notesDir/configDir 覆盖，每条 host 消息开一个
-ledger.create(payload)        → { capture, duplicate, reactivated }
+ledger.create(normalized)  → { capture, duplicate, reactivated }  // normalized 由 clip-core 的 normalizePayload 产出
 ledger.markProcessed(id)      → { capture }
 ledger.remove(id)             → { deletedAt }
 ledger.list({lifecycle,limit}) → { summaries, warnings, lifecycle }
@@ -42,7 +42,7 @@ ledger.applySyncResults(id, results) → { capture }       // 统一执行 lifec
 
 ## 相邻模块
 
-- `clip-core.mjs` — payload 纯函数（normalize / classifyTags / contentHash）+ 响应组装。
+- `clip-core.mjs` — payload 纯函数（normalizePayload / cleanCapturedMarkdown）+ 响应组装；classifyTags 与 contentHash 是 ledger 的 implementation（classifyTags 导出供测试）。
 - `history-core.mjs` — History 视图的 wire 组装、open/copy 便利操作。
 - `sync-core.mjs` — sink 编排（notion-api / flomo-api / local-export）与 secrets，结果经 `applySyncResults` 落账。
 

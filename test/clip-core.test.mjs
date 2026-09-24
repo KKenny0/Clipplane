@@ -3,11 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { classifyTags, MAX_CAPTURE_CONTENT_BYTES } from "../native-host/capture-ledger.mjs";
 import {
-  classifyTags,
   cleanCapturedMarkdown,
   clipPayload,
-  MAX_CAPTURE_CONTENT_BYTES,
   normalizePayload
 } from "../native-host/clip-core.mjs";
 
@@ -27,7 +26,7 @@ test("normalizePayload preserves an explicit element capture method", () => {
   assert.equal(payload.extractionMethod, "element");
 });
 
-test("oversized captures fail before any local file is written", async () => {
+test("oversized captures fail before any capture is written", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-oversized-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   const payload = {
@@ -40,7 +39,12 @@ test("oversized captures fail before any local file is written", async () => {
     clipPayload(payload, { notesDir, configDir }),
     (error) => error.code === "capture_too_large" && /Selection or Element/.test(error.message)
   );
-  assert.deepEqual(await fs.readdir(notesDir), []);
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  await assert.rejects(fs.access(capturesPath), (error) => error.code === "ENOENT");
+  const captureBodiesDir = path.join(notesDir, ".clipplane", "captures");
+  await assert.rejects(fs.access(captureBodiesDir), (error) => error.code === "ENOENT");
+  const inbox = await fs.readFile(path.join(notesDir, "inbox.md"), "utf8");
+  assert.doesNotMatch(inbox, /clipplane:capture:start/);
 });
 
 test("frontmatter overhead cannot leave a record for a near-limit capture", async () => {

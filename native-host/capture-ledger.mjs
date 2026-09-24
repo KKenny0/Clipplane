@@ -1,18 +1,32 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { withCaptureMutationLock } from "./capture-lock.mjs";
-import { finishCreatingCapture, finishReactivatingCapture } from "./capture-creation.mjs";
-import { MAX_CAPTURE_DOCUMENT_BYTES, captureDocumentMarkdown } from "./capture-document.mjs";
-import { captureBodyPath, inspectCaptureBody, localExportPath, resolveCaptureBodyForRead } from "./capture-record.mjs";
 import {
+  MAX_CAPTURE_DOCUMENT_BYTES,
+  captureDocumentMarkdown,
+  renderCaptureDocument
+} from "./capture-document.mjs";
+import {
+  assertSupportedCaptureRecord,
+  captureBodyPath,
+  ensureCaptureBody,
+  inspectCaptureBody,
+  localExportPath,
+  resolveCaptureBodyForRead,
+  writeNewCaptureBody
+} from "./capture-record.mjs";
+import {
+  appendCaptureRecord,
   assertCaptureStoreWritable,
   captureRecords,
   findUniqueStoreEntry,
   readCaptureStore,
+  replaceCaptureRecord,
   writeCaptureStore
 } from "./capture-store.mjs";
 import { resolveConfiguredPaths } from "./config.mjs";
-import { readMarkdownInboxIds, removeMarkdownInboxEntry } from "./inbox-markdown.mjs";
+import { appendMarkdownInboxEntry, readMarkdownInboxIds, removeMarkdownInboxEntry } from "./inbox-markdown.mjs";
 import { prepareCaptureStorage } from "./inbox-migration.mjs";
 
 export const MAX_CAPTURE_CONTENT_BYTES = MAX_CAPTURE_DOCUMENT_BYTES;
@@ -21,6 +35,15 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const PREVIEW_LIMIT = 500;
 const LIFECYCLE_FILTERS = new Set(["active", "processed", "all"]);
+const TAG_RULES = [
+  { tag: "ai", patterns: [/ai\b/i, /llm/i, /agent/i, /model/i, /\u673a\u5668\u5b66\u4e60/, /\u5927\u6a21\u578b/] },
+  { tag: "tech", patterns: [/code/i, /programming/i, /software/i, /api\b/i, /\u7f16\u7a0b/, /\u4ee3\u7801/, /\u5f00\u53d1/] },
+  { tag: "biz", patterns: [/startup/i, /business/i, /market/i, /pricing/i, /\u521b\u4e1a/, /\u5546\u4e1a/, /\u6295\u8d44/] },
+  { tag: "think", patterns: [/philosophy/i, /cognition/i, /reason/i, /\u54f2\u5b66/, /\u601d\u8003/, /\u8ba4\u77e5/] },
+  { tag: "design", patterns: [/design/i, /ux\b/i, /ui\b/i, /\u8bbe\u8ba1/] },
+  { tag: "life", patterns: [/habit/i, /life/i, /health/i, /\u751f\u6d3b/, /\u4e60\u60ef/, /\u5065\u5eb7/] },
+  { tag: "read", patterns: [/book/i, /paper/i, /article/i, /reading/i, /\u8bfb\u4e66/, /\u8bba\u6587/, /\u9605\u8bfb/] }
+];
 
 export class ClipplaneError extends Error {
   constructor(code, message) {
@@ -36,6 +59,7 @@ export async function openCaptureLedger(options = {}) {
     paths,
     config,
     recoverPending: () => recoverPendingCaptures(paths),
+    create: (normalized) => createCapture(paths, normalized),
     list: (query = {}) => listCaptures(paths, query),
     get: (captureId, query = {}) => getCapture(paths, captureId, query),
     markProcessed: (captureId) => mutateCapture(paths, () => markProcessedCapture(paths, captureId)),
@@ -149,6 +173,155 @@ async function getCapture(paths, captureId, query = {}) {
   return result;
 }
 
+export function classifyTags(text) {
+  const tags = [];
+  for (const rule of TAG_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(text))) {
+      tags.push(rule.tag);
+    }
+    if (tags.length >= 2) {
+      break;
+    }
+  }
+  return tags.length ? tags : ["clip"];
+}
+
+function createContentHash(normalized) {
+  const body = [
+    normalized.inputType,
+    normalizeUrlForHash(normalized.sourceUrl),
+    normalized.contentMarkdown.replace(/\s+/g, " ").trim()
+  ].join("\n");
+  return crypto.createHash("sha256").update(body).digest("hex");
+}
+
+async function createCapture(paths, normalized) {
+  return withCaptureMutationLock(paths, async () => {
+    await prepareCaptureStorage(paths, { create: true });
+    const warnings = await recoverPendingCaptures(paths);
+    if (warnings.length) {
+      throw new ClipplaneError(
+        "lifecycle_recovery_failed",
+        "A previous capture could not be recovered. Open History before clipping again."
+      );
+    }
+
+    const contentHash = createContentHash(normalized);
+    const store = await readCaptureStore(paths.capturesPath);
+    assertCaptureStoreWritable(store.entries);
+    const existing = findExistingCapture(store, contentHash);
+
+    if (existing) {
+      assertSupportedCaptureRecord(existing);
+      let capture = await ensureDuplicateCaptureBody(paths, existing, normalized);
+      const reactivated = capture.lifecycle_status === "processed";
+      if (reactivated) {
+        capture = await reactivateCapture(paths, capture);
+      }
+      return { capture, duplicate: true, reactivated };
+    }
+
+    const capture = await buildCapture(normalized, contentHash, paths, store);
+    const document = renderCaptureDocument(capture, normalized.contentMarkdown);
+    if (Buffer.byteLength(document, "utf8") > MAX_CAPTURE_CONTENT_BYTES) {
+      throw new ClipplaneError("capture_too_large", "This clip is too large to save safely. Try Selection or Element instead.");
+    }
+    await appendCaptureRecord(paths.capturesPath, capture);
+    await writeNewCaptureBody(paths, capture.capture_id, document);
+    await appendMarkdownInboxEntry(paths.inboxPath, capture, document);
+    const completed = await finishCreatingCapture(paths, capture.capture_id);
+
+    return { capture: completed, duplicate: false, reactivated: false };
+  });
+}
+
+function findExistingCapture(store, contentHash) {
+  return captureRecords(store).find((record) => record.content_hash === contentHash) || null;
+}
+
+async function ensureDuplicateCaptureBody(paths, existing, normalized) {
+  await ensureCaptureBody(paths, existing.capture_id, renderCaptureDocument(existing, normalized.contentMarkdown));
+  const updated = { ...existing };
+  await replaceCaptureRecord(paths.capturesPath, updated);
+  return updated;
+}
+
+async function reactivateCapture(paths, capture) {
+  const pending = {
+    ...capture,
+    lifecycle_status: "reactivating",
+    lifecycle_started_at: new Date().toISOString()
+  };
+  await replaceCaptureRecord(paths.capturesPath, pending);
+  return finishReactivatingCapture(paths, capture.capture_id);
+}
+
+async function buildCapture(normalized, contentHash, paths, store) {
+  const clippedAt = new Date();
+  const tags = classifyTags(`${normalized.title}\n${normalized.contentMarkdown}`);
+  const captureId = await createUniqueCaptureId(clippedAt, paths, store);
+  return {
+    capture_id: captureId,
+    source_url: normalized.sourceUrl,
+    source_title: normalized.sourceTitle,
+    title: normalized.title,
+    author: normalized.author,
+    published_at: normalized.publishedAt,
+    description: normalized.description,
+    site_name: normalized.siteName,
+    input_type: normalized.inputType,
+    extraction_method: normalized.extractionMethod,
+    clipped_at: clippedAt.toISOString(),
+    content_hash: contentHash,
+    tags,
+    lifecycle_status: "creating",
+    lifecycle_started_at: clippedAt.toISOString(),
+    sync_status: "local_saved",
+    sinks: {
+      local: { status: "saved" }
+    },
+    error: null
+  };
+}
+
+async function createUniqueCaptureId(clippedAt, paths, store) {
+  const existingIds = new Set(captureRecords(store).map((record) => record.capture_id));
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const captureId = `${formatCompactTimestamp(clippedAt)}-${crypto.randomUUID()}`;
+    if (existingIds.has(captureId)) {
+      continue;
+    }
+    const body = await inspectCaptureBody(paths, captureId);
+    if (body.state === "unsafe") {
+      throw body.error;
+    }
+    if (body.state === "missing") {
+      return captureId;
+    }
+  }
+  throw new ClipplaneError("capture_id_unavailable", "Could not allocate a unique capture ID.");
+}
+
+function formatCompactTimestamp(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  const sec = String(date.getSeconds()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}T${hh}${min}${sec}`;
+}
+
+function normalizeUrlForHash(value) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 export async function recoverPendingCaptures(paths) {
   const warnings = [];
   const store = await readCaptureStore(paths.capturesPath);
@@ -175,7 +348,55 @@ export async function recoverPendingCaptures(paths) {
   return warnings;
 }
 
-export async function finishProcessingCapture(paths, captureId) {
+async function finishCreatingCapture(paths, captureId) {
+  const store = await readCaptureStore(paths.capturesPath);
+  const entry = findUniqueStoreEntry(store.entries, captureId);
+  const inspected = await inspectCaptureBody(paths, captureId);
+  if (inspected.state === "unsafe") {
+    throw inspected.error;
+  }
+  if (inspected.state === "missing") {
+    await removeMarkdownInboxEntry(paths.inboxPath, captureId);
+    await writeCaptureStore(paths.capturesPath, store.entries.filter((candidate) => candidate !== entry));
+    return null;
+  }
+
+  const markdown = await fs.readFile(inspected.path, "utf8");
+  await appendMarkdownInboxEntry(paths.inboxPath, entry.record, markdown);
+  entry.record = { ...entry.record };
+  delete entry.record.lifecycle_status;
+  delete entry.record.lifecycle_started_at;
+  await writeCaptureStore(paths.capturesPath, store.entries);
+  return entry.record;
+}
+
+async function finishReactivatingCapture(paths, captureId) {
+  const store = await readCaptureStore(paths.capturesPath);
+  const entry = findUniqueStoreEntry(store.entries, captureId);
+  const inspected = await inspectCaptureBody(paths, captureId);
+  if (inspected.state === "unsafe") {
+    throw inspected.error;
+  }
+  if (inspected.state === "missing") {
+    entry.record = { ...entry.record, lifecycle_status: "processed" };
+    delete entry.record.lifecycle_started_at;
+    await writeCaptureStore(paths.capturesPath, store.entries);
+    const error = new Error(`Capture body is missing: ${captureId}`);
+    error.code = "missing_capture_body";
+    throw error;
+  }
+
+  const markdown = await fs.readFile(inspected.path, "utf8");
+  await appendMarkdownInboxEntry(paths.inboxPath, entry.record, markdown);
+  entry.record = { ...entry.record };
+  delete entry.record.lifecycle_status;
+  delete entry.record.lifecycle_started_at;
+  delete entry.record.processed_at;
+  await writeCaptureStore(paths.capturesPath, store.entries);
+  return entry.record;
+}
+
+async function finishProcessingCapture(paths, captureId) {
   const store = await readCaptureStore(paths.capturesPath);
   const entry = findUniqueStoreEntry(store.entries, captureId);
   await removeMarkdownInboxEntry(paths.inboxPath, captureId);
@@ -189,7 +410,7 @@ export async function finishProcessingCapture(paths, captureId) {
   return entry.record;
 }
 
-export async function finishDeletingCapture(paths, captureId) {
+async function finishDeletingCapture(paths, captureId) {
   const store = await readCaptureStore(paths.capturesPath);
   const entry = findUniqueStoreEntry(store.entries, captureId);
   const contentCandidate = captureBodyPath(paths, entry.record.capture_id);
