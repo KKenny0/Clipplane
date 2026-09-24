@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as vendored from "../extension/src/host-protocol.js";
 import * as canonical from "../native-host/host-protocol.mjs";
+import { handleMessage, messageHandlers } from "../native-host/host.mjs";
 
 const { MIN_HOST_PROTOCOL, requiresCurrentHostProtocol, supportsHostProtocol } = vendored;
 
@@ -19,6 +20,23 @@ test("every capture-data mutation requires the current Host protocol", () => {
   }
   for (const type of ["status", "history", "copy_capture", "open_capture_body", "get_config", "set_config"]) {
     assert.equal(requiresCurrentHostProtocol(type), false, type);
+  }
+});
+
+test("the host dispatch table carries exactly the vocabulary's message types", () => {
+  assert.deepEqual(
+    [...messageHandlers.keys()].sort(),
+    Object.keys(canonical.HOST_MESSAGE_TYPES).sort()
+  );
+});
+
+test("unknown and prototype-spoofed message types fall through to unknown_message", async () => {
+  for (const type of ["nonsense", "__proto__", "constructor", "toString"]) {
+    const response = await handleMessage({ type });
+    assert.deepEqual(response, {
+      ok: false,
+      error: { code: "unknown_message", message: "Unsupported native host message." }
+    }, type);
   }
 });
 
