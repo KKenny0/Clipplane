@@ -76,7 +76,7 @@ test("history keeps destructive actions inside a capture-scoped management discl
   assert.match(script, /closeHistoryMenuOnEscape/);
 
   const background = await readFile(path.join(rootDir, "extension", "src", "background.js"), "utf8");
-  assert.match(background, /"copy_capture"/);
+  assert.match(background, /FORWARDED_MESSAGE_TYPES\.includes\(message\?\.type\)/);
   assert.match(background, /async function sendNative\(message\)[\s\S]*requiresCurrentHostProtocol\(message\?\.type\)[\s\S]*sendNativeUnchecked/);
 
   const popup = await readFile(path.join(rootDir, "extension", "popup.js"), "utf8");

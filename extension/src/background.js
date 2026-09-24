@@ -6,7 +6,7 @@ import {
 } from "./element-capture-state.js";
 import { canSyncStatus, hasSyncConsent } from "./sync-consent.js";
 import { capturablePage } from "./capture-policy.js";
-import { requiresCurrentHostProtocol, supportsHostProtocol } from "./host-protocol.js";
+import { FORWARDED_MESSAGE_TYPES, requiresCurrentHostProtocol, supportsHostProtocol } from "./host-protocol.js";
 
 const HOST_NAME = "com.clipplane.host";
 const PAGE_CAPTURE_FILES = ["vendor/Readability.js", "src/dom-normalizer.js", "src/page-capture.js"];
@@ -50,16 +50,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if ([
-    "get_config",
-    "set_config",
-    "open_notes_dir",
-    "history",
-    "open_capture_body",
-    "copy_capture",
-    "process_capture",
-    "delete_capture"
-  ].includes(message?.type)) {
+  if (FORWARDED_MESSAGE_TYPES.includes(message?.type)) {
     sendNative(message).then(sendResponse);
     return true;
   }
