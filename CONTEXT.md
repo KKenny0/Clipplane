@@ -40,6 +40,18 @@ ledger.applySyncResults(id, results) → { capture }       // 统一执行 lifec
 `inbox-markdown.mjs`（inbox 格式）、`inbox-migration.mjs`（迁移）、`capture-lock.mjs`（变更锁）。
 它们的测试是模块自有测试（内部 seam 测试），其中构造损坏态的手术仅限恢复场景。
 
+## Host message vocabulary（主机消息词汇表）`native-host/host-protocol.mjs`
+
+跨越扩展↔host seam 的消息类型的唯一权威定义：每个 type 一条
+`{ forwarded, gated }` 标志（两者独立，如 process_capture 同时属于两类），
+加 `MIN_HOST_PROTOCOL`。`FORWARDED_MESSAGE_TYPES` 与门控集均从词汇派生，不手写。
+
+- 正本在 native-host；`prepare-extension-vendor.mjs` 同步副本到
+  `extension/src/host-protocol.js`（入 git），测试断言两份一致。
+- `host.mjs` 的分发表（Map）运行时不依赖词汇表，键集一致性由测试断言。
+- background.js 的转发列表与 host-protocol 的门控集从副本派生。
+- 新增消息类型只改词汇表一处（host 分发表加 handler 是新增能力，非定义同步）。
+
 ## 相邻模块
 
 - `clip-core.mjs` — payload 纯函数（normalizePayload / cleanCapturedMarkdown）+ 响应组装；classifyTags 与 contentHash 是 ledger 的 implementation（classifyTags 导出供测试）。
