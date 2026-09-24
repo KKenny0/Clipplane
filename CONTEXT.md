@@ -1,0 +1,52 @@
+# CONTEXT — Clipplane 领域词汇表
+
+领域术语的唯一权威。代码、测试、评审讨论都使用这里的词。
+
+## Capture（剪藏）
+
+一次网页剪藏的完整持久状态，由**三重表示**构成，三者必须保持一致：
+
+- **Capture record** — `captures.jsonl` 中的一行 JSON 记录（schema v3），含 `lifecycle_status`、`sync_status`、tags 等元数据。
+- **Capture body** — `.clipplane/captures/<id>.md`，自包含的 Markdown 剪藏正文（capture document，带 frontmatter）。
+- **Inbox entry** — `inbox.md` 中被 `<!-- clipplane:capture:start/end -->` 标记包裹的条目，等待用户处理。
+
+## Lifecycle（生命周期）
+
+Capture record 上的状态机：`creating → active`、`reactivating → active`、`processing → processed`、`deleting → （删除）`。
+未完成转移（pending）的 capture 必须先**恢复（recover）**才能继续操作。
+
+## Capture ledger（剪藏账本）`native-host/capture-ledger.mjs`
+
+三重表示的唯一权威模块：所有对 record / body / inbox entry 的读写都经过它的动词，
+变更前的四步不变量（解析路径 → 取变更锁 → 准备存储/迁移 → 恢复 pending）全部是它的 implementation。
+
+Interface（领域数据进出，不含 wire envelope）：
+
+```
+openCaptureLedger(options) → ledger   // 解析 notesDir/configDir 覆盖，每条 host 消息开一个
+ledger.create(payload)        → { capture, duplicate, reactivated }
+ledger.markProcessed(id)      → { capture }
+ledger.remove(id)             → { deletedAt }
+ledger.list({lifecycle,limit}) → { summaries, warnings }
+ledger.get(id)                → { capture, body }        // body 读取含尺寸守卫
+ledger.applySyncResults(id, results) → { capture }       // 统一执行 lifecycle 拒绝规则
+```
+
+错误模式：`ClipplaneError`（含 code）由 ledger 抛出，`MAX_CAPTURE_CONTENT_BYTES` 是 interface 事实。
+
+## 内部 seam（只允许 ledger import）
+
+`capture-store.mjs`（JSONL）、`capture-record.mjs`（body + managed-path 校验）、
+`inbox-markdown.mjs`（inbox 格式）、`inbox-migration.mjs`（迁移）、`capture-lock.mjs`（变更锁）。
+它们的测试是模块自有测试（内部 seam 测试），其中构造损坏态的手术仅限恢复场景。
+
+## 相邻模块
+
+- `clip-core.mjs` — payload 纯函数（normalize / classifyTags / contentHash）+ 响应组装。
+- `history-core.mjs` — History 视图的 wire 组装、open/copy 便利操作。
+- `sync-core.mjs` — sink 编排（notion-api / flomo-api / local-export）与 secrets，结果经 `applySyncResults` 落账。
+
+## 架构词汇
+
+module / interface / implementation / seam / adapter / depth(deep, shallow) / leverage / locality
+沿用 codebase-design 词表，不作同义替换。
