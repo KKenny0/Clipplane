@@ -69,7 +69,7 @@ for (const relative of activePages) {
 }
 
 const setupSource = await readFile(path.join(docs, "setup/index.html"), "utf8");
-const windowsSourceCommit = "ffe658b1820cafda130684f8b98b467052136426";
+const windowsSourceCommit = "1c19c56f2745e32a156f4659d93cca865f553695";
 if (!setupSource.includes(windowsSourceCommit) || !setupSource.includes("git checkout --detach")) {
   errors.push("docs/setup/index.html: Windows source setup must pin and verify the reviewed full commit SHA.");
 }
