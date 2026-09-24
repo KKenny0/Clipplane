@@ -58,12 +58,12 @@ export async function openCaptureLedger(options = {}) {
   return {
     paths,
     config,
-    recoverPending: () => recoverPendingCaptures(paths),
     create: (normalized) => createCapture(paths, normalized),
     list: (query = {}) => listCaptures(paths, query),
     get: (captureId, query = {}) => getCapture(paths, captureId, query),
     markProcessed: (captureId) => mutateCapture(paths, () => markProcessedCapture(paths, captureId)),
-    remove: (captureId) => mutateCapture(paths, () => removeCapture(paths, captureId))
+    remove: (captureId) => mutateCapture(paths, () => removeCapture(paths, captureId)),
+    applySyncResults: (captureId, results) => mutateCapture(paths, () => applySyncResultsCapture(paths, captureId, results))
   };
 }
 
@@ -115,6 +115,40 @@ async function removeCapture(paths, captureId) {
   await finishDeletingCapture(paths, id);
 
   return { deletedAt: new Date().toISOString() };
+}
+
+async function applySyncResultsCapture(paths, captureId, results) {
+  const id = requireCaptureId(captureId);
+  const store = await readCaptureStore(paths.capturesPath);
+  const entry = findUniqueStoreEntry(store.entries, id);
+  const capture = updateCaptureSinks(entry.record, results);
+  entry.record = capture;
+  await writeCaptureStore(paths.capturesPath, store.entries);
+  return { capture };
+}
+
+function updateCaptureSinks(capture, results) {
+  const sinks = { ...(capture.sinks || {}) };
+  for (const result of results) {
+    sinks[result.sink] = {
+      status: result.status,
+      external_id: result.external_id || null,
+      external_url: result.external_url || null,
+      synced_at: result.status === "synced" ? new Date().toISOString() : null,
+      error_code: result.error_code || null,
+      last_error: result.last_error || null
+    };
+  }
+
+  const hasFailed = results.some((result) => result.status === "failed");
+  const hasSynced = results.some((result) => result.status === "synced");
+  const hasSkipped = results.some((result) => result.status === "skipped");
+
+  return {
+    ...capture,
+    sinks,
+    sync_status: hasFailed ? "sync_failed" : hasSynced ? "synced" : hasSkipped ? "sync_skipped" : capture.sync_status
+  };
 }
 
 async function listCaptures(paths, query = {}) {

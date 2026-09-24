@@ -316,3 +316,26 @@ function memorySecretStore(initial = {}) {
     }
   };
 }
+
+test("syncCapture refuses a capture whose deletion recovery finished", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-sync-stuck-deleting-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
+  const clip = await clipPayload({
+    inputType: "selection",
+    sourceUrl: "https://example.com/stuck-deleting-sync",
+    sourceTitle: "Stuck",
+    title: "Stuck",
+    contentMarkdown: "Stuck deleting body"
+  }, { notesDir, configDir });
+  const capturesPath = path.join(notesDir, ".clipplane", "captures.jsonl");
+  const record = JSON.parse((await fs.readFile(capturesPath, "utf8")).trim());
+  record.lifecycle_status = "deleting";
+  record.lifecycle_started_at = new Date().toISOString();
+  await fs.writeFile(capturesPath, `${JSON.stringify(record)}\n`, "utf8");
+
+  await assert.rejects(
+    syncCapture(clip.capture.capture_id, { notesDir, configDir, sinks: ["flomo-api"] }),
+    (error) => error.code === "capture_not_found"
+  );
+  assert.equal((await fs.readFile(capturesPath, "utf8")).trim(), "");
+});

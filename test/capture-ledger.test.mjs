@@ -10,7 +10,7 @@ import { appendMarkdownInboxEntry, readMarkdownInboxIds } from "../native-host/i
 import { prepareCaptureStorage } from "../native-host/inbox-migration.mjs";
 import { getDefaultPaths } from "../native-host/paths.mjs";
 
-test("the ledger factory resolves paths and reports a clean recovery", async () => {
+test("the ledger factory resolves paths and opens a clean view", async () => {
   const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-open-"));
   const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-"));
   await prepareCaptureStorage(getDefaultPaths(notesDir, { configDir }), { create: true });
@@ -19,7 +19,7 @@ test("the ledger factory resolves paths and reports a clean recovery", async () 
 
   assert.equal(ledger.paths.inboxPath, path.join(notesDir, "inbox.md"));
   assert.ok(ledger.config);
-  assert.deepEqual(await ledger.recoverPending(), []);
+  assert.deepEqual((await ledger.list()).summaries, []);
 });
 
 test("creating records recover from a body or disappear when no body was written", async () => {
@@ -319,6 +319,45 @@ test("create writes the triple, dedupes by content hash, and reactivates process
   assert.equal(reactivated.reactivated, true);
   const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
   assert.equal("lifecycle_status" in record, false);
+});
+
+test("applySyncResults records sink outcomes under the commit envelope", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-sync-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = sampleCapture("sync-me");
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Syncable body");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  const { capture: updated } = await ledger.applySyncResults(capture.capture_id, [
+    { sink: "flomo-api", status: "synced", external_url: "https://flomoapp.com/memo/1" },
+    { sink: "notion-api", status: "failed", error_code: "sync_failed", last_error: "no token" }
+  ]);
+
+  assert.equal(updated.sync_status, "sync_failed");
+  assert.equal(updated.sinks["flomo-api"].status, "synced");
+  assert.ok(updated.sinks["flomo-api"].synced_at);
+  assert.equal(updated.sinks["notion-api"].error_code, "sync_failed");
+  const [record] = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.equal(record.sinks["flomo-api"].status, "synced");
+});
+
+test("applySyncResults refuses a capture whose deletion recovery finished", async () => {
+  const notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-ledger-sync-heal-"));
+  const paths = getDefaultPaths(notesDir, { configDir: await fs.mkdtemp(path.join(os.tmpdir(), "clipplane-config-")) });
+  await prepareCaptureStorage(paths, { create: true });
+  const capture = { ...sampleCapture("stuck-sync"), lifecycle_status: "deleting", lifecycle_started_at: new Date().toISOString() };
+  await appendCaptureRecord(paths.capturesPath, capture);
+  await writeNewCaptureBody(paths, capture.capture_id, "Body");
+  const ledger = await openCaptureLedger({ notesDir, configDir: paths.appConfigDir });
+
+  await assert.rejects(
+    ledger.applySyncResults(capture.capture_id, [{ sink: "flomo-api", status: "synced" }]),
+    (error) => error.code === "capture_not_found"
+  );
+  const records = (await readCaptureStore(paths.capturesPath)).entries.filter((entry) => entry.record).map((entry) => entry.record);
+  assert.deepEqual(records, []);
 });
 
 function sampleCapture(captureId) {

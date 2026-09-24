@@ -2,8 +2,6 @@ import { ClipplaneError, openCaptureLedger } from "./capture-ledger.mjs";
 import { withRuntimeCapturePaths } from "./capture-record.mjs";
 import { sanitizeSourceUrl } from "./url-sanitizer.mjs";
 
-export { ClipplaneError };
-
 export async function clipPayload(payload, options = {}) {
   const normalized = normalizePayload(payload);
   const ledger = await openCaptureLedger(options);

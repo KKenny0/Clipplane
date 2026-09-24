@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { clipPayload, ClipplaneError } from "./clip-core.mjs";
+import { clipPayload } from "./clip-core.mjs";
+import { ClipplaneError } from "./capture-ledger.mjs";
 import {
   copyCapture,
   deleteCapture,

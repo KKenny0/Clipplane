@@ -1,10 +1,6 @@
-import fs from "node:fs/promises";
-import { withCaptureMutationLock } from "./capture-lock.mjs";
-import { resolveCaptureBodyForRead, withRuntimeCapturePaths } from "./capture-record.mjs";
-import { assertCaptureStoreWritable, captureRecords, readCaptureStore, writeCaptureStore } from "./capture-store.mjs";
-import { ClipplaneError } from "./capture-ledger.mjs";
+import { openCaptureLedger } from "./capture-ledger.mjs";
+import { withRuntimeCapturePaths } from "./capture-record.mjs";
 import { configuredExternalSinks, getSecretStatus, resolveConfiguredPaths, resolveSyncSecrets } from "./config.mjs";
-import { prepareCaptureStorage } from "./inbox-migration.mjs";
 import { syncFlomoApi } from "./sinks/flomo-api.mjs";
 import { syncLocalExport } from "./sinks/local-export.mjs";
 import { syncNotionApi } from "./sinks/notion-api.mjs";
@@ -62,23 +58,10 @@ export async function syncClipResult(clipResult, options = {}) {
 }
 
 export async function syncCapture(captureId, options = {}) {
-  const { paths, config } = await resolveConfiguredPaths(options);
-  return withCaptureMutationLock(paths, () => syncCaptureLocked(captureId, options, paths, config));
-}
-
-async function syncCaptureLocked(captureId, options, paths, config) {
-  await prepareCaptureStorage(paths);
-  const store = await readCaptureStore(paths.capturesPath);
-  assertCaptureStoreWritable(store.entries);
-  const records = captureRecords(store);
-  const index = records.findIndex((record) => record.capture_id === captureId);
-
-  if (index < 0) {
-    throw new ClipplaneError("capture_not_found", `Capture not found: ${captureId}`);
-  }
-
-  const capture = records[index];
-  const markdown = await readCaptureMarkdown(capture, paths);
+  const ledger = await openCaptureLedger(options);
+  const { capture, body } = await ledger.get(captureId, { withBody: true });
+  const markdown = captureDocumentMarkdown(body, capture.capture_id);
+  const config = ledger.config;
   const sinkNames = chooseSinkNames(options.sinks, config);
   const secrets = sinkNames.some((name) => name === "notion-api" || name === "flomo-api")
     ? await resolveSyncSecrets(config, options)
@@ -91,7 +74,7 @@ async function syncCaptureLocked(captureId, options, paths, config) {
       status: "no_sinks",
       requested: [],
       results,
-      capture: withRuntimeCapturePaths(capture, paths)
+      capture: withRuntimeCapturePaths(capture, ledger.paths)
     };
   }
 
@@ -112,7 +95,7 @@ async function syncCaptureLocked(captureId, options, paths, config) {
         markdown,
         config,
         secrets,
-        paths,
+        paths: ledger.paths,
         fetchImpl: options.fetchImpl
       });
       results.push(markResult(sinkName, result));
@@ -125,17 +108,14 @@ async function syncCaptureLocked(captureId, options, paths, config) {
     }
   }
 
-  const updatedCapture = updateCaptureSinks(capture, results);
-  const entry = store.entries.find((candidate) => candidate.record === capture);
-  entry.record = updatedCapture;
-  await writeCaptureStore(paths.capturesPath, store.entries);
+  const { capture: updatedCapture } = await ledger.applySyncResults(capture.capture_id, results);
 
   return {
     ok: true,
     status: updatedCapture.sync_status,
     requested: sinkNames,
     results,
-    capture: withRuntimeCapturePaths(updatedCapture, paths)
+    capture: withRuntimeCapturePaths(updatedCapture, ledger.paths)
   };
 }
 
@@ -149,34 +129,6 @@ export function chooseSinkNames(requested, config) {
   }
 
   return configuredExternalSinks(config);
-}
-
-async function readCaptureMarkdown(capture, paths) {
-  return captureDocumentMarkdown(await fs.readFile(await resolveCaptureBodyForRead(paths, capture.capture_id), "utf8"), capture.capture_id);
-}
-
-function updateCaptureSinks(capture, results) {
-  const sinks = { ...(capture.sinks || {}) };
-  for (const result of results) {
-    sinks[result.sink] = {
-      status: result.status,
-      external_id: result.external_id || null,
-      external_url: result.external_url || null,
-      synced_at: result.status === "synced" ? new Date().toISOString() : null,
-      error_code: result.error_code || null,
-      last_error: result.last_error || null
-    };
-  }
-
-  const hasFailed = results.some((result) => result.status === "failed");
-  const hasSynced = results.some((result) => result.status === "synced");
-  const hasSkipped = results.some((result) => result.status === "skipped");
-
-  return {
-    ...capture,
-    sinks,
-    sync_status: hasFailed ? "sync_failed" : hasSynced ? "synced" : hasSkipped ? "sync_skipped" : capture.sync_status
-  };
 }
 
 function markResult(sink, result) {
