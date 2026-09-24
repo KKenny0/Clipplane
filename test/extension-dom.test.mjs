@@ -64,11 +64,11 @@ test("settings follows tab and keyboard accessibility structure", async () => {
 });
 
 test("history keeps destructive actions inside a capture-scoped management disclosure", async () => {
-  const script = await readFile(path.join(rootDir, "extension", "settings.js"), "utf8");
+  const script = await readFile(path.join(rootDir, "extension", "src", "history-view.js"), "utf8");
   assert.match(script, /manage\.className = "history-manage"/);
   assert.match(script, /copyAgent\.dataset\.action = "copy-agent"/);
   assert.match(script, /copyContent\.dataset\.action = "copy-content"/);
-  assert.match(script, /hostLink\.send\(\{ type: "copy_capture", captureId, mode \}\)/);
+  assert.match(script, /hostLink\.send\(\{ type: "copy_capture", captureId, mode: copyMode \}\)/);
   assert.match(script, /manageSummary\.setAttribute\("aria-label", `Manage /);
   assert.match(script, /manageActions\.append\(remove\)/);
   assert.match(script, /actions\.append\(quickActions, manage\)/);
