@@ -1,6 +1,6 @@
 {
   "name": "clipplane",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Browser clipper that turns web pages and selections into inspectable local Markdown captures.",
