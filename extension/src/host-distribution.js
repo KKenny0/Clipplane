@@ -1,5 +1,7 @@
 const RELEASES_BASE = "https://github.com/KKenny0/Clipplane/releases/download";
-const PUBLISHED_HOST_RELEASES = new Map([
+// Exported for the cross-field consistency test: every future entry
+// must keep asset version === hostVersion and stay newest-first.
+export const PUBLISHED_HOST_RELEASES = new Map([
   ["mac:arm64:0.8.0", Object.freeze({
     releaseTag: "v0.8.0",
     asset: "clipplane-host-v0.8.0-macos-arm64.pkg",
@@ -8,6 +10,11 @@ const PUBLISHED_HOST_RELEASES = new Map([
     appleTeamId: "S7V7CK2G9T"
   })],
   ["mac:arm64:0.7.7", Object.freeze({
+    // Extension 0.7.7 deliberately reused the 0.7.6 Host package: the
+    // immutable v0.7.7 release republished that asset. The asset version
+    // still equals hostVersion, which is the invariant the consistency
+    // test enforces; the key may differ when the extension and Host
+    // versions move independently.
     releaseTag: "v0.7.7",
     asset: "clipplane-host-v0.7.6-macos-arm64.pkg",
     hostVersion: "0.7.6",

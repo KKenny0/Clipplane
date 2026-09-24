@@ -1,6 +1,40 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getHostAsset, getHostDownloadUrl, getHostRelease } from "../extension/src/host-distribution.js";
+import { getHostAsset, getHostDownloadUrl, getHostRelease, PUBLISHED_HOST_RELEASES } from "../extension/src/host-distribution.js";
+
+const versionParts = (value) => value.split(".").map(Number);
+const compareVersions = (left, right) => left.map((part, index) => part - right[index]).find((delta) => delta !== 0) || 0;
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+test("every pinned Host release stays internally consistent", () => {
+  const entries = [...PUBLISHED_HOST_RELEASES.entries()];
+  assert.ok(entries.length > 0, "the pin table must never be empty");
+
+  const keys = entries.map(([key]) => key);
+  for (const [index, key] of keys.entries()) {
+    assert.match(key, /^mac:arm64:\d+\.\d+\.\d+$/, `${key} has a well-formed platform key`);
+    if (index > 0) {
+      assert.ok(
+        compareVersions(versionParts(keys[index - 1].split(":")[2]), versionParts(key.split(":")[2])) > 0,
+        `${keys[index - 1]} must list before the older ${key}`
+      );
+    }
+  }
+
+  for (const [key, release] of entries) {
+    const note = `${key} → ${release.asset}`;
+    assert.match(release.releaseTag, /^v\d+\.\d+\.\d+$/, `${note}: release tag format`);
+    assert.match(
+      release.asset,
+      new RegExp(`^clipplane-host-v${escapeRegExp(release.hostVersion)}-macos-arm64\\.pkg$`),
+      `${note}: the asset users download must be the version the entry claims`
+    );
+    assert.ok(getHostRelease(...key.split(":")), `${note}: the identity validator accepts the entry`);
+  }
+});
 
 test("unpublished Host installers never produce public download links", () => {
   assert.equal(getHostAsset("win", "x86-64", "0.5.0"), null);
